@@ -1,5 +1,5 @@
 {
-  "name": "starter-workspace",
+  "name": "infra-kit-monorepo",
   "version": "1.0.0",
   "type": "module",
   "private": true,
