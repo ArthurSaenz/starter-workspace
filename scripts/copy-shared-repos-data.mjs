@@ -7,7 +7,7 @@ const execFn = util.promisify(exec)
 
 const PROJECT_ROOT = join(process.env.HOME, 'projects')
 const WORKSPACE_ROOT = join(PROJECT_ROOT, 'starter-workspace')
-const TARGET_REPOS = ['travelist-monorepo', 'hulyo-monorepo', 'sandbox-workspace']
+const TARGET_REPOS = ['travelist-monorepo', 'hulyo-monorepo', 'sandbox-workspace', 'infra-kit']
 
 const EXCLUDED_PATTERNS = ['node_modules', 'dist', '*.tsbuildinfo', '.turbo', '.eslintcache']
 
@@ -132,6 +132,54 @@ const COPY_CONFIG = [
     source: 'devops/scripts/lib',
     target: 'devops/scripts/lib',
     type: 'directory',
+  },
+  {
+    name: 'Lib BE Dev',
+    source: 'packages/lib-be-dev',
+    target: 'packages/lib-be-dev',
+    type: 'directory',
+  },
+  {
+    name: 'GH Workflow: Cache Node Modules',
+    source: '.github/workflows/_cache-nodemodules-jobs.yml',
+    target: '.github/workflows/_cache-nodemodules-jobs.yml',
+    type: 'file',
+  },
+  {
+    name: 'GH Workflow: Code Quality Jobs',
+    source: '.github/workflows/_code-quality-jobs.yml',
+    target: '.github/workflows/_code-quality-jobs.yml',
+    type: 'file',
+  },
+  {
+    name: 'GH Workflow: Deploy Media Jobs',
+    source: '.github/workflows/_deploy-media-jobs.yml',
+    target: '.github/workflows/_deploy-media-jobs.yml',
+    type: 'file',
+  },
+  {
+    name: 'GH Workflow: Notify Success Jobs',
+    source: '.github/workflows/_notify-success-jobs.yml',
+    target: '.github/workflows/_notify-success-jobs.yml',
+    type: 'file',
+  },
+  {
+    name: 'GH Workflow: Playwright Jobs',
+    source: '.github/workflows/_playwright-jobs.yml',
+    target: '.github/workflows/_playwright-jobs.yml',
+    type: 'file',
+  },
+  {
+    name: 'GH Workflow: Terraform Apply Infrastructure',
+    source: '.github/workflows/_terraform-apply-infrastructure-jobs.yml',
+    target: '.github/workflows/_terraform-apply-infrastructure-jobs.yml',
+    type: 'file',
+  },
+  {
+    name: 'GH Workflow: Code Quality',
+    source: '.github/workflows/code-quality.yml',
+    target: '.github/workflows/code-quality.yml',
+    type: 'file',
   },
 ]
 

@@ -1,5 +1,4 @@
 import react from '@vitejs/plugin-react-swc'
-import type { UserConfig } from 'vite'
 import { defineConfig } from 'vite'
 import dts from 'vite-plugin-dts'
 
@@ -9,27 +8,20 @@ import { peerDependencies } from './package.json'
 
 export default defineConfig(
   () =>
-    ({
-      css: {
-        preprocessorOptions: {
-          scss: {
-            api: 'modern-compiler',
-          },
-        },
-      },
+    { return {
       build: {
-        target: 'es2017',
+        target: 'esnext',
         lib: {
           entry: ['src/index.ts'],
           formats: ['es'],
-          fileName: (format) => `index.${format}.js`,
+          fileName: (format) => { return `index.${format}.js` },
           cssFileName: 'style',
         },
-        rollupOptions: {
+        rolldownOptions: {
           external: [...Object.keys(peerDependencies)],
         },
         sourcemap: true,
       },
       plugins: [react(), dts({ insertTypesEntry: true })],
-    }) as UserConfig,
+    } },
 )
