@@ -1,17 +1,14 @@
 import { Suspense, lazy, useEffect, useState } from 'react'
 
+import { isSSR } from '../ssr'
+
 /**
  * @see https://vike.dev/ClientOnly
  */
 export const clientOnly = <T extends React.ComponentType<any>>(
   load: () => Promise<{ default: T } | T>,
 ): React.ComponentType<React.ComponentProps<T> & { fallback?: React.ReactNode }> => {
-  // Client side: always bundled by Vite, import.meta.env.SSR === false
-  // Server side: may or may not be bundled by Vite, import.meta.env.SSR === true || import.meta.env === undefined
-  // eslint-disable-next-line ts/ban-ts-comment
-  // @ts-expect-error
-  import.meta.env ??= { SSR: true }
-  if (import.meta.env.SSR) {
+  if (isSSR) {
     return (props) => {
       return <>{props.fallback}</>
     }
@@ -38,6 +35,7 @@ export const clientOnly = <T extends React.ComponentType<any>>(
     useEffect(() => {
       setMounted(true)
     }, [])
+
     if (!mounted) {
       return <>{props.fallback}</>
     }
