@@ -7,7 +7,7 @@ const execFn = util.promisify(exec)
 
 const PROJECT_ROOT = join(process.env.HOME, 'projects')
 const WORKSPACE_ROOT = join(PROJECT_ROOT, 'starter-workspace')
-const TARGET_REPOS = ['travelist-monorepo', 'hulyo-monorepo', 'sandbox-workspace', 'infra-kit']
+const TARGET_REPOS = ['travelist-monorepo', 'hulyo-monorepo', 'sandbox-workspace', 'infra-kit', 'nomadream-monorepo']
 
 const EXCLUDED_PATTERNS = ['node_modules', 'dist', '*.tsbuildinfo', '.turbo', '.eslintcache']
 
