@@ -11,7 +11,9 @@ const __dirname = dirname(__filename)
 const OUT_DIR = resolve(__dirname, '../dist')
 const ENTRY_DIR = resolve(__dirname, '../src/entry')
 
-const entryPoints = fs.readdirSync(ENTRY_DIR).map((file) => resolve(ENTRY_DIR, file))
+const entryPoints = fs.readdirSync(ENTRY_DIR).map((file) => {
+  return resolve(ENTRY_DIR, file)
+})
 
 await esbuild.build({
   entryPoints,
