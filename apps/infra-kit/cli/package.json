@@ -10,7 +10,7 @@
     "ik": "dist/cli.js"
   },
   "engines": {
-    "node": ">=20.x"
+    "node": ">=24.x"
   },
   "scripts": {
     "inspector": "npx @modelcontextprotocol/inspector node ./dist/mcp.js --debug",

@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { $ } from 'zx'
 
 import { getReleasePRsWithInfo } from 'src/integrations/gh'
-import { deliverJiraRelease, loadJiraConfig } from 'src/integrations/jira'
+import { deliverJiraRelease, loadJiraConfigOptional } from 'src/integrations/jira'
 import { commandEcho } from 'src/lib/command-echo'
 import { logger } from 'src/lib/logger'
 import { detectReleaseType, formatBranchChoices, getJiraDescriptions } from 'src/lib/release-utils'
@@ -23,9 +23,6 @@ export const ghReleaseDeliver = async (args: GhReleaseDeliverArgs): Promise<Tool
   const { version, confirmedCommand } = args
 
   commandEcho.start('release-deliver')
-
-  // Load Jira config - mandatory for release delivery
-  const jiraConfig = await loadJiraConfig()
 
   const releasePRsInfo = await getReleasePRsWithInfo()
 
@@ -121,13 +118,19 @@ export const ghReleaseDeliver = async (args: GhReleaseDeliverArgs): Promise<Tool
 
     $.quiet = false
 
-    // Deliver Jira release
-    try {
-      const versionName = selectedReleaseBranch.replace('release/', '')
+    // Deliver Jira release if Jira is configured
+    const jiraConfig = await loadJiraConfigOptional()
 
-      await deliverJiraRelease({ versionName }, jiraConfig)
-    } catch (error) {
-      logger.error({ error }, 'Failed to deliver Jira release (non-blocking)')
+    if (jiraConfig) {
+      try {
+        const versionName = selectedReleaseBranch.replace('release/', '')
+
+        await deliverJiraRelease({ versionName }, jiraConfig)
+      } catch (error) {
+        logger.error({ error }, 'Failed to deliver Jira release (non-blocking)')
+      }
+    } else {
+      logger.info('🔔 Jira is not configured, skipping Jira release delivery')
     }
 
     logger.info(`Successfully delivered ${selectedReleaseBranch} to production!`)
