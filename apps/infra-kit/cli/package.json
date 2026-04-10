@@ -1,7 +1,7 @@
 {
   "name": "infra-kit",
   "type": "module",
-  "version": "0.1.83",
+  "version": "0.1.85",
   "description": "infra-kit",
   "main": "dist/cli.js",
   "module": "dist/cli.js",
@@ -15,8 +15,8 @@
   "scripts": {
     "inspector": "npx @modelcontextprotocol/inspector node ./dist/mcp.js --debug",
     "build": "pnpm run clean-artifacts && node ./scripts/build.js",
-    "clean-artifacts": "rimraf dist",
-    "clean-cache": "rimraf node_modules/.cache .eslintcache tsconfig.tsbuildinfo .turbo .swc",
+    "clean-artifacts": "rm -rf dist",
+    "clean-cache": "rm -rf node_modules/.cache .eslintcache tsconfig.tsbuildinfo .turbo .swc",
     "prettier-fix": "pnpm exec prettier **/* --write --no-error-on-unmatched-pattern --log-level warn --ignore-path ../../.prettierignore",
     "prettier-check": "pnpm exec prettier **/* --check --no-error-on-unmatched-pattern --log-level warn --ignore-path ../../.prettierignore",
     "eslint-check": "pnpm exec eslint --cache --quiet --report-unused-disable-directives ./src",
