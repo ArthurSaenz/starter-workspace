@@ -1,4 +1,4 @@
-dopplerProjectName: starter
+dopplerProjectName: infra-kit
 
 environments:
   - dev
