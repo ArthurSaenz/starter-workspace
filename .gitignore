@@ -69,6 +69,10 @@ coverage
 # Misc
 tmp
 stats.html
+.DS_Store
+dist-ssr
+.tanstack
+.output
 
 # Mobile / Firebase credentials
 apps/client/mobile-app/android/app/release
