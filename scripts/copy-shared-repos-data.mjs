@@ -63,6 +63,12 @@ const COPY_CONFIG = [
     type: 'file',
   },
   {
+    name: 'VsCode settings',
+    source: '.vscode/settings.json',
+    target: '.vscode/settings.json',
+    type: 'file',
+  },
+  {
     name: 'Prettier config',
     source: '.prettierrc.mjs',
     target: '.prettierrc.mjs',
