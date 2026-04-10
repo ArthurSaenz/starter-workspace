@@ -1,0 +1,7 @@
+dopplerProjectName: starter
+
+environments:
+  - dev
+  - arthur
+
+taskManagerProvider: false
