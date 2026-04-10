@@ -1,5 +1,6 @@
 dopplerProjectName: infra-kit
 
+# `prod` env is protected from manual CLI commands
 environments:
   - dev
   - arthur
