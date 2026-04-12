@@ -186,9 +186,15 @@ const mergeDev = async (branch: string): Promise<boolean> => {
 // MCP Tool Registration
 export const ghMergeDevMcpTool = {
   name: 'gh-merge-dev',
-  description: 'Merge dev branch into selected release branches',
+  description:
+    'Merge origin/dev into every open regular (non-hotfix) release branch and push the result. Mutates local git state and the remote release branches. When invoked via MCP, pass all=true — the branch picker is unreachable without a TTY, and the confirmation prompt is auto-skipped for MCP calls, so the caller is responsible for gating. Irreversible once pushed.',
   inputSchema: {
-    all: z.boolean().describe('Merge dev into all release branches without prompting'),
+    all: z
+      .boolean()
+      .optional()
+      .describe(
+        'Target every open regular release branch. Must be true for MCP calls (the interactive picker is unavailable without a TTY).',
+      ),
   },
   outputSchema: {
     successfulMerges: z.number().describe('Number of successful merges'),

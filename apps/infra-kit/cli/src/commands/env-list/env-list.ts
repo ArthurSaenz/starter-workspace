@@ -40,7 +40,8 @@ export const envList = async (): Promise<ToolsExecutionResult> => {
 // MCP Tool Registration
 export const envListMcpTool = {
   name: 'env-list',
-  description: 'List available Doppler configs for the detected project',
+  description:
+    'List the environments the project is configured to support. Returns a static list defined in infra-kit constants (not a live fetch from Doppler) plus the Doppler project name auto-detected from the current directory. Read-only.',
   inputSchema: {},
   outputSchema: {
     project: z.string().describe('Detected Doppler project name'),

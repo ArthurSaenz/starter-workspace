@@ -162,9 +162,10 @@ export const ghReleaseDeliver = async (args: GhReleaseDeliverArgs): Promise<Tool
 // MCP Tool Registration
 export const ghReleaseDeliverMcpTool = {
   name: 'gh-release-deliver',
-  description: 'Deliver a release branch to production',
+  description:
+    'Deliver a release to production. For hotfixes: squash-merges the release branch to main and dispatches the deploy-all workflow. For regular releases: squash-merges to dev, opens an RC PR, merges dev into main, dispatches the deploy-all workflow, then syncs main back to dev. Also releases the matching Jira fix version if Jira is configured. Dispatches the deploy workflow fire-and-forget — the tool returns once the workflow is accepted by GitHub, not when the deployment finishes. Irreversible production operation: the confirmation prompt is auto-skipped for MCP calls, so the caller is responsible for gating. "version" is required when invoked via MCP (the picker is unreachable without a TTY).',
   inputSchema: {
-    version: z.string().describe('Version to deliver to production (e.g., "1.2.5")'),
+    version: z.string().describe('Release version to deliver to production (e.g., "1.2.5"). Required for MCP calls.'),
   },
   outputSchema: {
     releaseBranch: z.string().describe('The release branch that was delivered'),

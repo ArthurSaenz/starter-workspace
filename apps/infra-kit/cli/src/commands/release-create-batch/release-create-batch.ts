@@ -158,9 +158,12 @@ export const releaseCreateBatch = async (args: ReleaseCreateBatchArgs): Promise<
 // MCP Tool Registration
 export const releaseCreateBatchMcpTool = {
   name: 'release-create-batch',
-  description: 'Create multiple release branches for specified versions with Jira version creation (batch operation)',
+  description:
+    'Create several releases in one pass: for each comma-separated version in "versions", cuts the release branch off the appropriate base (dev for regular releases, main for hotfixes), opens a GitHub PR, and creates the Jira fix version. Continues on per-version failure and reports which versions succeeded and which failed. Confirmation is auto-skipped for MCP calls, so the caller is responsible for gating. "versions" is required when invoked via MCP (the interactive input prompt is unreachable without a TTY). Use release-create for a single version with optional checkout.',
   inputSchema: {
-    versions: z.string().describe('Comma-separated list of versions to create (e.g., "1.2.5, 1.2.6")'),
+    versions: z
+      .string()
+      .describe('Comma-separated list of versions to create (e.g., "1.2.5, 1.2.6"). Required for MCP calls.'),
     type: z
       .enum(['regular', 'hotfix'])
       .optional()

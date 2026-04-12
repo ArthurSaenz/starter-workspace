@@ -79,9 +79,6 @@ dx-release-deliver:	## Deliver release to production
 dx-release-deploy-all:	## Deploy release to any environment
 	pnpm run dx-release-deploy-all
 
-dx-release-deploy-service:	## Deploy specific service in release to any environment
-	pnpm run dx-release-deploy-service
-
 dx-release-deploy-selected:	## Deploy selected services in release to any environment
 	pnpm run dx-release-deploy-selected
 

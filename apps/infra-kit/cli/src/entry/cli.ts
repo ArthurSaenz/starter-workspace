@@ -11,7 +11,6 @@ import { ghMergeDev } from 'src/commands/gh-merge-dev'
 import { ghReleaseDeliver } from 'src/commands/gh-release-deliver'
 import { ghReleaseDeployAll } from 'src/commands/gh-release-deploy-all'
 import { ghReleaseDeploySelected } from 'src/commands/gh-release-deploy-selected'
-import { ghReleaseDeployService } from 'src/commands/gh-release-deploy-service'
 import { ghReleaseList } from 'src/commands/gh-release-list'
 import { init } from 'src/commands/init'
 import { releaseCreate } from 'src/commands/release-create'
@@ -79,22 +78,6 @@ program
   .option('--skip-terraform', 'Skip terraform deployment step')
   .action(async (options) => {
     await ghReleaseDeployAll({ version: options.version, env: options.env, skipTerraform: options.skipTerraform })
-  })
-
-program
-  .command('release-deploy-service')
-  .description('Deploy specific service in release branch to any environment')
-  .option('-v, --version <version>', 'Specify the version to deploy, e.g. 1.2.5')
-  .option('-e, --env <env>', 'Specify the environment to deploy to, e.g. dev')
-  .option('-s, --service <service>', 'Specify the service to deploy, e.g. client-be')
-  .option('--skip-terraform', 'Skip terraform deployment step')
-  .action(async (options) => {
-    await ghReleaseDeployService({
-      version: options.version,
-      env: options.env,
-      service: options.service,
-      skipTerraform: options.skipTerraform,
-    })
   })
 
 program
@@ -217,7 +200,6 @@ if (process.argv.length <= 2) {
     'release-create',
     'release-create-batch',
     'release-deploy-all',
-    'release-deploy-service',
     'release-deploy-selected',
     'release-deliver',
   ]

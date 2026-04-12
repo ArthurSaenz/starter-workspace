@@ -268,12 +268,33 @@ const logResults = (created: string[]): void => {
 // MCP Tool Registration
 export const worktreesAddMcpTool = {
   name: 'worktrees-add',
-  description: 'Create git worktrees for selected release branches',
+  description:
+    'Create local git worktrees for release branches under the worktrees directory and run "pnpm install" in each. Mutates the local filesystem. When invoked via MCP, pass either "versions" (comma-separated) or all=true — the branch picker and "open in Cursor / GitHub Desktop" follow-up prompts are unreachable without a TTY, and the CLI confirmation is auto-skipped for MCP calls.',
   inputSchema: {
-    all: z.boolean().describe('Add git worktrees for all release branches without prompting'),
-    versions: z.string().optional().describe('Specify versions by comma, e.g. 1.2.5, 1.2.6'),
-    cursor: z.boolean().optional().describe('Open created git worktrees in Cursor'),
-    githubDesktop: z.boolean().optional().describe('Open created git worktrees in GitHub Desktop'),
+    all: z
+      .boolean()
+      .optional()
+      .describe(
+        'Add worktrees for every open release branch. Either "all" or "versions" must be provided for MCP calls (the interactive picker is unavailable without a TTY). Ignored if "versions" is provided.',
+      ),
+    versions: z
+      .string()
+      .optional()
+      .describe(
+        'Comma-separated release versions to target (e.g. "1.2.5, 1.2.6"). Either "versions" or all=true must be provided for MCP calls. Overrides "all" when set.',
+      ),
+    cursor: z
+      .boolean()
+      .optional()
+      .describe(
+        'Open each created worktree in Cursor. Defaults to false in MCP mode (the follow-up prompt is not shown).',
+      ),
+    githubDesktop: z
+      .boolean()
+      .optional()
+      .describe(
+        'Open each created worktree in GitHub Desktop. Defaults to false in MCP mode (the follow-up prompt is not shown).',
+      ),
   },
   outputSchema: {
     createdWorktrees: z.array(z.string()).describe('List of created git worktree branches'),

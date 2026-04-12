@@ -78,7 +78,8 @@ export const envStatus = async (): Promise<ToolsExecutionResult> => {
 // MCP Tool Registration
 export const envStatusMcpTool = {
   name: 'env-status',
-  description: 'Show Doppler authentication status and detected project info',
+  description:
+    'Report which Doppler project/config is currently loaded in the terminal session, when it was loaded, and how many variables are cached. Read-only — use env-load / env-clear to change the terminal session.',
   inputSchema: {},
   outputSchema: {
     sessionId: z.string().describe('Current terminal session ID'),

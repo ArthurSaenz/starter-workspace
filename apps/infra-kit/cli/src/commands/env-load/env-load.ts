@@ -88,6 +88,7 @@ export const envLoad = async (args: EnvLoadArgs): Promise<ToolsExecutionResult> 
   }).length
 
   const structuredContent = {
+    filePath: envFilePath,
     variableCount: varCount,
     project,
     config: selectedConfig,
@@ -108,9 +109,11 @@ export const envLoad = async (args: EnvLoadArgs): Promise<ToolsExecutionResult> 
 export const envLoadMcpTool = {
   name: 'env-load',
   description:
-    'Load Doppler env vars for a config. Returns a file path that must be sourced (source <path>) to apply variables. The env-load shell alias does this automatically.',
+    'Download the env vars for a Doppler config and write them to a temporary shell script. Does NOT mutate the calling process — returns the path to a script that must be sourced ("source <filePath>") for the vars to take effect. The infra-kit shell wrapper auto-sources; direct MCP callers must handle sourcing themselves or surface filePath to the user. "config" is required when invoked via MCP (the CLI interactive picker is unreachable without a TTY).',
   inputSchema: {
-    config: z.string().describe('Environment config name to load (e.g. dev, arthur, renana)'),
+    config: z
+      .string()
+      .describe('Doppler config / environment name to load (e.g. "dev", "arthur", "renana"). Required for MCP calls.'),
   },
   outputSchema: {
     filePath: z.string().describe('Path to the file that must be sourced to apply variables'),

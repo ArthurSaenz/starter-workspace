@@ -145,7 +145,8 @@ const logResults = (removed: string[]): void => {
 // MCP Tool Registration
 export const worktreesSyncMcpTool = {
   name: 'worktrees-sync',
-  description: 'Synchronize worktrees with active release branches',
+  description:
+    'Remove worktrees whose release PR is no longer open (stale cleanup). Only removes — never creates; use worktrees-add to create worktrees for new releases. The CLI confirmation is auto-skipped for MCP calls, so the caller is responsible for gating.',
   inputSchema: {},
   outputSchema: {
     removedWorktrees: z.array(z.string()).describe('List of removed worktree branches'),

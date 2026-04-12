@@ -60,6 +60,7 @@ export const envClear = async (): Promise<ToolsExecutionResult> => {
   fs.unlinkSync(envLoadPath)
 
   const structuredContent = {
+    filePath: clearFilePath,
     variableCount: varNames.length,
     unsetStatements: unsetLines,
   }
@@ -79,7 +80,7 @@ export const envClear = async (): Promise<ToolsExecutionResult> => {
 export const envClearMcpTool = {
   name: 'env-clear',
   description:
-    'Clear loaded env vars. Returns a file path that must be sourced (source <path>) to apply. The env-clear shell alias does this automatically.',
+    'Generate a shell script that unsets every env var previously loaded by env-load for this session, plus the infra-kit session metadata vars. Does NOT mutate the calling process — returns the path to a script that must be sourced ("source <filePath>") for the unsets to take effect. The infra-kit shell wrapper auto-sources; direct MCP callers must handle sourcing themselves or surface filePath to the user. Errors if no env is currently loaded.',
   inputSchema: {},
   outputSchema: {
     filePath: z.string().describe('Path to the file that must be sourced to apply'),

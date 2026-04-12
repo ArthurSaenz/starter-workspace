@@ -160,9 +160,10 @@ export const releaseCreate = async (args: ReleaseCreateArgs): Promise<ToolsExecu
 // MCP Tool Registration
 export const releaseCreateMcpTool = {
   name: 'release-create',
-  description: 'Create a single release branch for specified version with Jira version creation',
+  description:
+    'Create a new release: cuts the release branch off the appropriate base (dev for regular releases, main for hotfixes), opens a GitHub release PR, creates the matching Jira fix version, and optionally checks out to the new branch. Confirmation is auto-skipped for MCP calls, so the caller is responsible for gating. "version" is required when invoked via MCP (the interactive input prompt is unreachable without a TTY); "type" / "description" / "checkout" default to regular / empty / true when omitted.',
   inputSchema: {
-    version: z.string().describe('Version to create (e.g., "1.2.5")'),
+    version: z.string().describe('Version to create (e.g., "1.2.5"). Required for MCP calls.'),
     description: z.string().optional().describe('Optional description for the Jira version'),
     type: z
       .enum(['regular', 'hotfix'])

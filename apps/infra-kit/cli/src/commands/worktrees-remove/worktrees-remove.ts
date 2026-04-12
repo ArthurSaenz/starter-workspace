@@ -188,10 +188,21 @@ const logResults = (removed: string[]): void => {
 // MCP Tool Registration
 export const worktreesRemoveMcpTool = {
   name: 'worktrees-remove',
-  description: 'Remove selected worktrees',
+  description:
+    'Remove local git worktrees for release branches. When everything is removed, also runs "git worktree prune" and deletes the worktrees directory. When invoked via MCP, pass either "versions" (comma-separated) or all=true — the branch picker is unreachable without a TTY, and the CLI confirmation is auto-skipped for MCP calls, so the caller is responsible for gating.',
   inputSchema: {
-    all: z.boolean().describe('Remove all git worktrees without prompting'),
-    versions: z.string().optional().describe('Specify versions by comma, e.g. 1.2.5, 1.2.6'),
+    all: z
+      .boolean()
+      .optional()
+      .describe(
+        'Remove every existing worktree. Either "all" or "versions" must be provided for MCP calls (the interactive picker is unavailable without a TTY). Ignored if "versions" is provided.',
+      ),
+    versions: z
+      .string()
+      .optional()
+      .describe(
+        'Comma-separated release versions to target (e.g. "1.2.5, 1.2.6"). Either "versions" or all=true must be provided for MCP calls. Overrides "all" when set.',
+      ),
   },
   outputSchema: {
     removedWorktrees: z.array(z.string()).describe('List of removed git worktree branches'),

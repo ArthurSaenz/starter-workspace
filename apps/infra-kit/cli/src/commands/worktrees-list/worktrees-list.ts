@@ -83,7 +83,8 @@ export const worktreesList = async (): Promise<ToolsExecutionResult> => {
 // MCP Tool Registration
 export const worktreesListMcpTool = {
   name: 'worktrees-list',
-  description: 'List all git worktrees with detailed information',
+  description:
+    'List existing release-branch worktrees with version, release type (regular / hotfix), and Jira fix-version description. Read-only.',
   inputSchema: {},
   outputSchema: {
     worktrees: z

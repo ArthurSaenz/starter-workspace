@@ -65,7 +65,8 @@ export const ghReleaseList = async (): Promise<ToolsExecutionResult> => {
 // MCP Tool Registration
 export const ghReleaseListMcpTool = {
   name: 'gh-release-list',
-  description: 'List all open release branches',
+  description:
+    'List every open release PR with its version, type (regular / hotfix), and associated Jira fix-version description. Read-only; sourced from GitHub and Jira.',
   inputSchema: {},
   outputSchema: {
     releases: z

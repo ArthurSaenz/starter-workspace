@@ -8,7 +8,6 @@ import { ghMergeDevMcpTool } from 'src/commands/gh-merge-dev'
 import { ghReleaseDeliverMcpTool } from 'src/commands/gh-release-deliver'
 import { ghReleaseDeployAllMcpTool } from 'src/commands/gh-release-deploy-all'
 import { ghReleaseDeploySelectedMcpTool } from 'src/commands/gh-release-deploy-selected'
-import { ghReleaseDeployServiceMcpTool } from 'src/commands/gh-release-deploy-service'
 import { ghReleaseListMcpTool } from 'src/commands/gh-release-list'
 import { releaseCreateMcpTool } from 'src/commands/release-create'
 import { releaseCreateBatchMcpTool } from 'src/commands/release-create-batch'
@@ -29,7 +28,6 @@ const tools = [
   ghReleaseDeliverMcpTool,
   ghReleaseDeployAllMcpTool,
   ghReleaseDeploySelectedMcpTool,
-  ghReleaseDeployServiceMcpTool,
   ghReleaseListMcpTool,
   worktreesAddMcpTool,
   worktreesListMcpTool,

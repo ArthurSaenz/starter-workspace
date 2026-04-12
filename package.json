@@ -42,7 +42,6 @@
     "dx-release-create": "pnpm exec infra-kit release-create",
     "dx-release-create-batch": "pnpm exec infra-kit release-create-batch",
     "dx-release-deploy-all": "pnpm exec infra-kit release-deploy-all",
-    "dx-release-deploy-service": "pnpm exec infra-kit release-deploy-service",
     "dx-release-deploy-selected": "pnpm exec infra-kit release-deploy-selected",
     "dx-release-deliver": "pnpm exec infra-kit release-deliver",
     "dx-worktrees-list": "pnpm exec infra-kit worktrees-list",
@@ -61,7 +60,7 @@
     "@pkg/prettier-config": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "infra-kit": "0.1.85",
+    "infra-kit": "0.1.87",
     "shadcn": "^4.2.0",
     "turbo": "2.9.5",
     "typescript": "catalog:"
