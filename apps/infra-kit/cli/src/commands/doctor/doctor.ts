@@ -26,7 +26,7 @@ const checkCommand = async (
 }
 
 /**
- * Check installation and authentication status of gh and doppler CLIs
+ * Check installation and authentication status of gh, doppler, and aws CLIs
  */
 export const doctor = async (): Promise<ToolsExecutionResult> => {
   const checks: CheckResult[] = await Promise.all([
@@ -54,6 +54,19 @@ export const doctor = async (): Promise<ToolsExecutionResult> => {
       'Doppler CLI is authenticated',
       'Doppler CLI is not authenticated. Run: doppler login',
     ),
+    checkCommand(
+      'aws installed',
+      ['aws', '--version'],
+      'AWS CLI is installed',
+      'AWS CLI is not installed. Install from: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html',
+    ),
+    // INFO: no need now, util the user does not load the env variables, the aws cli is not authenticated
+    // checkCommand(
+    //   'aws authenticated',
+    //   ['aws', 'sts', 'get-caller-identity'],
+    //   'AWS CLI is authenticated',
+    //   'AWS CLI is not authenticated. Run: aws configure (or aws sso login)',
+    // ),
   ])
 
   logger.info('Doctor check results:\n')
@@ -87,7 +100,7 @@ export const doctor = async (): Promise<ToolsExecutionResult> => {
 // MCP Tool Registration
 export const doctorMcpTool = {
   name: 'doctor',
-  description: 'Check installation and authentication status of gh and doppler CLIs',
+  description: 'Check installation and authentication status of gh, doppler, and aws CLIs',
   inputSchema: {},
   outputSchema: {
     checks: z
