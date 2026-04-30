@@ -4,6 +4,8 @@ packages:
   - configs/*
   - '!**/test/**'
 
+enableGlobalVirtualStore: true
+
 catalog:
   '@playwright/test': ^1.59.1
   '@tailwindcss/vite': ^4.2.2
