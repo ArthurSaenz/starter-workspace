@@ -74,9 +74,6 @@ dist-ssr
 .tanstack
 .output
 
-# infra-kit local overrides
-infra-kit.local.yml
-
 # Mobile / Firebase credentials
 apps/client/mobile-app/android/app/release
 google-services.json
