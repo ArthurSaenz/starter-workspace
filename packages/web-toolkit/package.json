@@ -38,7 +38,7 @@
     "@pkg/eslint-config": "workspace:*",
     "@pkg/vitest-config": "workspace:*",
     "@types/lodash": "^4.17.24",
-    "@types/qs": "^6.14.0",
+    "@types/qs": "^6.15.1",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
