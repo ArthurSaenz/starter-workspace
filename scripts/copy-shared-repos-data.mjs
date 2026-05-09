@@ -81,12 +81,6 @@ const COPY_CONFIG = [
     type: 'file',
   },
   {
-    name: 'NPM config',
-    source: '.npmrc',
-    target: '.npmrc',
-    type: 'file',
-  },
-  {
     name: 'Node version',
     source: '.node-version',
     target: '.node-version',
@@ -104,12 +98,12 @@ const COPY_CONFIG = [
     target: '.editorconfig',
     type: 'file',
   },
-  {
-    name: 'Infra Kit config',
-    source: 'infra-kit.yml',
-    target: 'infra-kit.yml',
-    type: 'file',
-  },
+  // {
+  //   name: 'Infra Kit config',
+  //   source: 'infra-kit.yml',
+  //   target: 'infra-kit.yml',
+  //   type: 'file',
+  // },
   {
     name: 'Vitest config',
     source: 'vitest.config.ts',
