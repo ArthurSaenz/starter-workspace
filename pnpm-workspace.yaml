@@ -68,3 +68,22 @@ supportedArchitectures:
   os:
     - darwin
     - linux
+
+strictPeerDependencies: false
+
+publicHoistPattern:
+  - '*types*'
+  - '*eslint*'
+  - '*prettier*'
+  - '*stylelint*'
+  - '*typescript*'
+  - '*config*'
+  - '@storybook*'
+  - storybook*
+  - '*@testing-library*'
+  - '*@vitejs*'
+  - '*vitest*'
+  - '*@vitest*'
+
+allowBuilds:
+  msw: true
