@@ -254,7 +254,7 @@ importers:
         specifier: 'catalog:'
         version: 2.9.3(@types/react@19.2.14)(react@19.2.6)
       lodash:
-        specifier: ^4.17.23
+        specifier: ^4.18.1
         version: 4.18.1
       qs:
         specifier: ^6.15.1
