@@ -7,6 +7,7 @@
     "commit-commands@claude-plugins-official": true,
     "frontend-design@claude-plugins-official": true,
     "superpowers@claude-plugins-official": false,
-    "oh-my-claudecode@omc": true
+    "oh-my-claudecode@omc": true,
+    "context-mode@context-mode": true
   }
 }
