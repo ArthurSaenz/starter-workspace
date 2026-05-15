@@ -25,8 +25,8 @@ catalogs:
       specifier: ^2.1.1
       version: 2.1.1
     jotai:
-      specifier: 2.9.3
-      version: 2.9.3
+      specifier: 2.20.0
+      version: 2.20.0
     playwright:
       specifier: ^1.59.1
       version: 1.59.1
@@ -252,7 +252,7 @@ importers:
         version: 6.2.2
       jotai:
         specifier: 'catalog:'
-        version: 2.9.3(@types/react@19.2.14)(react@19.2.6)
+        version: 2.20.0(@babel/core@7.29.0)(@babel/template@7.28.6)(@types/react@19.2.14)(react@19.2.6)
       lodash:
         specifier: ^4.18.1
         version: 4.18.1
@@ -3007,13 +3007,19 @@ packages:
   jose@6.2.3:
     resolution: {integrity: sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw==}
 
-  jotai@2.9.3:
-    resolution: {integrity: sha512-IqMWKoXuEzWSShjd9UhalNsRGbdju5G2FrqNLQJT+Ih6p41VNYe2sav5hnwQx4HJr25jq9wRqvGSWGviGG6Gjw==}
+  jotai@2.20.0:
+    resolution: {integrity: sha512-b5GAqgmXmXzB4WPaTH26ppk9Sl7AA9WSQX7yfdM+gJ1rFROiWcVbi97gFuN/yVCojOcbcvop2sfLL+fjxW0JVg==}
     engines: {node: '>=12.20.0'}
     peerDependencies:
+      '@babel/core': '>=7.0.0'
+      '@babel/template': '>=7.0.0'
       '@types/react': '>=17.0.0'
       react: '>=17.0.0'
     peerDependenciesMeta:
+      '@babel/core':
+        optional: true
+      '@babel/template':
+        optional: true
       '@types/react':
         optional: true
       react:
@@ -7592,8 +7598,10 @@ snapshots:
 
   jose@6.2.3: {}
 
-  jotai@2.9.3(@types/react@19.2.14)(react@19.2.6):
+  jotai@2.20.0(@babel/core@7.29.0)(@babel/template@7.28.6)(@types/react@19.2.14)(react@19.2.6):
     optionalDependencies:
+      '@babel/core': 7.29.0
+      '@babel/template': 7.28.6
       '@types/react': 19.2.14
       react: 19.2.6
 
