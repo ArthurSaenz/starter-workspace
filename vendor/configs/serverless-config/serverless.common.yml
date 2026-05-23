@@ -23,6 +23,10 @@ custom:
             prod: rate(2 hours)
             dev: rate(2 hours)
             default: rate(1 day)
+        rate1Day:
+            prod: rate(1 day)
+            dev: rate(1 day)
+            default: rate(1 day)
         selfService:
             prod: cron(0,20,40 5-21 * * ? *)
             dev: rate(1 day)

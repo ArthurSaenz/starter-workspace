@@ -163,7 +163,7 @@ export const defineExperiments = <const T extends ExperimentsConfig>(config: T) 
       if (isSSR) return
 
       if (isEnabledDebug) {
-        // eslint-disable-next-line react-web-api/no-leaked-timeout
+        // eslint-disable-next-line react/web-api-no-leaked-timeout
         setTimeout(() => {
           attachImplementedExperiments()
           setOptimizeAtom(getDevDebugExperimentsValues())

@@ -11,7 +11,7 @@ export const ScriptExperimentsInit = (props: ScriptExperimentsInitProps) => {
     <Script
       id="experiments-script-vwo"
       strategy="lazyOnload"
-      // eslint-disable-next-line react-dom/no-dangerously-set-innerhtml
+      // eslint-disable-next-line react/dom-no-dangerously-set-innerhtml
       dangerouslySetInnerHTML={{
         __html: `
             window._vwo_code || (function() {

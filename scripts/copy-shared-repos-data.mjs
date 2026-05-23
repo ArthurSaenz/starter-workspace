@@ -1,6 +1,6 @@
 import { exec } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import util from 'node:util'
 
@@ -11,7 +11,25 @@ const WORKSPACE_ROOT = join(PROJECT_ROOT, 'starter-workspace')
 
 const TARGET_REPOS = ['travelist-monorepo', 'hulyo-monorepo', 'sandbox-workspace', 'infra-kit', 'nomadream-monorepo']
 
-const EXCLUDED_PATTERNS = ['node_modules', 'dist', '*.tsbuildinfo', '.turbo', '.eslintcache', '.omc', '__screenshots__', '.output', '.source', '.nitro', '.tanstack']
+const EXCLUDED_PATTERNS = [
+  'node_modules',
+  'dist',
+  '*.tsbuildinfo',
+  '.turbo',
+  '.eslintcache',
+  '.omc',
+  '__screenshots__',
+  '.output',
+  '.source',
+  '.nitro',
+  '.tanstack',
+  // serverless-config is intentionally NOT vendored. Deployment config (deploymentBucket name,
+  // per-repo SSM paths, schedules) is repo-specific, so each consumer owns its own
+  // packages/serverless-config (@pkg/serverless-config). Starter keeps vendor/configs/serverless-config
+  // only as a reference template; this exclude stops the configs sync from pushing it into — and
+  // overwriting — each consumer's copy.
+  'serverless-config',
+]
 
 // Root of the mirrored ("vendored") tree inside each consumer repo.
 const VENDOR_DIR = 'vendor'
@@ -22,7 +40,17 @@ const VENDOR_DIR = 'vendor'
 const LEGACY_CLEANUP = ['packages/web-toolkit', 'packages/lib-be-dev', 'configs']
 
 // Files/dirs skipped when walking `vendor/` to build the integrity manifest.
-const MANIFEST_SKIP_DIRS = new Set(['node_modules', 'dist', '.turbo', '.omc', '__screenshots__', '.output', '.source', '.nitro', '.tanstack'])
+const MANIFEST_SKIP_DIRS = new Set([
+  'node_modules',
+  'dist',
+  '.turbo',
+  '.omc',
+  '__screenshots__',
+  '.output',
+  '.source',
+  '.nitro',
+  '.tanstack',
+])
 const MANIFEST_SKIP_FILES = new Set(['.sync-manifest.json', '.eslintcache'])
 const MANIFEST_SKIP_SUFFIXES = ['.tsbuildinfo']
 
@@ -147,12 +175,6 @@ const COPY_CONFIG = [
     vendored: true,
   },
   {
-    name: 'Deploy and E2E scripts lib',
-    source: 'devops/scripts/lib',
-    target: 'devops/scripts/lib',
-    type: 'directory',
-  },
-  {
     name: 'Vendor drift-check script',
     source: 'scripts/vendor-check.mjs',
     target: 'scripts/vendor-check.mjs',
@@ -172,48 +194,54 @@ const COPY_CONFIG = [
     type: 'directory',
     vendored: true,
   },
-  {
-    name: 'GH Workflow: Cache Node Modules',
-    source: '.github/workflows/_cache-nodemodules-jobs.yml',
-    target: '.github/workflows/_cache-nodemodules-jobs.yml',
-    type: 'file',
-  },
-  {
-    name: 'GH Workflow: Code Quality Jobs',
-    source: '.github/workflows/_code-quality-jobs.yml',
-    target: '.github/workflows/_code-quality-jobs.yml',
-    type: 'file',
-  },
-  {
-    name: 'GH Workflow: Deploy Media Jobs',
-    source: '.github/workflows/_deploy-media-jobs.yml',
-    target: '.github/workflows/_deploy-media-jobs.yml',
-    type: 'file',
-  },
-  {
-    name: 'GH Workflow: Notify Success Jobs',
-    source: '.github/workflows/_notify-success-jobs.yml',
-    target: '.github/workflows/_notify-success-jobs.yml',
-    type: 'file',
-  },
-  {
-    name: 'GH Workflow: Playwright Jobs',
-    source: '.github/workflows/_playwright-jobs.yml',
-    target: '.github/workflows/_playwright-jobs.yml',
-    type: 'file',
-  },
-  {
-    name: 'GH Workflow: Terraform Apply Infrastructure',
-    source: '.github/workflows/_terraform-apply-infrastructure-jobs.yml',
-    target: '.github/workflows/_terraform-apply-infrastructure-jobs.yml',
-    type: 'file',
-  },
-  {
-    name: 'GH Workflow: Code Quality',
-    source: '.github/workflows/code-quality.yml',
-    target: '.github/workflows/code-quality.yml',
-    type: 'file',
-  },
+  // {
+  //   name: 'Deploy and E2E scripts lib',
+  //   source: 'devops/scripts/lib',
+  //   target: 'devops/scripts/lib',
+  //   type: 'directory',
+  // },
+  // {
+  //   name: 'GH Workflow: Cache Node Modules',
+  //   source: '.github/workflows/_cache-nodemodules-jobs.yml',
+  //   target: '.github/workflows/_cache-nodemodules-jobs.yml',
+  //   type: 'file',
+  // },
+  // {
+  //   name: 'GH Workflow: Code Quality Jobs',
+  //   source: '.github/workflows/_code-quality-jobs.yml',
+  //   target: '.github/workflows/_code-quality-jobs.yml',
+  //   type: 'file',
+  // },
+  // {
+  //   name: 'GH Workflow: Deploy Media Jobs',
+  //   source: '.github/workflows/_deploy-media-jobs.yml',
+  //   target: '.github/workflows/_deploy-media-jobs.yml',
+  //   type: 'file',
+  // },
+  // {
+  //   name: 'GH Workflow: Notify Success Jobs',
+  //   source: '.github/workflows/_notify-success-jobs.yml',
+  //   target: '.github/workflows/_notify-success-jobs.yml',
+  //   type: 'file',
+  // },
+  // {
+  //   name: 'GH Workflow: Playwright Jobs',
+  //   source: '.github/workflows/_playwright-jobs.yml',
+  //   target: '.github/workflows/_playwright-jobs.yml',
+  //   type: 'file',
+  // },
+  // {
+  //   name: 'GH Workflow: Terraform Apply Infrastructure',
+  //   source: '.github/workflows/_terraform-apply-infrastructure-jobs.yml',
+  //   target: '.github/workflows/_terraform-apply-infrastructure-jobs.yml',
+  //   type: 'file',
+  // },
+  // {
+  //   name: 'GH Workflow: Code Quality',
+  //   source: '.github/workflows/code-quality.yml',
+  //   target: '.github/workflows/code-quality.yml',
+  //   type: 'file',
+  // },
 ]
 
 const parseArgs = (argv) => {
@@ -286,9 +314,7 @@ const diffDirectory = async (source, target) => {
   if (!existsSync(source)) return []
   if (!existsSync(target)) return [`missing target: ${target}`]
 
-  const { stdout } = await execFn(
-    `rsync -ai --dry-run --delete ${excludeFlags()} "${source}/" "${target}/"`,
-  )
+  const { stdout } = await execFn(`rsync -ai --dry-run --delete ${excludeFlags()} "${source}/" "${target}/"`)
 
   return stdout
     .split('\n')

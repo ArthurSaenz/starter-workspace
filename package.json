@@ -21,6 +21,7 @@
     "build": "pnpm exec turbo build --env-mode=loose",
     "mobile-host-build": "pnpm exec turbo run build-mobile-host --filter mobile-app",
     "dev": "pnpm exec turbo run dev --concurrency=24 --env-mode=loose",
+    "docs": "pnpm --filter @wl/docs-ui dev",
     "storybook": "pnpm exec turbo run storybook --concurrency=24 --env-mode=loose",
     "storybook-build": "pnpm exec turbo run storybook-build --env-mode=loose",
     "white-label-sync": "node scripts/copy-shared-repos-data.mjs",

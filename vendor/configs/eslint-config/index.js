@@ -72,6 +72,10 @@ const config = async (userOptions = {}) => {
 
         'unicorn/no-new-array': 'off',
 
+        // prettier owns numeric-literal formatting (lowercases hex), which conflicts with
+        // unicorn/number-literal-case (wants uppercase hex digits). Let prettier win.
+        'unicorn/number-literal-case': 'off',
+
         //#region Architecture import relation rules
         'no-restricted-imports': [
           'error',
