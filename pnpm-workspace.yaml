@@ -1,7 +1,7 @@
 packages:
   - apps/*/*
-  - packages/*
-  - configs/*
+  - vendor/packages/*
+  - vendor/configs/*
   - '!**/test/**'
 
 enableGlobalVirtualStore: true
@@ -86,4 +86,6 @@ publicHoistPattern:
   - '*@vitest*'
 
 allowBuilds:
+  '@parcel/watcher': true
+  esbuild: true
   msw: true
