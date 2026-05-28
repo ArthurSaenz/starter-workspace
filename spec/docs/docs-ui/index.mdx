@@ -1,0 +1,32 @@
+---
+title: Docs UI
+description: The white-label docs app that powers this site — aggregates Markdown/MDX from across the monorepo in place.
+---
+
+`@wl/docs-ui` is the docs app rendering this site. It is vendored at
+`vendor/packages/docs-ui` and built with [Fumadocs](https://fumadocs.dev) on
+[TanStack Start](https://tanstack.com/start).
+
+## What it does
+
+- Reads `.md` / `.mdx` files **in place** from across the monorepo — no copying step.
+- Groups pages by package in the sidebar (e.g. `apps/ai/agent/docs/draft.md` →
+  `/docs/ai-agent/draft`).
+- Prerenders every doc URL into a fully static site that can be served from S3 or any CDN.
+
+## Where content lives
+
+| Location                       | Purpose                                              |
+| ------------------------------ | ---------------------------------------------------- |
+| `spec/docs/**`                 | Per-repo landing content (this folder). Not vendored. |
+| `apps/<app>/**/docs/**`        | App-specific documentation.                          |
+| `packages/<pkg>/docs/**`       | Package-specific documentation.                      |
+
+The aggregation logic lives in
+`vendor/packages/docs-ui/src/lib/docs-aggregation.ts` and is the single source of truth
+for which files are published, how URLs are derived, and which paths get prerendered.
+
+## Pages in this section
+
+- [Adding docs](./adding-docs) — drop a Markdown file into a `docs/` folder and it shows up.
+- [How aggregation works](./aggregation) — globs, slug derivation, frontmatter overrides.

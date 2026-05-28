@@ -42,7 +42,7 @@ vite.config.ts.timestamp-*.mjs
 **/.eslintcache
 
 # OMC (oh-my-claudecode) local state
-**/.omc/state/
+**/.omc/
 
 # Testing - Playwright
 **/test-results/
