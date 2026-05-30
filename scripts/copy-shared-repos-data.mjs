@@ -23,6 +23,7 @@ const EXCLUDED_PATTERNS = [
   '.source',
   '.nitro',
   '.tanstack',
+  'log.txt',
   // serverless-config is intentionally NOT vendored. Deployment config (deploymentBucket name,
   // per-repo SSM paths, schedules) is repo-specific, so each consumer owns its own
   // packages/serverless-config (@pkg/serverless-config). Starter keeps vendor/configs/serverless-config
@@ -51,7 +52,7 @@ const MANIFEST_SKIP_DIRS = new Set([
   '.nitro',
   '.tanstack',
 ])
-const MANIFEST_SKIP_FILES = new Set(['.sync-manifest.json', '.eslintcache'])
+const MANIFEST_SKIP_FILES = new Set(['.sync-manifest.json', '.eslintcache', 'log.txt'])
 const MANIFEST_SKIP_SUFFIXES = ['.tsbuildinfo']
 
 // Configuration for files and folders to copy. `vendored: true` marks workspace packages that
@@ -125,12 +126,12 @@ const COPY_CONFIG = [
     target: '.prettierignore',
     type: 'file',
   },
-  {
-    name: 'Node version',
-    source: '.node-version',
-    target: '.node-version',
-    type: 'file',
-  },
+  // {
+  //   name: 'Node version',
+  //   source: '.node-version',
+  //   target: '.node-version',
+  //   type: 'file',
+  // },
   {
     name: 'Git ignore',
     source: '.gitignore',
