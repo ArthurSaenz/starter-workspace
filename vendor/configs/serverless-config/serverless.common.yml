@@ -1,5 +1,10 @@
 custom:
     version: v1
+    # Disables Dashboard log forwarding (EnterpriseLogAccessIamRole). Without this, the role's
+    # inline policy grows one log-group ARN per function and overflows AWS's 10,240-byte limit
+    # on high-function-count services. CloudWatch logging is unaffected.
+    enterprise:
+        collectLambdaLogs: false
     deploymentBucket:
         name: ${ssm:/hulyo/s3/buckets/bknd_deployment}
         versioning: false
