@@ -49,12 +49,14 @@ vite.config.ts.timestamp-*.mjs
 **/playwright-report/
 **/blob-report/
 **/playwright/.cache/
+**/.playwright-mcp/
 
 # Testing - Vitest / Coverage
 .coverage
 coverage
 *.lcov
 .nyc_output
+**/.vitest-attachments/
 
 # Logs
 *.log
