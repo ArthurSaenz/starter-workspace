@@ -1,4 +1,5 @@
 import antfu from '@antfu/eslint-config'
+// import wl from '@slip-stream-kit/eslint-plugin'
 import sonarjs from 'eslint-plugin-sonarjs'
 
 const config = async (userOptions = {}) => {
@@ -106,12 +107,17 @@ const config = async (userOptions = {}) => {
         ]
       : [],
 
+    // White-label architecture rules: props destructuring + component file order
+    // wl.configs.recommended,
+
     // Temporary disable all sonarjs rules for markdown files
     {
       files: ['**/*.md'],
       rules: Object.fromEntries(Object.keys(sonarjs.configs.recommended.rules).map((rule) => [rule, 'off'])),
     },
-    { ignores: ['**/routeTree.gen.ts', '**/citiesOld.json', '**/airports.json', '**/.astro/', '**/.omc/**', ...ignores] },
+    {
+      ignores: ['**/routeTree.gen.ts', '**/citiesOld.json', '**/airports.json', '**/.astro/', '**/.omc/**', ...ignores],
+    },
   )
 
   return baseConfig
