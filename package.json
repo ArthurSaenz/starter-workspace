@@ -65,12 +65,12 @@
     "@wl/prettier-config": "workspace:*",
     "infra-kit": "0.1.102",
     "shadcn": "^4.11.0",
-    "turbo": "2.9.16",
+    "turbo": "2.9.18",
     "typescript": "catalog:"
   },
   "engines": {
     "node": ">=24.x",
     "pnpm": ">=10"
   },
-  "packageManager": "pnpm@11.4.0"
+  "packageManager": "pnpm@11.6.0"
 }
