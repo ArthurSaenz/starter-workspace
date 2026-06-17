@@ -42,7 +42,7 @@ catalog:
 
   jotai: 2.20.1
   lucide-react: ^1.18.0
-  playwright: ^1.60.0
+  playwright: ^1.61.0
   react: 19.2.7
   react-dom: 19.2.7
   rollup-plugin-visualizer: ^7.0.0
@@ -89,6 +89,7 @@ allowBuilds:
   '@parcel/watcher': true
   esbuild: true
   msw: true
+  unrs-resolver: set this to true or false
 
 minimumReleaseAgeExclude:
   - '@slip-stream-kit/*'
