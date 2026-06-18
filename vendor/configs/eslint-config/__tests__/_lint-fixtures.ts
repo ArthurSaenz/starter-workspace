@@ -5,10 +5,9 @@ import { expect } from 'vitest'
 
 import config from '../index.js'
 
-// Shared lint-and-index harness for the test suites. The two suites (no-restricted-imports
-// and boundaries) ran byte-identical copies of this machinery; that duplication is what let
-// their fixture vocabulary and assertion idioms drift apart. Owning it here makes the two
-// suites symmetric by construction.
+// Shared lint-and-index harness for both suites (no-restricted-imports and boundaries).
+// The suites once ran byte-identical copies, which let their assertion idioms drift apart;
+// owning one copy here keeps them symmetric by construction.
 //
 // cwd = package root. This file MUST live in __tests__/ (sibling of the test files) so
 // `import.meta.dirname` resolves to <pkg>/__tests__ and `..` to the package root — the
@@ -74,5 +73,10 @@ export const makeLintIndex = ({ fixtures, ruleFilter, flagRuleId }: LintIndexOpt
     expect(messages[0]?.message).toContain(messageSubstring)
   }
 
-  return { populate, messagesFor, expectFlagged }
+  // Symmetric to expectFlagged: assert zero messages matching this suite's ruleFilter.
+  const expectClean = (relPath: string) => {
+    expect(messagesFor(relPath)).toHaveLength(0)
+  }
+
+  return { populate, messagesFor, expectFlagged, expectClean }
 }

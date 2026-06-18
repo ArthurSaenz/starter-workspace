@@ -1,6 +1,6 @@
 import antfu from '@antfu/eslint-config'
+import wl from '@slip-stream-kit/eslint-plugin'
 import boundaries from 'eslint-plugin-boundaries'
-// import wl from '@slip-stream-kit/eslint-plugin'
 import sonarjs from 'eslint-plugin-sonarjs'
 
 const config = async (userOptions = {}) => {
@@ -205,8 +205,22 @@ const config = async (userOptions = {}) => {
         ]
       : [],
 
-    // White-label architecture rules: props destructuring + component file order
-    // wl.configs.recommended,
+    // White-label architecture: component-file conventions on JSX/TSX files. Enabled on purpose
+    // RULE-BY-RULE — NOT wl.configs.recommended, which would also pull in require-component-stories
+    // (filesystem-coupled, needs a stories tree) and props-destructuring-blank-line.
+    //   - component-file-order: top-level order (imports → *Props interface/type → component).
+    //     Report-only; activates only on files that contain a React component.
+    //   - props-destructuring-newline: a component must accept a single `props` parameter and
+    //     destructure it on its own line in the body, never inline in the parameter list
+    //     (auto-fixable). Component detection: PascalCase name or a JSX return.
+    {
+      files: ['**/*.{jsx,tsx}'],
+      plugins: { '@wl': wl },
+      rules: {
+        '@wl/component-file-order': 'error',
+        '@wl/props-destructuring-newline': 'error',
+      },
+    },
 
     // Temporary disable all sonarjs rules for markdown files
     {

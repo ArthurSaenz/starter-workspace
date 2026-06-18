@@ -97,6 +97,9 @@ importers:
       '@eslint-react/eslint-plugin':
         specifier: ^5.9.0
         version: 5.9.0(eslint@10.5.0(jiti@2.7.0))(typescript@6.0.3)
+      '@slip-stream-kit/eslint-plugin':
+        specifier: ^0.1.7
+        version: 0.1.7(eslint@10.5.0(jiti@2.7.0))
       '@wl/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
@@ -2263,6 +2266,12 @@ packages:
   '@sindresorhus/merge-streams@4.0.0':
     resolution: {integrity: sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ==}
     engines: {node: '>=18'}
+
+  '@slip-stream-kit/eslint-plugin@0.1.7':
+    resolution: {integrity: sha512-yWidkwxDpfVxkWw+f2+WhB65YtGKdKmDha/ZVccGCpzbMW9Tic8WlaNR5RlP/bT3dE0fxW3TI5PkIlyPP+g9Nw==}
+    engines: {node: '>=24.x'}
+    peerDependencies:
+      eslint: '>=9'
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -8491,6 +8500,10 @@ snapshots:
 
   '@sindresorhus/merge-streams@4.0.0': {}
 
+  '@slip-stream-kit/eslint-plugin@0.1.7(eslint@10.5.0(jiti@2.7.0))':
+    dependencies:
+      eslint: 10.5.0(jiti@2.7.0)
+
   '@standard-schema/spec@1.1.0': {}
 
   '@storybook/addon-docs@10.4.5(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(esbuild@0.28.1)(storybook@10.4.5)(vite@8.0.16(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(stylus@0.62.0)(yaml@2.9.0))':
@@ -9099,8 +9112,8 @@ snapshots:
 
   '@typescript-eslint/project-service@8.58.1(typescript@6.0.3)':
     dependencies:
-      '@typescript-eslint/tsconfig-utils': 8.61.0(typescript@6.0.3)
-      '@typescript-eslint/types': 8.61.0
+      '@typescript-eslint/tsconfig-utils': 8.58.1(typescript@6.0.3)
+      '@typescript-eslint/types': 8.58.1
       debug: 4.4.3
       typescript: 6.0.3
     transitivePeerDependencies:

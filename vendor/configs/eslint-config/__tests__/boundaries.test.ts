@@ -8,7 +8,7 @@ import { makeLintIndex } from './_lint-fixtures.js'
 // exception (features/services may import it through its barrel); shared may not depend outward.
 // This drives the real exported config over a fixture tree and asserts that matrix. The
 // lint-and-index harness lives in ./_lint-fixtures.ts, shared with no-restricted-imports.test.ts.
-const { populate, messagesFor, expectFlagged } = makeLintIndex({
+const { populate, expectFlagged, expectClean } = makeLintIndex({
   fixtures: '__tests__/fixtures-p2/src',
   ruleFilter: (id) => (id ?? '').startsWith('boundaries/'),
   flagRuleId: 'boundaries/dependencies',
@@ -30,21 +30,21 @@ describe('boundaries: sibling cross-imports are type-only', () => {
   })
 
   it('allows a type-only cross-feature import', () => {
-    expect(messagesFor('features/beta/uses-alpha-internal-type.ts')).toHaveLength(0)
+    expectClean('features/beta/uses-alpha-internal-type.ts')
   })
 
   it('allows a type-only cross-service import', () => {
-    expect(messagesFor('services/sms/uses-email-type.ts')).toHaveLength(0)
+    expectClean('services/sms/uses-email-type.ts')
   })
 
   it('allows a same-feature relative import into own internals', () => {
-    expect(messagesFor('features/beta/uses-self-internal.ts')).toHaveLength(0)
+    expectClean('features/beta/uses-self-internal.ts')
   })
 })
 
 describe('boundaries: shared layer', () => {
   it('allows a feature to import shared at runtime through its barrel', () => {
-    expect(messagesFor('features/beta/uses-shared.ts')).toHaveLength(0)
+    expectClean('features/beta/uses-shared.ts')
   })
 
   it('flags a runtime deep import into shared (barrel only)', () => {
