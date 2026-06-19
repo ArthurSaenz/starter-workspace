@@ -222,6 +222,17 @@ const config = async (userOptions = {}) => {
       },
     },
 
+    // Storybook stories legitimately deviate from the imports → *Props → component order
+    // (meta/args/decorators/render fns), so component-file-order would only produce noise there.
+    // props-destructuring-newline is intentionally left enabled. No `plugins` re-declaration is
+    // needed to set a namespaced rule to 'off'. Matches Storybook's `.stories.` convention.
+    {
+      files: ['**/*.stories.{js,jsx,ts,tsx}'],
+      rules: {
+        '@wl/component-file-order': 'off',
+      },
+    },
+
     // Temporary disable all sonarjs rules for markdown files
     {
       files: ['**/*.md'],
