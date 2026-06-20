@@ -1,28 +1,44 @@
-import { ESLint } from 'eslint'
-import path from 'node:path'
-import { beforeAll, expect, it } from 'vitest'
+import { expect, it } from 'vitest'
 
-import config from '../index.js'
+import { code, expectAtLeastOne, expectClean, lintCase } from './_lint-case.js'
 
-// cwd = package root, mirroring the _lint-fixtures.ts idiom (this file lives in __tests__/).
-const cwd = path.resolve(import.meta.dirname, '..')
+// The RULE's own behavior is owned by the plugin's RuleTester suite. This package only proves the
+// exported config WIRES it correctly: `@wl/component-file-order` is OFF on `*.stories.tsx` (stories
+// legitimately deviate from imports → *Props → component order) but ON for an ordinary `.tsx` with
+// byte-identical content. The only differentiator is the filename glob, so both cases lint the same
+// inline source under two virtual `fileName`s.
 const RULE = '@wl/component-file-order'
 
-// filename -> count of RULE messages. Other rules (e.g. props-destructuring-newline, which stays
-// ON for stories) are filtered out by ruleId, so they cannot affect these counts.
-let byFile: Map<string, number>
+// Wrong order: a stray const wedged before the component, mirroring the former Bad.tsx fixture.
+const WRONG = code`
+  import type { ReactElement } from 'react'
 
-beforeAll(async () => {
-  const eslint = new ESLint({ cwd, overrideConfigFile: true, overrideConfig: await config() })
-  const results = await eslint.lintFiles(['__tests__/fixtures-stories/*.tsx'])
+  interface BadProps {
+    label: string
+  }
 
-  byFile = new Map(results.map((r) => [path.basename(r.filePath), r.messages.filter((m) => m.ruleId === RULE).length]))
+  const SOME_CONSTANT = 'wedge'
+
+  function Bad(props: BadProps): ReactElement {
+    const { label } = props
+
+    return <div>{label}</div>
+  }
+
+  export { Bad, SOME_CONSTANT }
+`
+
+it('skips component-file-order on *.stories.tsx (rule disabled for stories)', async () => {
+  expectClean(await lintCase({ source: WRONG, fileName: 'src/Bad.stories.tsx' }), RULE)
 })
 
-it('skips component-file-order on *.stories.tsx (rule disabled for stories)', () => {
-  expect(byFile.get('Bad.stories.tsx')).toBe(0)
+// POSITIVE CONTROL — same content under a plain `.tsx` must still be flagged. Kept as ">= 1" to avoid
+// coupling to the plugin's exact messageId set.
+it('still enforces component-file-order on a non-story .tsx with identical content (control)', async () => {
+  expectAtLeastOne(await lintCase({ source: WRONG, fileName: 'src/Bad.tsx' }), RULE)
 })
 
-it('still enforces component-file-order on a non-story .tsx with identical content (control)', () => {
-  expect(byFile.get('Bad.tsx')).toBeGreaterThanOrEqual(1)
+// Self-falsifying guard: a mistyped/ignored virtual path must THROW, not silently report clean.
+it('meta: an ignored/typo virtual path throws, not silently clean', async () => {
+  await expect(lintCase({ source: WRONG, fileName: '.omc/ignored.tsx' })).rejects.toThrow()
 })

@@ -205,33 +205,10 @@ const config = async (userOptions = {}) => {
         ]
       : [],
 
-    // White-label architecture: component-file conventions on JSX/TSX files. Enabled on purpose
-    // RULE-BY-RULE — NOT wl.configs.recommended, which would also pull in require-component-stories
-    // (filesystem-coupled, needs a stories tree) and props-destructuring-blank-line.
-    //   - component-file-order: top-level order (imports → *Props interface/type → component).
-    //     Report-only; activates only on files that contain a React component.
-    //   - props-destructuring-newline: a component must accept a single `props` parameter and
-    //     destructure it on its own line in the body, never inline in the parameter list
-    //     (auto-fixable). Component detection: PascalCase name or a JSX return.
-    {
-      files: ['**/*.{jsx,tsx}'],
-      plugins: { '@wl': wl },
-      rules: {
-        '@wl/component-file-order': 'error',
-        '@wl/props-destructuring-newline': 'error',
-      },
-    },
-
-    // Storybook stories legitimately deviate from the imports → *Props → component order
-    // (meta/args/decorators/render fns), so component-file-order would only produce noise there.
-    // props-destructuring-newline is intentionally left enabled. No `plugins` re-declaration is
-    // needed to set a namespaced rule to 'off'. Matches Storybook's `.stories.` convention.
-    {
-      files: ['**/*.stories.{js,jsx,ts,tsx}'],
-      rules: {
-        '@wl/component-file-order': 'off',
-      },
-    },
+    // White-label component-file conventions, consumed from the plugin's `configs.recommended`
+    // preset (the single source of truth for rule scope/rationale). Spread so each preset block
+    // becomes a positional antfu config.
+    ...wl.configs.recommended,
 
     // Temporary disable all sonarjs rules for markdown files
     {
