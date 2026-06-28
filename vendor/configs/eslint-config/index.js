@@ -210,6 +210,38 @@ const config = async (userOptions = {}) => {
     // becomes a positional antfu config.
     ...wl.configs.recommended,
 
+    // Size-gated JSDoc. Any function longer than `minLineCount` lines must carry a JSDoc block
+    // with a body-style description (untagged summary text — the `@description` TAG is rejected,
+    // per `descriptionStyle: 'body'`) and at least one `@example`. The gate is line count, NOT
+    // cyclomatic complexity: a real complexity gate would mean reimplementing a metric that drifts
+    // from the sonarjs `cognitive-complexity` rule already enforced here, so line count is used as
+    // a simple, drift-free proxy (raise `minLineCount` to cut noise). Fixers are OFF so a `fix`
+    // run never injects empty doc stubs — authors write real docs. The `jsdoc/` plugin is provided
+    // and registered by antfu (eslint-plugin-jsdoc); flat config merges plugins per-file, so these
+    // rules resolve without re-registering it. Scoped to TS sources; tests, stories, declaration
+    // and generated files are exempt.
+    {
+      files: ['**/*.{ts,tsx}'],
+      ignores: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', '**/*.stories.{ts,tsx}', '**/__tests__/**', '**/*.d.ts'],
+      rules: {
+        'jsdoc/require-jsdoc': [
+          'error',
+          {
+            enableFixer: false,
+            minLineCount: 15,
+            require: {
+              ArrowFunctionExpression: true,
+              FunctionDeclaration: true,
+              FunctionExpression: true,
+              MethodDefinition: true,
+            },
+          },
+        ],
+        'jsdoc/require-description': ['error', { descriptionStyle: 'body' }],
+        'jsdoc/require-example': ['error', { enableFixer: false }],
+      },
+    },
+
     // Temporary disable all sonarjs rules for markdown files
     {
       files: ['**/*.md'],
