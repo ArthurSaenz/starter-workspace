@@ -118,6 +118,9 @@ importers:
       eslint-plugin-svelte:
         specifier: ^3.20.0
         version: 3.20.0(eslint@10.6.0(jiti@2.7.0))(svelte@5.55.2(@typescript-eslint/types@8.62.0))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
 
   vendor/configs/prettier-config:
     devDependencies:
