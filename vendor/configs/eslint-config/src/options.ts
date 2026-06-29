@@ -1,10 +1,13 @@
+import { frameworks } from './configs/frameworks/index.js'
 import type { ConfigOptions, ResolvedOptions } from './types.js'
 
-/** Framework presets that have a real implementation; everything else falls back to react. */
-const KNOWN_MODES = new Set(['react', 'svelte'])
-
+/**
+ * A mode is "known" iff it has a real preset in the framework registry — the single source of truth.
+ * Adding an entry to `frameworks` is therefore the ONLY edit needed to register a mode; everything
+ * else (preset lookup, this validation) derives from it.
+ */
 export const isKnownMode = (mode: string): boolean => {
-  return KNOWN_MODES.has(mode)
+  return mode in frameworks
 }
 
 /**

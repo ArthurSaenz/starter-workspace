@@ -48,13 +48,8 @@ export const boundaries = (severity: 'warn' | 'error' = 'warn'): TypedFlatConfig
     ],
   },
   rules: {
-    // Single modern rule (v6; `entry-point`/`element-types` are deprecated). Policy:
-    // cross-element imports between SIBLINGS (feature<->feature, service<->service,
-    // feature<->service) must be TYPE-ONLY — no runtime/value cross-import. The one
-    // runtime exception is the shared layer: features/services may import `shared` at
-    // value level through its barrel. `shared` may not depend outward at all (no rule),
-    // so shared -> feature/service is disallowed for both value AND type. Intra-element
-    // imports are exempt (checkInternals=false).
+    // Single modern rule (v6; `entry-point`/`element-types` are deprecated). The policy it encodes
+    // is described in this file's header block; the inline notes below mark each `allow` exception.
     'boundaries/dependencies': [
       severity,
       {

@@ -23,10 +23,10 @@ consumers calling `config()` / `config({ ignores })` are unaffected.
 | `mode`        | `'react' \| 'svelte' \| string` | `'react'` | Framework preset. Unknown values fall back to `react` with a dev-time `console.warn`.               |
 | `ignores`     | `string[]`                      | `[]`      | Extra ignore globs appended to the built-in ignores.                                                |
 | `boundaries`  | `boolean \| 'warn' \| 'error'`  | `'warn'`  | Phase-2 relationship-aware import boundaries. `false` drops the layer; `'error'` enforces strictly. |
-| `jsdoc`       | `boolean`                       | `true`    | Size-gated JSDoc layer.                                                                             |
+| `jsdoc`       | `boolean`                       | `true`    | Size-gated JSDoc layer (PascalCase components exempt from `@example`/description — see below).      |
 | `markdown`    | `boolean`                       | `true`    | Markdown sonarjs-off layer.                                                                         |
 | `components`  | `boolean`                       | `true`    | White-label component conventions (`@wl`).                                                          |
-| `rules`       | `Record<string, RuleEntry>`     | `{}`      | Consumer rule overrides, merged **last** (highest precedence). Omitted from the call when empty.    |
+| `rules`       | `ConfigRules`                   | `{}`      | Consumer rule overrides, merged **last** (highest precedence). Omitted from the call when empty.    |
 | `userConfigs` | `FlatConfig[]`                  | `[]`      | Arbitrary consumer flat-configs appended **last**.                                                  |
 
 ```js
@@ -152,10 +152,37 @@ consumer that imports via a path alias (e.g. `#root` ⇒ `src`) must add a match
 (e.g. `eslint-import-resolver-typescript` in its `settings['import/resolver']`); otherwise
 aliased targets resolve as `unknown` and are silently not enforced.
 
+## JSDoc layer (size-gated)
+
+Any function longer than 15 lines must carry a JSDoc block (`jsdoc/require-jsdoc`). For
+**non-component** functions the block must also have a body-style description
+(`jsdoc/require-description`) and at least one `@example` (`jsdoc/require-example`).
+
+**React components are exempt from the description and `@example` requirements** — a component's
+contract is its props + JSX, not prose or a runnable example. A component is identified by a
+**PascalCase name** (the React convention), implemented via esquery `contexts` in
+`src/configs/docs.ts`. Components still require a JSDoc block when over the size gate; that block
+just need not contain a description or example.
+
+```tsx
+// ✅ component: block required over 15 lines, but no description/@example needed
+/** */
+export const UserCard = (props: UserCardProps) => <article>{props.name}</article>
+
+// ❌ non-component > 15 lines: needs a JSDoc block WITH a body description and an @example
+export const formatAddress = (parts: string[]) => {
+  /* …16+ lines… */
+}
+```
+
+> Limitation: the heuristic is **named-declaration-only**. Anonymous / default-export components
+> (`export default () => …`) and HOC-wrapped ones (`memo(...)`, `forwardRef(...)`) are not recognized
+> and remain subject to all three rules.
+
 ## Component conventions (`@wl/eslint-plugin`)
 
-On JSX/TSX files the config enables two white-label component rules (registered rule-by-rule, not
-the plugin's `recommended` preset):
+On JSX/TSX files the config enables two white-label component rules (consumed from the plugin's
+`configs.recommended` preset, the single source of truth for their scope and rationale):
 
 - **`@wl/component-file-order`** — enforces top-level order: imports → `*Props` interface/type →
   component declaration. Report-only; activates only on files that contain a React component.
@@ -183,8 +210,15 @@ const UserCard = (props: UserCardProps) => {
 pnpm --filter @wl/eslint-config test
 ```
 
-Tests run the exported config programmatically (the `ESLint` class) against fixtures:
+Tests run the **real exported config** (`config()`) programmatically via ESLint. Fixtures are
+constructed by the suite, not committed as on-disk trees:
 
-- `__tests__/fixtures/src` — Phase 1 string rule (deep imports flagged, barrels/relative pass).
-- `__tests__/fixtures-p2/src` — Phase 2 boundaries (cross-element internals flagged; barrels,
-  same-element, and type-only imports pass) for both features and services.
+- `_lint-case.ts` — a declarative harness that lints inline `code` strings under a virtual
+  `fileName`, so the wired file-glob behavior is exercised. Drives the string-rule suites:
+  `no-restricted-imports.test.ts` (Phase 1: deep imports flagged, barrels/relative pass),
+  `component-file-order-stories.test.ts`, `props-destructuring.test.ts`.
+- `_boundaries-tree.ts` — Phase 2 (`boundaries/dependencies`) resolves each import on disk, so it
+  materializes a scaffold tree into a temp dir (`mkdtempSync`, cleaned up after the suite) and
+  writes the importer file inline per case. Drives `boundaries.test.ts` (cross-element internals
+  flagged; barrels, same-element, and type-only imports pass) for features and services.
+- `options-*.test.ts` — the factory's option resolution: defaults, toggles, and passthrough.

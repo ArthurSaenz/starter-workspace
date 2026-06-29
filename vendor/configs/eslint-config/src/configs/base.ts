@@ -6,11 +6,12 @@ import type { ConfigRules } from '../types.js'
 /** Base antfu options shared by every mode. Framework flags (react/svelte) are merged in the factory. */
 export const antfuBaseOptions = { lessOpinionated: true }
 
-/** sonarjs recommended preset — positional arg 2 of the antfu call. */
+/** sonarjs recommended preset. Composed early so later layers can override its rules. */
 export const sonarjsRecommended = sonarjs.configs.recommended
 
 /**
- * The project-wide rule overrides — positional arg 3.
+ * The project-wide rule overrides. Applied after the antfu base + sonarjs so these win; consumer
+ * `rules`/`userConfigs` are appended even later and win over these. See `factory.ts` for the order.
  *
  * Extracted VERBATIM from the original index.js: rule order, the `no-restricted-imports` Phase-1
  * region, the prettier-coordination toggles, and the intentional duplicate keys are all preserved.
