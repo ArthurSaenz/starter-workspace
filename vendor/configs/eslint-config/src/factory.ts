@@ -7,26 +7,21 @@ import { wlComponentsRecommended } from './configs/components.js'
 import { jsdoc, markdown } from './configs/docs.js'
 import { frameworks } from './configs/frameworks/index.js'
 import { ignores } from './configs/ignores.js'
+import { tempDisabledRules } from './configs/temp-disabled.js'
 import { isKnownMode, resolveOptions } from './options.js'
 import type { ConfigOptions } from './types.js'
 
-// Minimal ambient declaration so the unknown-mode dev warning type-checks without pulling in DOM or
-// @types/node (this package imports no node: builtins). `console` exists globally at runtime in Node.
+// Ambient `console` so the dev warning type-checks without pulling in DOM or @types/node.
 declare const console: { warn: (...args: unknown[]) => void }
 
 const hasKeys = (obj: object): boolean => Object.keys(obj).length > 0
 
 /**
- * Build the shared flat ESLint config. Composes @antfu/eslint-config + sonarjs + architecture import
- * boundaries + the white-label component conventions + size-gated JSDoc into a single `antfu(...)`
- * call. Every layer is gated by an option whose default reproduces the historical config byte-for-byte,
- * so `createConfig()` and `createConfig({ ignores })` are unchanged for existing consumers.
- *
- * The modules are passed as POSITIONAL arguments in the original order; optional `rules`/`userConfigs`
- * are appended only when non-empty, so the default call shape never changes.
+ * Build the shared flat ESLint config as a single `antfu(...)` call. Each layer is gated by an option
+ * (see `resolveOptions`); layers are positional in the original order, and `rules`/`userConfigs` are
+ * appended only when non-empty, so the default call shape never changes.
  *
  * @example
- * export default createConfig() // react preset, all layers on
  * export default createConfig({ mode: 'svelte', boundaries: 'error', ignores: ['dist'] })
  */
 export const createConfig = async (userOptions: ConfigOptions = {}): Promise<TypedFlatConfigItem[]> => {
@@ -47,6 +42,9 @@ export const createConfig = async (userOptions: ConfigOptions = {}): Promise<Typ
     ...(o.components ? wlComponentsRecommended : []),
     ...(o.jsdoc ? [jsdoc] : []),
     ...(o.markdown ? [markdown] : []),
+    // Appended after every rule-bearing layer so its `'off'` entries win — the single place for
+    // temporary rule disables. Kept before `o.rules`/`userConfigs` so consumers can still override.
+    tempDisabledRules(o),
     ignores(o.ignores),
     ...(hasKeys(o.rules) ? [{ rules: o.rules }] : []),
     ...o.userConfigs,

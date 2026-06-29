@@ -9,13 +9,12 @@ import config from '../src/index.js'
 type Flat = Awaited<ReturnType<typeof config>>
 
 const ourBoundaries = (flat: Flat) => flat.find((c) => c?.plugins?.boundaries)
-const ourJsdoc = (flat: Flat) => {
-  return flat.find((c) => {
-    const r = c?.rules?.['jsdoc/require-jsdoc'] as Linter.RuleEntry | undefined
-
-    return Array.isArray(r) && (r[1] as { minLineCount?: number })?.minLineCount === 15
-  })
-}
+// Our jsdoc item is the file-scoped layer that sets `jsdoc/require-jsdoc` to 'off' (function-level JSDoc
+// was handed off to `@wl/require-jsdoc-example`). antfu's jsdoc layer never touches that rule, and a
+// global temporarily-disabled override (if present) carries no `files`, so requiring a `files` array
+// uniquely pins OUR docs.ts item.
+const ourJsdoc = (flat: Flat) =>
+  flat.find((c) => Array.isArray(c?.files) && c?.rules?.['jsdoc/require-jsdoc'] === 'off')
 const ourMarkdown = (flat: Flat) => {
   return flat.find(
     (c) =>

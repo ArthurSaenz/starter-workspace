@@ -10,12 +10,9 @@ export const antfuBaseOptions = { lessOpinionated: true }
 export const sonarjsRecommended = sonarjs.configs.recommended
 
 /**
- * The project-wide rule overrides. Applied after the antfu base + sonarjs so these win; consumer
- * `rules`/`userConfigs` are appended even later and win over these. See `factory.ts` for the order.
- *
- * Extracted VERBATIM from the original index.js: rule order, the `no-restricted-imports` Phase-1
- * region, the prettier-coordination toggles, and the intentional duplicate keys are all preserved.
- * Do not reorder or dedupe — the zero-drift baseline depends on byte-for-byte equivalence.
+ * Project-wide rule overrides. Applied after antfu base + sonarjs (so these win); consumer
+ * `rules`/`userConfigs` win over these — see `factory.ts`. Order reproduces the published baseline
+ * byte-for-byte; do not reorder or dedupe.
  */
 export const overrides: TypedFlatConfigItem = {
   rules: {
@@ -24,7 +21,6 @@ export const overrides: TypedFlatConfigItem = {
 
     'react/prefer-shorthand-boolean': 'off',
 
-    // TEMPORARY DISABLED RULES
     'react/component-hook-factories': 'off',
     'react/rules-of-hooks': 'off',
     'react/unsupported-syntax': 'off',
@@ -35,7 +31,6 @@ export const overrides: TypedFlatConfigItem = {
     'style/arrow-parens': ['error', 'always'],
     'arrow-body-style': ['error', 'always'],
 
-    // Temporary disable
     'ts/no-use-before-define': 'off',
 
     'perfectionist/sort-named-imports': 'off',
@@ -53,15 +48,12 @@ export const overrides: TypedFlatConfigItem = {
     'style/brace-style': 'off',
     'style/member-delimiter-style': 'off',
     'style/multiline-ternary': 'off',
-    'style/operator-linebreak': 'off', // TODO
+    'style/operator-linebreak': 'off',
     'style/quote-props': 'off',
     'style/jsx-wrap-multilines': 'off',
     'style/indent-binary-ops': 'off',
     'style/indent': 'off',
-    // NOTE: in the original index.js, 'style/jsx-wrap-multilines' and 'style/indent-binary-ops' were
-    // each listed twice with the identical value ('off'). TypeScript (TS1117) forbids duplicate object
-    // keys, so the redundant second copies are dropped here. This is print-config-neutral: same value,
-    // last-wins === single declaration, so the effective rule set is unchanged.
+    // Each style/* key appears once — TS1117 forbids duplicate object keys, so don't add a second.
     'style/jsx-curly-newline': 'off',
     'style/quotes': 'off',
 
@@ -72,33 +64,20 @@ export const overrides: TypedFlatConfigItem = {
     'sonarjs/mouse-events-a11y': 'off',
     'sonarjs/no-array-index-key': 'off',
 
-    'sonarjs/no-commented-code': 'off', // TODO: temporary disable, must be enabled
+    'sonarjs/no-commented-code': 'off', // TODO: re-enable
 
     'unicorn/no-new-array': 'off',
 
-    // prettier owns numeric-literal formatting (lowercases hex), which conflicts with
-    // unicorn/number-literal-case (wants uppercase hex digits). Let prettier win.
+    // prettier lowercases hex literals, conflicting with unicorn/number-literal-case (wants
+    // uppercase) — let prettier win.
     'unicorn/number-literal-case': 'off',
 
-    //#region Architecture import relation rules
-    // Enforce public-API boundaries: features/services must be imported via their barrel
-    // (index.ts), never their internals. `**/<kind>/*/**` anchors on the segment (not a
-    // leading-segment count), so it matches every prefix (#root/, @/, src/, ../) at any
-    // depth, while the trailing `/**` requires >=1 inner segment — keeping the bare-directory
-    // barrel import allowed.
-    //
-    // The two `!`-negations carve the IMMEDIATE `index` barrel back out: an EXPLICIT barrel
-    // import (`.../<el>/index`, `.../<el>/index.js|ts|…`) is the public API and must pass —
-    // it is also the ONLY valid form under NodeNext/ESM, where a bare-directory import does
-    // not resolve. ESLint matches these globs with gitignore semantics, so `!` re-includes;
-    // `*` never crosses `/`, so a nested `.../internal/index.js` stays blocked. Keep the
-    // features/services carve-outs identical — the paired barrel tests guard each side's
-    // behavior. Known residual: a feature-nested-service barrel
-    // (`features/*/services/*/index.js`) cannot be re-included this way (gitignore forbids
-    // re-including under an excluded parent dir) — deferred to Phase 2.
-    //
-    // String-only: bans deep imports but can't detect cross-element relationships (feature A
-    // -> feature B); that is gated Phase 2, see .omc/plans/eslint-import-boundary-rules.md.
+    // Phase-1 public-API boundary (string-only): features/services may be imported only via their
+    // index barrel, not internals. ESLint matches these globs with gitignore semantics, so the
+    // `!**/…/index*` negations re-include the explicit barrel (also the only valid form under
+    // NodeNext/ESM). Can't detect cross-element relations (feature A -> B) — that's the Phase-2
+    // boundaries layer. Known residual: a feature-nested-service barrel can't be re-included
+    // (gitignore forbids re-including under an excluded parent) — deferred to Phase 2.
     'no-restricted-imports': [
       'error',
       {
@@ -116,6 +95,5 @@ export const overrides: TypedFlatConfigItem = {
         ],
       },
     ],
-    //#endregion Architecture import relation rules
   } as ConfigRules,
 }

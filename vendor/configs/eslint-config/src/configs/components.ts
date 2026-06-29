@@ -1,21 +1,19 @@
 import type { TypedFlatConfigItem } from '@antfu/eslint-config'
 import wl from '@slip-stream-kit/eslint-plugin'
 
-// White-label component-file conventions, consumed from the plugin's `configs.recommended` preset
-// (the single source of truth for rule scope/rationale). Spread by the factory so each preset block
-// becomes a positional antfu config. Typed as an array (it is one at runtime) so the factory can
-// spread it.
+import { GLOB_TS } from '../globs.js'
+import type { ConfigRules } from '../types.js'
+
+// White-label component-file conventions, from the plugin's `configs.recommended` preset. Some @wl
+// rules are muted in `configs/temp-disabled.ts`, not here.
 export const wlComponentsRecommended: TypedFlatConfigItem[] = [
   ...(wl.configs.recommended as TypedFlatConfigItem[]),
-  // ── TEMPORARILY DISABLED: component/JSX size rules ──────────────────────────
-  // Appended last so it overrides the preset (flat config: later blocks win for
-  // matching files). To RE-ENABLE, just delete this override block.
+  // The preset ships `@wl/require-jsdoc-example` at `warn` for soft, non-breaking adoption; we enforce
+  // it at `error` to match the other @wl rules. It is currently muted in `configs/temp-disabled.ts`
+  // until adoption completes — the `error` severity here is the intended state once that mute is lifted.
   {
-    files: ['**/*.tsx'],
-    rules: {
-      '@wl/max-jsx-return-size': 'off',
-      '@wl/max-components-per-file': 'off',
-    },
+    name: 'wl/require-jsdoc-example-error',
+    files: [GLOB_TS],
+    rules: { '@wl/require-jsdoc-example': 'error' } as ConfigRules,
   },
-  // ────────────────────────────────────────────────────────────────────────────
 ]

@@ -1,6 +1,4 @@
-// Shared glob constants. Kept byte-identical to the literals previously inlined in the monolithic
-// index.js so the composed flat-config is unchanged. New config modules should reference these
-// instead of re-typing the globs.
+// Shared glob constants. New config modules should reference these instead of re-typing the globs.
 
 /** Every lintable source extension — the scope of the boundaries layer. */
 export const GLOB_SRC_ALL = '**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}'

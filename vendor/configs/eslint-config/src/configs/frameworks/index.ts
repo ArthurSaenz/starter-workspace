@@ -12,9 +12,8 @@ export interface FrameworkPreset {
 }
 
 /**
- * Framework registry — the single seam for adding a new mode. To add a framework, drop a
- * `configs/frameworks/<name>.ts` exporting its config(s) and add one entry here. The factory looks
- * the preset up by `mode` and falls back to `react` for unknown values.
+ * Framework registry — the single seam for adding a mode: drop a `configs/frameworks/<name>.ts` and
+ * add an entry here. The factory looks the preset up by `mode`, falling back to `react`.
  */
 export const frameworks: Record<string, FrameworkPreset> = {
   react: { antfuFlags: { react: true }, extraConfigs: [] },

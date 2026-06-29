@@ -101,8 +101,8 @@ importers:
         specifier: ^5.10.0
         version: 5.10.0(eslint@10.6.0(jiti@2.7.0))(typescript@6.0.3)
       '@slip-stream-kit/eslint-plugin':
-        specifier: ^0.1.19
-        version: 0.1.19(eslint@10.6.0(jiti@2.7.0))
+        specifier: ^0.1.20
+        version: 0.1.20(eslint@10.6.0(jiti@2.7.0))
       '@wl/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
@@ -2007,8 +2007,8 @@ packages:
     resolution: {integrity: sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ==}
     engines: {node: '>=18'}
 
-  '@slip-stream-kit/eslint-plugin@0.1.19':
-    resolution: {integrity: sha512-Y6tT9dS1Kr0grFIZJELM6KWtXVp2ZXWb7EcqIhXRPVuQGrCJlh+ljquI57V0Nvg+sq4LqwNUBvQXxV0xHWHDhQ==}
+  '@slip-stream-kit/eslint-plugin@0.1.20':
+    resolution: {integrity: sha512-1kn18Yj6xb/qggZV+vfNsh3HDAayUQMnk3SKIOgkjMX9qeI839pIA2JZ4HSqIZ4DTNGVVEaV+wu8LJglC8YQJQ==}
     engines: {node: '>=24.x'}
     peerDependencies:
       eslint: '>=9'
@@ -8297,7 +8297,7 @@ snapshots:
 
   '@sindresorhus/merge-streams@4.0.0': {}
 
-  '@slip-stream-kit/eslint-plugin@0.1.19(eslint@10.6.0(jiti@2.7.0))':
+  '@slip-stream-kit/eslint-plugin@0.1.20(eslint@10.6.0(jiti@2.7.0))':
     dependencies:
       eslint: 10.6.0(jiti@2.7.0)
 

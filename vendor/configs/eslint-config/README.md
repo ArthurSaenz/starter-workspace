@@ -154,19 +154,17 @@ aliased targets resolve as `unknown` and are silently not enforced.
 
 ## JSDoc layer (size-gated)
 
-Any function longer than 15 lines must carry a JSDoc block (`jsdoc/require-jsdoc`). For
-**non-component** functions the block must also have a body-style description
-(`jsdoc/require-description`) and at least one `@example` (`jsdoc/require-example`).
+Any **non-component** function longer than 15 lines must carry a JSDoc block (`jsdoc/require-jsdoc`)
+that also has a body-style description (`jsdoc/require-description`) and at least one `@example`
+(`jsdoc/require-example`).
 
-**React components are exempt from the description and `@example` requirements** — a component's
-contract is its props + JSX, not prose or a runnable example. A component is identified by a
-**PascalCase name** (the React convention), implemented via esquery `contexts` in
-`src/configs/docs.ts`. Components still require a JSDoc block when over the size gate; that block
-just need not contain a description or example.
+**React components are fully exempt from all three rules** — a component's contract is its props +
+JSX, not prose, a runnable example, or even a doc block. A component is identified by a **PascalCase
+name** (the React convention), implemented via esquery `contexts` shared by all three rules in
+`src/configs/docs.ts`. A component never owes a JSDoc block, regardless of length.
 
 ```tsx
-// ✅ component: block required over 15 lines, but no description/@example needed
-/** */
+// ✅ component: no JSDoc required, even over 15 lines
 export const UserCard = (props: UserCardProps) => <article>{props.name}</article>
 
 // ❌ non-component > 15 lines: needs a JSDoc block WITH a body description and an @example
