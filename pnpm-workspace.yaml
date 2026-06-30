@@ -23,14 +23,6 @@ packageExtensions:
       '@storybook/addon-links': { optional: true }
       '@storybook/addon-vitest': { optional: true }
 
-# infra-kit >= 0.1.120 ships with `"react": "catalog:"` in its *published* manifest
-# (it depends on ink, which needs React). The catalog protocol only resolves inside a
-# workspace, so pnpm can't install it for an external package and fails with
-# ERR_PNPM_SPEC_NOT_SUPPORTED_BY_ANY_RESOLVER. This is a publish-automation bug upstream;
-# until it's fixed, rewrite that spec to the real react version (mirrors the catalog entry).
-overrides:
-  'infra-kit>react': 19.2.7
-
 catalog:
   '@playwright/test': ^1.59.1
   '@tailwindcss/vite': ^4.3.1

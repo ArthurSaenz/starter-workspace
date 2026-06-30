@@ -178,12 +178,6 @@ const COPY_CONFIG = [
     vendored: true,
   },
   {
-    name: 'Vendor drift-check script',
-    source: 'scripts/vendor-check.mjs',
-    target: 'scripts/vendor-check.mjs',
-    type: 'file',
-  },
-  {
     name: 'Lib BE Dev',
     source: 'vendor/packages/lib-be-dev',
     target: `${VENDOR_DIR}/packages/lib-be-dev`,

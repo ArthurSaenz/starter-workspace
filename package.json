@@ -63,7 +63,7 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@wl/prettier-config": "workspace:*",
-    "infra-kit": "0.1.120",
+    "infra-kit": "0.1.122",
     "shadcn": "^4.12.0",
     "turbo": "2.10.0",
     "typescript": "catalog:"
