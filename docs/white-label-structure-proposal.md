@@ -36,7 +36,7 @@ config/CI/editor files that happen to ride the same mechanism.
 | # | Category | Paths | Nature |
 |---|----------|-------|--------|
 | **A** | **Workspace packages** | `packages/web-toolkit`, `packages/lib-be-dev`, `configs/*` (eslint-config, prettier-config, serverless-config, storybook-config, ts-config, vitest-config) | **Real code, `@pkg/*`** |
-| B | Root tooling configs | `Makefile`, `.prettierrc.mjs`, `.prettierignore`, `.node-version`, `.gitignore`, `.editorconfig`, `vitest.config.ts`, `skills-lock.json`, `turbo.json` | Dotfiles |
+| B | Root tooling configs | `.prettierrc.mjs`, `.prettierignore`, `.node-version`, `.gitignore`, `.editorconfig`, `vitest.config.ts`, `skills-lock.json`, `turbo.json` | Dotfiles |
 | C | AI / editor configs | `.claude/`, `.cursor/mcp.json`, `.cursor/rules/`, `.agents/`, `.vscode/{extensions,global.code-snippets,settings}` | Dotfiles |
 | D | CI | `.github/workflows/_*.yml` (reusable) + `code-quality.yml` | CI |
 | E | Devops | `devops/scripts/lib` | Scripts |

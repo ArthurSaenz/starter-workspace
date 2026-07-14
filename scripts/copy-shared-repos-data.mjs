@@ -39,7 +39,9 @@ const VENDOR_DIR = 'vendor'
 // Legacy locations that earlier syncs wrote at the repo root. The sync only removes its own
 // target paths, so without an explicit pre-clean a stale copy here would collide with the new
 // `vendor/` package of the same `@pkg/*` name and break pnpm. Removed before copying.
-const LEGACY_CLEANUP = ['packages/web-toolkit', 'packages/lib-be-dev', 'configs']
+// Do not re-add `packages/lib-be-dev`: starter no longer ships it, and consumers that still use it
+// must be free to adopt their own copy there without the next sync deleting it.
+const LEGACY_CLEANUP = ['packages/web-toolkit', 'configs']
 
 // Files/dirs skipped when walking `vendor/` to build the integrity manifest.
 const MANIFEST_SKIP_DIRS = new Set([
@@ -84,12 +86,6 @@ const COPY_CONFIG = [
     source: '.cursor/rules',
     target: '.cursor/rules',
     type: 'directory',
-  },
-  {
-    name: 'Make scripts',
-    source: 'Makefile',
-    target: 'Makefile',
-    type: 'file',
   },
   {
     name: 'Web-toolkit',
@@ -174,13 +170,6 @@ const COPY_CONFIG = [
     name: 'Configs',
     source: 'vendor/configs',
     target: `${VENDOR_DIR}/configs`,
-    type: 'directory',
-    vendored: true,
-  },
-  {
-    name: 'Lib BE Dev',
-    source: 'vendor/packages/lib-be-dev',
-    target: `${VENDOR_DIR}/packages/lib-be-dev`,
     type: 'directory',
     vendored: true,
   },

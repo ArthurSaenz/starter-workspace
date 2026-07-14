@@ -57,7 +57,7 @@ A file path is mapped to a grouped sidebar slug by `pathToSlugs`. Examples:
 | `spec/docs/index.mdx`                 | `/docs`                      |
 | `spec/docs/docs-ui/adding-docs.md`    | `/docs/docs-ui/adding-docs`  |
 | `apps/ai/agent/docs/draft.md`         | `/docs/ai-agent/draft`       |
-| `packages/lib-be-dev/docs/README.md`  | `/docs/lib-be-dev`           |
+| `packages/web-toolkit/docs/README.md` | `/docs/web-toolkit`          |
 
 A single `README.md` or `index.md` directly under a package's `docs/` folder
 collapses to the group URL itself — there is no trailing `/readme` segment.
