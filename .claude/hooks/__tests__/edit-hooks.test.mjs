@@ -1,9 +1,40 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readdirSync, rmSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { runHook, edit, HOOKS_DIR } from './helpers.mjs';
 import { findPackageDir } from '../hooklib.mjs';
+
+const REPO_ROOT = resolve(HOOKS_DIR, '..', '..');
+
+// Find a real package (tsconfig.json + a non-.d.ts source) to exercise the incremental typecheck.
+// Returns null if none is available so the test can skip instead of failing on a partial checkout.
+function findTypecheckablePackage() {
+  let hit = null;
+  const walk = (dir, depth) => {
+    if (hit || depth > 4) return;
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    if (entries.some((e) => e.isFile() && e.name === 'tsconfig.json')) {
+      const src = entries.find((e) => e.isFile() && /(?<!\.d)\.ts$/.test(e.name));
+      if (src) {
+        hit = { pkgDir: dir, file: join(dir, src.name) };
+        return;
+      }
+    }
+    for (const e of entries) {
+      if (e.isDirectory() && e.name !== 'node_modules' && !e.name.startsWith('.')) {
+        walk(join(dir, e.name), depth + 1);
+      }
+    }
+  };
+  walk(REPO_ROOT, 0);
+  return hit;
+}
 
 // -------------------------------------------------------------- protect-files
 
@@ -60,4 +91,17 @@ test('findPackageDir returns the nearest ancestor holding a package.json', () =>
 
 test('findPackageDir returns null for a path outside any package', () => {
   assert.equal(findPackageDir('/nonexistent/deep/x.ts'), null);
+});
+
+// Locks the F2 incremental behavior: typecheck.mjs must write a .tsbuildinfo (only --incremental
+// does that) and exit 0. Skips if no typecheckable package exists (partial checkout).
+const pkg = findTypecheckablePackage();
+test('typecheck.mjs writes an incremental tsbuildinfo and exits 0', { skip: !pkg }, () => {
+  const tsBuildInfo = join(pkg.pkgDir, 'node_modules', '.cache', 'hook-tsc.tsbuildinfo');
+  rmSync(tsBuildInfo, { force: true });
+
+  const res = runHook('typecheck.mjs', edit(pkg.file));
+
+  assert.equal(res.status, 0, 'typecheck must never block');
+  assert.ok(existsSync(tsBuildInfo), 'incremental run must produce a tsbuildinfo');
 });

@@ -6,6 +6,12 @@
 //
 // Deliberately self-contained (no local imports) so no sibling-hook bug can disable it, and
 // invoked as `node <path>` so a stripped exec bit can't turn a block into a silent pass.
+//
+// Relationship to permissions.deny: this hook is a near-superset of the deny prefixes (it also
+// catches the deliver commands, spaced `ik release deliver` included). deny's value is
+// layer-independence — it survives this hook being skipped/deleted — not extra coverage. And
+// because `curl` is on the allow list, this hook is the SOLE guard against a curl/wget call to
+// the workflow-dispatch endpoint. Keep both.
 
 import { readFileSync } from 'node:fs';
 
