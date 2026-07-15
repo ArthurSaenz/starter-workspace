@@ -5,7 +5,9 @@
 // wall — the durable control is server-side.
 //
 // Deliberately self-contained (no local imports) so no sibling-hook bug can disable it, and
-// invoked as `node <path>` so a stripped exec bit can't turn a block into a silent pass.
+// invoked as `node <path>` so a stripped exec bit can't turn a block into a silent pass. Blocks via
+// a PreToolUse permissionDecision:"deny" (exit 0 + JSON), which holds even under bypassPermissions /
+// --dangerously-skip-permissions — the mode where a settings deny rule would be skipped.
 //
 // Relationship to permissions.deny: this hook is a near-superset of the deny prefixes (it also
 // catches the deliver commands, spaced `ik release deliver` included). deny's value is
@@ -25,13 +27,30 @@ const RE_ENV_ASSIGN = /^[A-Za-z_][A-Za-z0-9_]*=/;
 // single token so `deploy-all` and paths like `scripts/deliver` don't match.
 const RE_DELIVER = /^(dx-)?(release-)?deliver$/i;
 
+// Emit a PreToolUse "deny" decision. Uses the JSON permissionDecision channel (exit 0 — JSON is
+// only read on exit 0), not exit-2, because a permissionDecision:"deny" holds even under
+// bypassPermissions / --dangerously-skip-permissions, where a settings deny rule does not. `reason`
+// is surfaced to the model.
+function denyDecision(reason) {
+  process.stdout.write(
+    JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny',
+        permissionDecisionReason: reason,
+      },
+    }),
+  );
+  process.exit(0);
+}
+
+// Fail closed: we could not prove the call is safe, so deny it.
 function failClosed(reason) {
-  process.stderr.write(`block-deploy: ${reason} — failing closed.\n`);
-  process.exit(2);
+  denyDecision(`block-deploy: ${reason} — failing closed.`);
 }
 
 function deny(reason) {
-  process.stderr.write(
+  denyDecision(
     [
       `BLOCKED by deploy guard: ${reason}`,
       '',
@@ -43,14 +62,12 @@ function deny(reason) {
       '    pnpm exec infra-kit release-deploy-all',
       '    pnpm exec infra-kit release-deploy-selected',
       '',
-      'prod is DELIVERED, never deployed ad-hoc — and delivery is a human\'s call:',
+      "prod is DELIVERED, never deployed ad-hoc — and delivery is a human's call:",
       '    pnpm dx-release-deliver                       # run by a human, not by you',
       '',
       'Reading workflow state is allowed: gh run list / view / watch, gh workflow view.',
-      '',
     ].join('\n'),
   );
-  process.exit(2);
 }
 
 // Two-char operators before their single-char prefixes.
@@ -115,45 +132,51 @@ function checkInfraKit(argv) {
   }
 }
 
-let input;
+// Everything runs inside a fail-closed boundary: any unexpected throw denies rather than crashing
+// (an uncaught error would exit non-zero-but-not-2, which does NOT block).
 try {
-  input = JSON.parse(readFileSync(0, 'utf8'));
-} catch {
-  failClosed('unparseable hook input');
-}
-
-const toolName = input.tool_name ?? '';
-if (!toolName) failClosed('missing tool_name');
-if (toolName !== 'Bash') process.exit(0);
-
-const command = input.tool_input?.command ?? '';
-if (!command) process.exit(0);
-
-for (const segment of splitIntoSegments(command)) {
-  if (!segment.trim()) continue;
-
-  const argv = tokenise(segment);
-  if (argv.length === 0) continue;
-
-  switch (argv[0].toLowerCase()) {
-    case 'gh':
-      checkGh(argv, segment);
-      break;
-    case 'curl':
-    case 'wget':
-      checkHttp(segment);
-      break;
-    case 'pnpm':
-    case 'npm':
-    case 'npx':
-    case 'pnpx':
-    case 'yarn':
-    case 'node':
-    case 'infra-kit':
-    case 'ik':
-      checkInfraKit(argv);
-      break;
+  let input;
+  try {
+    input = JSON.parse(readFileSync(0, 'utf8'));
+  } catch {
+    failClosed('unparseable hook input');
   }
-}
 
-process.exit(0);
+  const toolName = input.tool_name ?? '';
+  if (!toolName) failClosed('missing tool_name');
+  if (toolName !== 'Bash') process.exit(0);
+
+  const command = input.tool_input?.command ?? '';
+  if (!command) process.exit(0);
+
+  for (const segment of splitIntoSegments(command)) {
+    if (!segment.trim()) continue;
+
+    const argv = tokenise(segment);
+    if (argv.length === 0) continue;
+
+    switch (argv[0].toLowerCase()) {
+      case 'gh':
+        checkGh(argv, segment);
+        break;
+      case 'curl':
+      case 'wget':
+        checkHttp(segment);
+        break;
+      case 'pnpm':
+      case 'npm':
+      case 'npx':
+      case 'pnpx':
+      case 'yarn':
+      case 'node':
+      case 'infra-kit':
+      case 'ik':
+        checkInfraKit(argv);
+        break;
+    }
+  }
+
+  process.exit(0);
+} catch (err) {
+  failClosed(`internal error: ${err?.message ?? err}`);
+}

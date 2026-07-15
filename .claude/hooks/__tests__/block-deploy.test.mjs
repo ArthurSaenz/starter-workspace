@@ -3,7 +3,13 @@ import assert from 'node:assert/strict';
 import { runHook, bash } from './helpers.mjs';
 
 const HOOK = 'block-deploy.mjs';
-const status = (command, opts) => runHook(HOOK, bash(command), opts).status;
+
+// Blocks via a PreToolUse permissionDecision:"deny" on stdout (exit 0 — JSON is only read on
+// exit 0), so we assert on the JSON, not the exit code.
+function decision(command, opts) {
+  const res = runHook(HOOK, command === null ? '{bad json' : bash(command), opts);
+  return { denied: /"permissionDecision"\s*:\s*"deny"/.test(res.stdout), status: res.status };
+}
 
 const BLOCKED = [
   ['gh workflow run', 'gh workflow run deploy.yml'],
@@ -35,29 +41,37 @@ const ALLOWED = [
   ['dispatches in a non-gh command', 'ls dispatches/'],
 ];
 
-test('block-deploy blocks every bypass (exit 2)', () => {
+test('block-deploy DENIES every bypass via permissionDecision (exit 0 + deny JSON)', () => {
   for (const [label, command] of BLOCKED) {
-    assert.equal(status(command), 2, label);
+    const d = decision(command);
+    assert.ok(d.denied, `should deny: ${label}`);
+    assert.equal(d.status, 0, `deny must exit 0 (JSON channel): ${label}`);
   }
 });
 
-test('block-deploy allows read paths and non-deploy commands (exit 0)', () => {
+test('block-deploy allows read paths and non-deploy commands (no deny)', () => {
   for (const [label, command] of ALLOWED) {
-    assert.equal(status(command), 0, label);
+    const d = decision(command);
+    assert.equal(d.denied, false, `should allow: ${label}`);
+    assert.equal(d.status, 0, label);
   }
 });
 
-test('block-deploy fails closed on malformed / empty / missing tool_name', () => {
-  assert.equal(runHook(HOOK, '{bad json').status, 2);
-  assert.equal(runHook(HOOK, '').status, 2);
-  assert.equal(runHook(HOOK, { tool_name: '' }).status, 2);
+test('block-deploy fails closed on malformed / empty / missing tool_name (deny JSON)', () => {
+  assert.ok(decision(null).denied, 'malformed → deny');
+  assert.ok(runHook(HOOK, '').stdout.includes('deny'), 'empty stdin → deny');
+  assert.ok(runHook(HOOK, { tool_name: '' }).stdout.includes('deny'), 'missing tool_name → deny');
 });
 
-test('block-deploy ignores non-Bash tools and empty commands (exit 0)', () => {
-  assert.equal(runHook(HOOK, { tool_name: 'Read', tool_input: {} }).status, 0);
-  assert.equal(runHook(HOOK, { tool_name: 'Bash', tool_input: {} }).status, 0);
+test('block-deploy ignores non-Bash tools and empty commands (no deny, exit 0)', () => {
+  const read = runHook(HOOK, { tool_name: 'Read', tool_input: {} });
+  assert.equal(/permissionDecision/.test(read.stdout), false);
+  assert.equal(read.status, 0);
+  const empty = runHook(HOOK, { tool_name: 'Bash', tool_input: {} });
+  assert.equal(/permissionDecision/.test(empty.stdout), false);
+  assert.equal(empty.status, 0);
 });
 
-test('block-deploy is mode-independent (blocks even with the exec bit stripped)', () => {
-  assert.equal(status('gh workflow run deploy.yml', { chmodStrip: true }), 2);
+test('block-deploy is mode-independent (denies even with the exec bit stripped)', () => {
+  assert.ok(decision('gh workflow run deploy.yml', { chmodStrip: true }).denied);
 });

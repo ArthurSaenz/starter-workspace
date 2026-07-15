@@ -38,11 +38,6 @@ export function addContext(text, event = 'PreToolUse') {
   process.exit(0);
 }
 
-// Surface a message to the model without exiting (the caller controls its own exit).
-export function systemMessage(text) {
-  process.stdout.write(JSON.stringify({ systemMessage: text }));
-}
-
 // Nearest directory at or above `filePath` that holds a package.json, so per-package tooling
 // (tsc, eslint, vitest) runs where its config lives instead of at the config-less monorepo root.
 // Bounded by CLAUDE_PROJECT_DIR when set; returns null if none is found.
