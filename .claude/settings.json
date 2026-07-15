@@ -14,6 +14,7 @@
   "permissions": {
     "deny": [
       "Bash(gh workflow run:*)",
+      "Bash(gh run rerun:*)",
 
       "Bash(pnpm exec infra-kit release-deliver:*)",
       "Bash(pnpm exec infra-kit release deliver:*)",
@@ -30,7 +31,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-deploy.sh"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-deploy.mjs"
           }
         ]
       }
