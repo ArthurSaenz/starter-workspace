@@ -25,7 +25,10 @@ raw dispatch is not a shortcut — it is a way to get the rules wrong.
 **You may:**
 
 - read workflow state freely — `gh run list` / `view` / `watch`, `gh workflow view`, `gh api` GETs
-- deploy to non-prod environments — `ik release deploy-all`, `ik release deploy-selected`
+- **deploy to non-prod environments** — this is allowed and expected. Either the MCP tools
+  `mcp__infra-kit__gh-release-deploy-all` / `mcp__infra-kit__gh-release-deploy-selected`, or the
+  CLI `ik release deploy-all` / `ik release deploy-selected`. Both enforce the same rules —
+  `prod` is refused (`assertDeployable`), every other environment is fair game.
 
 **You may not:**
 

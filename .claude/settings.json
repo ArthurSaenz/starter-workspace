@@ -1,21 +1,8 @@
 {
-  "enabledPlugins": {
-    "playwright@claude-plugins-official": true,
-    "context7@claude-plugins-official": true,
-    "chrome-devtools-mcp@chrome-devtools-plugins": true,
-    "atlassian@claude-plugins-official": true,
-    "commit-commands@claude-plugins-official": true,
-    "frontend-design@claude-plugins-official": true,
-    "oh-my-claudecode@omc": true,
-    "context-mode@context-mode": true,
-    "typescript-lsp@claude-plugins-official": true
-  },
-
   "permissions": {
     "deny": [
       "Bash(gh workflow run:*)",
       "Bash(gh run rerun:*)",
-
       "Bash(pnpm exec infra-kit release-deliver:*)",
       "Bash(pnpm exec infra-kit release deliver:*)",
       "Bash(pnpm exec ik release-deliver:*)",
@@ -23,7 +10,6 @@
       "Bash(pnpm dx-release-deliver:*)"
     ]
   },
-
   "hooks": {
     "PreToolUse": [
       {
@@ -36,5 +22,16 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "playwright@claude-plugins-official": true,
+    "context7@claude-plugins-official": true,
+    "chrome-devtools-mcp@chrome-devtools-plugins": true,
+    "atlassian@claude-plugins-official": true,
+    "commit-commands@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "oh-my-claudecode@omc": true,
+    "context-mode@context-mode": true,
+    "typescript-lsp@claude-plugins-official": true
   }
 }

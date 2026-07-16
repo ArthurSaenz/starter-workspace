@@ -15,6 +15,8 @@ endpoint directly, and they may not deliver to prod.
 - `gh workflow run` — **wholesale**. Every legitimate dispatch has an infra-kit command, so a
   raw one only ever means "going around the rules". Blanket beats per-workflow: `gh workflow run`
   accepts a *name or numeric ID*, so `gh workflow run 12345678` would slip past any filename rule.
+- `gh run rerun` — re-executing a past deploy run replays it with its **original inputs**,
+  `environment=prod` included. The same deployment, one indirection away.
 - `gh api` / `curl` against `/dispatches` — `gh workflow run` is sugar over this endpoint.
   Blocking one without the other is a one-line bypass. Matched **regardless of HTTP method**:
   `gh api` silently POSTs as soon as `-f` is present, with no `-X`.
