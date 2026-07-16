@@ -20,6 +20,22 @@ export function readInput() {
   };
 }
 
+// Split a command line on shell operators, so a guard anchored at ^ still sees `git worktree add`
+// in `cd /repo && git worktree add ...`. Two-char operators before their single-char prefixes.
+// Naive: quoted operators split too, which over-splits rather than under-splits — a guard sees more
+// candidate segments, never fewer.
+export function splitIntoSegments(command) {
+  return command
+    .replaceAll('&&', '\n')
+    .replaceAll('||', '\n')
+    .replaceAll(';', '\n')
+    .replaceAll('|', '\n')
+    .replaceAll('&', '\n')
+    .split('\n')
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+}
+
 export function block(message) {
   process.stderr.write(message.endsWith('\n') ? message : `${message}\n`);
   process.exit(2);

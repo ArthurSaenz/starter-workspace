@@ -39,14 +39,16 @@ test('cmux: blocks bare dev server, allows cmux-wrapped', () => {
   assert.equal(action(cmux.check('pnpm build')), null);
 });
 
-test('worktree: blocks managed add/remove (incl. -C / env prefixes), advises list, ignores ad-hoc', () => {
+test('worktree: blocks add/remove at any path (incl. -C / env prefixes), advises list', () => {
   assert.equal(action(worktree.check('git worktree add ../repo-worktrees/feat')), 'block');
   assert.equal(action(worktree.check('git worktree remove ../repo-worktrees/feat')), 'block');
   assert.equal(action(worktree.check('git -C /repo worktree add ../repo-worktrees/x')), 'block');
   assert.equal(action(worktree.check('FOO=1 git worktree add ../repo-worktrees/x')), 'block');
+  assert.equal(action(worktree.check('git worktree add ../fix-post-script-ci-cd')), 'block'); // ad-hoc path: no longer exempt
+  assert.equal(action(worktree.check('git worktree add /tmp/adhoc')), 'block');
   assert.equal(action(worktree.check('git worktree list')), 'advise');
-  assert.equal(action(worktree.check('git worktree add /tmp/adhoc')), null);
   assert.equal(action(worktree.check('git commit -m "worktree add note"')), null);
+  assert.equal(action(worktree.check('git worktree prune')), null);
 });
 
 // -------------------------------------------------------------- integration: dispatcher
@@ -59,6 +61,8 @@ test('bash-guard blocks when any guard blocks (exit 2)', () => {
     'pnpm dev',
     'git worktree add ../repo-worktrees/feat',
     'rm -rf /tmp/x && npm install', // multiple guards -> first block wins
+    'cd /repo && git worktree add ../repo-worktrees/x', // segment-scoped: ^ anchor survives the &&
+    'echo hi; git worktree add ../adhoc',
   ]) {
     assert.equal(runHook('bash-guard.mjs', bash(command)).status, 2, command);
   }
@@ -68,6 +72,13 @@ test('bash-guard allows clean commands (exit 0)', () => {
   for (const command of ['git status', 'ls -la', 'pnpm build', 'grep foo file | wc -l']) {
     assert.equal(runHook('bash-guard.mjs', bash(command)).status, 0, command);
   }
+});
+
+// Segmentation is opt-in per guard: whole-line guards must keep reading the whole line, or their
+// deliberate allowances (piped grep, cmux-wrapped dev) would flip to blocks.
+test('bash-guard does not segment whole-line guards', () => {
+  assert.equal(runHook('bash-guard.mjs', bash('rg foo | grep bar')).status, 0);
+  assert.equal(runHook('bash-guard.mjs', bash('cmux new-session -d -s dev "pnpm dev"')).status, 0);
 });
 
 test('bash-guard advises on git worktree list (exit 0 + additionalContext)', () => {
