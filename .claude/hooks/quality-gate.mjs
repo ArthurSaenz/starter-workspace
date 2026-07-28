@@ -10,6 +10,11 @@ import { acquireLock, releaseLock } from './lock.mjs';
 const TAIL_CHARS = 4000;
 
 function main() {
+  // SELF-DESCENT GUARD, before anything else so there is no lock to unwind. `pnpm run qa` ends in
+  // `test:hooks`, which spawns this very hook — so without this the gate runs qa inside qa. Set for
+  // the child below. Distinct from the lock: the lock serialises PEERS, this stops recursion.
+  if (process.env.CLAUDE_HOOK_QA_NESTED) allow();
+
   let input;
   try {
     input = readInput();
@@ -31,6 +36,9 @@ function main() {
     result = spawnSync('pnpm', ['run', 'qa'], {
       cwd,
       encoding: 'utf8',
+      // Marks the descent, so the gate `test:hooks` spawns returns immediately instead of
+      // running qa again. See the guard at the top of main().
+      env: { ...process.env, CLAUDE_HOOK_QA_NESTED: '1' },
       // Full-monorepo output exceeds spawnSync's 1MB default and would ENOBUFS.
       maxBuffer: 32 * 1024 * 1024,
     });
