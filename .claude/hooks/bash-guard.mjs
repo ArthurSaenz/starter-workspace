@@ -1,22 +1,20 @@
 #!/usr/bin/env node
+// Runs the advisory Bash guards in one process; first block wins. A guard that throws fails open,
+// so one bug can't swallow the rest. The deploy guard is separate — it fails closed.
 //
-// Runs the advisory Bash guards in one process. Each guard is a pure `check(command)`; first to
-// block wins, otherwise any advisory context is surfaced. A guard that throws fails open (warned
-// on stderr) so one bug can't swallow the rest. The deploy guard is separate — it fails closed.
-//
-// A guard exporting `scope = 'segment'` is called once per shell segment, so its ^-anchored
-// regexes still match in `cd /repo && git worktree add ...`. It is opt-in rather than the default
-// because some guards read the whole line by design: `suggest` allows `grep foo | wc -l` via a
-// lookahead, and `cmux` allows `pnpm dev` only when the line mentions cmux — segmenting either
-// would turn its deliberate allowance into a block.
+// `scope = 'segment'` calls a guard per shell segment, so its ^-anchored regexes match in
+// `cd /repo && git worktree add ...`. Opt-in: `style` and `cmux` read the whole line by design.
 
 import { readInput, block, addContext, allow, splitIntoSegments } from './hooklib.mjs';
+import * as doppler from './guards/doppler.mjs';
 import * as destructive from './guards/destructive.mjs';
-import * as suggest from './guards/suggest.mjs';
+import * as packageManager from './guards/package-manager.mjs';
+import * as style from './guards/style.mjs';
 import * as cmux from './guards/cmux.mjs';
 import * as worktree from './guards/worktree.mjs';
 
-const GUARDS = [destructive, suggest, cmux, worktree];
+// `doppler` first: when a command trips two guards, the one about secrets is worth showing.
+const GUARDS = [doppler, destructive, packageManager, style, cmux, worktree];
 
 let input;
 try {

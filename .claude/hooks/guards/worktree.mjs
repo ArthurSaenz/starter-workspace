@@ -1,14 +1,6 @@
-// Steer toward infra-kit's MCP worktree tools: BLOCK raw `git worktree add|remove` at any path;
-// ADVISE (non-blocking) on `git worktree list`. Soft steer — bypassable via aliases or subshells.
-//
-// The block is path-independent on purpose. Scoping it to the managed `<repo>-worktrees/` dir
-// only asked WHERE the worktree lives, but the thing that matters is WHAT infra-kit does when it
-// creates one (pnpm install, IDE open, Jira-derived description). A plain
-// `git worktree add ../my-branch` skipped all of that precisely BY landing outside the managed
-// dir, so the old rule was blind to the case it most needed to catch.
-//
-// A genuinely throwaway worktree is still fine — it just goes through the human, who can approve
-// the blocked call rather than have the guard guess intent from the path.
+// BLOCK raw `git worktree add|remove`; ADVISE on `git worktree list`. Path-independent, because
+// what matters is the setup infra-kit does — and `git worktree add ../my-branch` skips it precisely
+// BY landing outside the managed dir. A throwaway worktree just goes through the human instead.
 
 export const name = 'worktree';
 

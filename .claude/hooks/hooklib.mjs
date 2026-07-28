@@ -20,10 +20,8 @@ export function readInput() {
   };
 }
 
-// Split a command line on shell operators, so a guard anchored at ^ still sees `git worktree add`
-// in `cd /repo && git worktree add ...`. Two-char operators before their single-char prefixes.
-// Naive: quoted operators split too, which over-splits rather than under-splits — a guard sees more
-// candidate segments, never fewer.
+// So a ^-anchored guard still sees `git worktree add` in `cd /repo && git worktree add ...`.
+// Two-char operators first. Naive: quoted operators split too, which over-splits, never under.
 export function splitIntoSegments(command) {
   return command
     .replaceAll('&&', '\n')
@@ -33,6 +31,19 @@ export function splitIntoSegments(command) {
     .replaceAll('&', '\n')
     .split('\n')
     .map((segment) => segment.trim())
+    .filter(Boolean);
+}
+
+// Tokens sitting in front of the real command. Shared, so adding one covers every guard at once.
+// `worktree` keeps its own variant, which also swallows `-C <path>` and `--git-dir=<path>`.
+export const HEAD_PREFIX = String.raw`^([A-Za-z_][A-Za-z0-9_]*=\S+\s+|(sudo|doas|env|command|builtin|exec|eval|time|nice|nohup|stdbuf|xargs)\s+)*`;
+
+// HEAD_PREFIX stripped, so argv[0] is the command that will actually run.
+export function argvAfterPrefix(segment) {
+  return segment
+    .trim()
+    .replace(new RegExp(HEAD_PREFIX, 'i'), '')
+    .split(/\s+/)
     .filter(Boolean);
 }
 
