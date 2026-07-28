@@ -206,6 +206,13 @@ try {
         lintReport = parseEslintJson(run.stdout);
         // Fixable AND absent from stage 2 => eslint fixed it and prettier put it back. "Fixable"
         // alone would also name rules `--fix` never resolved.
+        //
+        // MEASURED, so removal is not reproposed on a hunch: only 2 fixable rules fire anywhere in
+        // this repo (react/exhaustive-deps, jsdoc/check-param-names), and across all 11 real files
+        // where they fire this yields ZERO conflicts. It is insurance, not a working detector —
+        // base.ts already disabled the rules that used to collide (see its unicorn/number-literal-case
+        // note), so what remains is cover for config drift re-introducing one. Kept because that
+        // failure is silent and repeats on every edit: the agent fixes the file, prettier undoes it.
         conflictRules = [
           ...new Set(
             lintReport.messages
