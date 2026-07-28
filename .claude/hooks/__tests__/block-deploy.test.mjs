@@ -94,6 +94,10 @@ const BLOCKED_ACCEPTED_FALSE_DENIES = [
   ['wrapper in one segment, phrase in another', 'bash script.sh && grep "gh workflow run" f'],
   ['shell named as a noun + phrase elsewhere', 'ls /bin/bash && grep "gh workflow run" f'],
   ['unrelated path containing /dispatches', 'bash -c "cat /var/log/dispatches/x"'],
+  // checkHttp is command-wide now too, so two independent searches that between them mention the
+  // host and the path read as one assembled call. Contrived, and the fail-closed direction —
+  // recorded here so it is not filed as a bug later. Either search ALONE still allows.
+  ['two searches that together name host and path', 'rg api.github.com docs/ && rg "/dispatches" docs/'],
 ];
 
 const ALLOWED = [
@@ -175,6 +179,29 @@ const EXECUTOR_CORPUS = [
   ['the suite itself', 'pnpm run test:hooks'],
   ['env assignment before an ordinary command', 'env MSG=x git commit -m "note gh workflow run"'],
 ];
+
+// C2 / I2: the whole-command `/dispatches` catch-all lived INSIDE checkRawShell, so it ran only
+// when a shell wrapper happened to be present — while its own comment claimed this hook is the only
+// guard on that endpoint. checkHttp needs host and path in the SAME segment, and assembling them
+// through a variable puts them in different ones. Fail-open in a fail-closed guard.
+const ASSEMBLED_NO_WRAPPER = [
+  ['host in a variable, no wrapper anywhere', `A=${HOST} ; curl -X POST $A/${PATH}`],
+  ['host + prefix in a variable, no wrapper', `A=${HOST}/repos/o/r ; curl "$A/actions/workflows/w.yml/dispatches"`],
+];
+
+test('block-deploy denies an assembled dispatch endpoint with no shell wrapper present', () => {
+  for (const [label, command] of ASSEMBLED_NO_WRAPPER) {
+    assert.ok(decision(command).denied, `should deny: ${label} — ${command}`);
+  }
+});
+
+// The conjunction is what keeps the fix from locking the room it is in. Searching for the token is
+// how anyone works on this guard; only the token TOGETHER WITH the host means execution.
+test('block-deploy still allows searching for the dispatch token alone', () => {
+  for (const command of ['rg "/dispatches" .claude/', 'ls dispatches/', 'grep -rn /dispatches docs/']) {
+    assert.equal(decision(command).denied, false, `should allow: ${command}`);
+  }
+});
 
 test('block-deploy denies a guarded command behind a value-taking prefix (no wrapper)', () => {
   for (const [label, command] of PREFIX_BYPASS) {

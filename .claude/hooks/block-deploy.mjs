@@ -264,6 +264,16 @@ try {
   const command = input.tool_input?.command ?? '';
   if (!command) process.exit(0);
 
+  // UNCONDITIONALLY, before the segment loop. This is the last-resort check on the one endpoint
+  // this hook calls its reason to exist, and it used to sit inside checkRawShell — so it ran only
+  // when a shell wrapper happened to be present. `A=https://api.github.com ; curl $A/…/dispatches`
+  // splits host and path into different segments, so the per-segment call below never sees both.
+  //
+  // Still the host AND path conjunction, never a bare `/dispatches`: the token appears throughout
+  // this repo's own tests and docs, and denying it alone would block `rg "/dispatches" .claude/` —
+  // the search anyone working on this guard runs. See guard-policy.test.mjs for that measurement.
+  checkHttp(command);
+
   for (const segment of splitIntoSegments(command)) {
     if (!segment.trim()) continue;
 
