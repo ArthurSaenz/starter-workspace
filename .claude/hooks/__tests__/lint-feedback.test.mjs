@@ -429,6 +429,64 @@ test('a fixable rule that --fix could not resolve is not blamed on prettier', ()
   }
 });
 
+// C6. Once prettier reflows, stage 2's line:col are dead. Stage 3b re-derives them — but every path
+// out of stage 3b that fails to produce a fresh report used to leave the stale one in place, and it
+// was rendered anyway. The TIMEOUT path is the most reachable (load-dependent, not content-
+// dependent) and was the one previously described as correct: it emitted "inconclusive" AND the
+// stale coordinates together.
+//
+// `probe/hang` busy-waits only once the file has >= 4 lines, so it is quiet on the 2-line
+// pre-reflow file and hangs on the 5-line post-reflow one — a deterministic stage-3b-only failure
+// with stage 2 clean. Nothing else can produce that: any stage-2 failure sets lintFailed and skips
+// 3b entirely.
+const FLAT_CONFIG_HANG_AFTER_REFLOW = `const hangOnBigFiles = {
+  create(context) {
+    return {
+      Program() {
+        if (context.sourceCode.lines.length >= 4) {
+          const end = Date.now() + 25000;
+          while (Date.now() < end) { /* busy-wait past the 15s stage budget */ }
+        }
+      },
+    };
+  },
+};
+
+export default [
+  {
+    files: ['**/*.js'],
+    plugins: { probe: { rules: { hang: hangOnBigFiles } } },
+    rules: {
+      'probe/hang': 'error',
+      'no-unused-vars': 'error',
+      'arrow-body-style': ['error', 'always'],
+    },
+  },
+];
+`;
+
+test('a stage-3b timeout after a reflow drops the stale coordinates', { timeout: 90_000 }, () => {
+  const pkg = makeLintPackage('const f = () => 1\nconst unusedProbeValue = 2\n', {
+    eslintConfig: FLAT_CONFIG_HANG_AFTER_REFLOW,
+    fileName: 'src.js',
+  });
+  try {
+    const res = runHook('edit-pipeline.mjs', edit(pkg.file));
+
+    assert.match(res.stderr, /inconclusive/, 'the expired stage must be reported as inconclusive');
+    // THE BUG: stage 2 said 2:7, and after the reflow line 2 is `  return 1`.
+    assert.doesNotMatch(
+      res.stderr,
+      /^\s*\d+:\d+\s+error/m,
+      `a coordinate that no longer resolves must not be reported at all, got:\n${res.stderr}`,
+    );
+    // The findings themselves were real — only their positions died. Keep the rule names.
+    assert.match(res.stderr, /no-unused-vars/, 'the rule that fired before reformatting is still named');
+  } finally {
+    pkg.cleanup();
+  }
+});
+
 test('a missing eslint config is silent', () => {
   // No flat config is a normal state, not a failure — the one status-2 case that emits nothing.
   const pkg = makeLintPackage('const foo = 1\n', { fileName: 'src.js' });

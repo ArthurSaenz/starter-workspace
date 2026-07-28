@@ -194,16 +194,15 @@ try {
   const survivedStage2 = new Set(lintReport?.messages.map((message) => message.ruleId) ?? []);
 
   if (reflowed && wantsEslint && hasEslintConfig && !lintFailed) {
+    let refreshed = false;
+
     try {
       const run = runStage('eslint', ['--quiet', '--format', 'json', abs], {
         cwd: pkgDir,
         timeout: 15_000,
       });
 
-      if (run.timedOut) {
-        sections.push({ title: 'ESLint:', lines: ['  inconclusive (timed out)'] });
-        lintFailed = true;
-      } else if (!run.missing && !run.spawnFailed && run.status !== 2) {
+      if (!run.timedOut && !run.missing && !run.spawnFailed && run.status !== 2) {
         lintReport = parseEslintJson(run.stdout);
         // Fixable AND absent from stage 2 => eslint fixed it and prettier put it back. "Fixable"
         // alone would also name rules `--fix` never resolved.
@@ -214,8 +213,28 @@ try {
               .map((message) => message.ruleId),
           ),
         ];
+        refreshed = true;
       }
     } catch {
+      // falls through to the discard below
+    }
+
+    // Stage 2's line:col died with the reflow above, so a re-lint that produced no fresh report
+    // must DISCARD them rather than print findings at positions that no longer resolve. All three
+    // failure paths land here — timed out, status 2 / missing / spawn failure, and a throw. Each
+    // used to leave the stale report in place, and the timeout path printed the marker beside it.
+    // The findings were real; only their coordinates died, so the rules are still named.
+    if (!refreshed) {
+      const rules = [...survivedStage2].filter(Boolean).sort();
+
+      sections.push({
+        title: 'ESLint:',
+        lines: [
+          '  inconclusive — the re-lint after reformatting did not complete, so line numbers were dropped.',
+          ...(rules.length > 0 ? [`  Rules reported before reformatting: ${rules.join(', ')}`] : []),
+        ],
+      });
+      lintReport = null;
       lintFailed = true;
     }
   }
