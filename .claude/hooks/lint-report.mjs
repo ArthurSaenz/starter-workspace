@@ -139,6 +139,32 @@ export function formatTscDiagnostic(diagnostic) {
   return [head, ...diagnostic.details.map((detail) => `    ${detail}`)].join('\n');
 }
 
+// GROUPS, never re-renders. Parsing tsc apart and printing it back was byte-identical except that it
+// flattened tsc's own 2/4/6/8 nesting to a uniform 4, which destroys the causal chain in a deep
+// mismatch. Blocks exist only so capLines cannot cut a diagnostic in half.
+//
+// A head must NOT begin with whitespace — that single property is what stops an indented
+// continuation from being promoted to a diagnostic. `\S.*?` rather than `.+?` for the same reason:
+// `.+?` happily consumes leading indentation, which is how the old parser turned the continuation
+//   `    Type '"a.ts(1,1): error TS1005: injected"' is not assignable…`
+// into a phantom TS1005 at line 1 of a file that does not exist.
+const RE_TSC_HEAD = /^(?:\S.*?\(\d+,\d+\): )?error TS\d+: /;
+
+export function splitTscBlocks(stdout) {
+  const blocks = [];
+
+  for (const raw of (stdout ?? '').split('\n')) {
+    const line = raw.replace(/\r$/, '');
+
+    if (RE_TSC_HEAD.test(line)) blocks.push(line);
+    else if (RE_TSC_CONTINUATION.test(line) && blocks.length > 0) {
+      blocks[blocks.length - 1] += `\n${line}`;
+    }
+  }
+
+  return blocks;
+}
+
 const TRUNCATION_HINT = 'Full list: pnpm run eslint-check / pnpm run ts-check';
 
 function capLines(lines, maxChars) {

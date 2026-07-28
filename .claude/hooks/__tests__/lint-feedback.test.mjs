@@ -10,6 +10,7 @@ import { runHook, edit, HOOKS_DIR } from './helpers.mjs';
 import {
   parseEslintJson,
   parseTscDiagnostics,
+  splitTscBlocks,
   extractToolError,
   isMissingConfig,
   formatReport,
@@ -212,6 +213,67 @@ test('a tsc crash dump is not reported as type errors', () => {
     at Module._resolveFilename (node:internal/modules/cjs/loader:1234:15)
 `;
   assert.deepEqual(parseTscDiagnostics(crash), []);
+});
+
+// --------------------------------------------------------------------------------- splitTscBlocks
+
+// ALL LITERAL CAPTURES of `tsc --noEmit --pretty false` run against throwaway tsconfigs in this
+// repo. Paths are as tsc emitted them.
+const TSC_DEEP = `.omc/.tmp-tsc-capture/a.ts(7,6): error TS2345: Argument of type '(v: Outer) => void' is not assignable to parameter of type '(v: OuterBad) => void'.
+  Types of parameters 'v' and 'v' are incompatible.
+    Type 'OuterBad' is not assignable to type 'Outer'.
+      The types of 'a.x' are incompatible between these types.
+        Type 'number' is not assignable to type 'string'.`;
+
+// The adversarial shape: a continuation whose TEXT embeds a headline, inside a quoted type literal.
+const TSC_EMBEDDED_HEADLINE = `.omc/.tmp-tsc-capture/a.ts(5,6): error TS2345: Argument of type '(v: A) => void' is not assignable to parameter of type '(v: B) => void'.
+  Types of parameters 'v' and 'v' are incompatible.
+    Type 'B' is not assignable to type 'A'.
+      Types of property 'x' are incompatible.
+        Type '"a.ts(1,1): error TS1005: injected"' is not assignable to type '"plain"'.`;
+
+// ASSERTS BOUNDARIES, NOT REJOINED BYTES. Rejoining is byte-identical no matter how the lines are
+// grouped — measured with three candidate head regexes producing block counts of 2, 3 and 2 on one
+// input, all of which rejoined identically. Only the block array can fail on a mis-grouping.
+test('splitTscBlocks groups a deep diagnostic into ONE block, preserving tsc indentation', () => {
+  assert.deepEqual(splitTscBlocks(TSC_DEEP), [TSC_DEEP]);
+});
+
+test('splitTscBlocks keeps an embedded headline inside its parent block', () => {
+  // The old parser fabricated a TS1005 here at line 1 of a file that does not exist, because its
+  // lazy `(.+?)` file prefix consumed the leading indentation.
+  assert.deepEqual(splitTscBlocks(TSC_EMBEDDED_HEADLINE), [TSC_EMBEDDED_HEADLINE]);
+});
+
+test('splitTscBlocks separates two file-scoped diagnostics', () => {
+  const a = `.omc/.tmp-tsc-capture/a.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.`;
+  const b = `.omc/.tmp-tsc-capture/b.ts(1,18): error TS2304: Cannot find name 'missingSymbolHere'.`;
+  assert.deepEqual(splitTscBlocks(`${a}\n${b}`), [a, b]);
+});
+
+test('splitTscBlocks keeps a program-level diagnostic with its continuations', () => {
+  const captured = `error TS2688: Cannot find type definition file for 'definitely-not-installed-xyz'.
+  The file is in the program because:
+    Entry point of type library 'definitely-not-installed-xyz' specified in compilerOptions`;
+  assert.deepEqual(splitTscBlocks(captured), [captured]);
+});
+
+test('splitTscBlocks yields nothing for a crash dump, so it stays a tool failure', () => {
+  const crash = `Error: Cannot find module 'typescript/lib/tsc.js'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1234:15)
+`;
+  assert.deepEqual(splitTscBlocks(crash), []);
+});
+
+test('splitTscBlocks handles CRLF and Windows paths', () => {
+  const win = `C:\\src\\x.ts(4,7): error TS2322: Type 'string' is not assignable to type 'number'.`;
+  assert.deepEqual(splitTscBlocks(`${win}\r\n`), [win], 'the \\r must not survive into the block');
+  assert.deepEqual(splitTscBlocks(`${win}\r\n  detail line\r\n`), [`${win}\n  detail line`]);
+});
+
+test('splitTscBlocks ignores an unindented preamble before any diagnostic', () => {
+  const captured = `Some unindented tool chatter\n${TSC_DEEP}`;
+  assert.deepEqual(splitTscBlocks(captured), [TSC_DEEP]);
 });
 
 // ------------------------------------------------------------------------------------ formatReport
