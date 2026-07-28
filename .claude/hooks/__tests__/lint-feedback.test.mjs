@@ -175,8 +175,11 @@ test('isMissingConfig matches the literal captured stderr, and both spellings', 
 
 // --------------------------------------------------------------------------------- splitTscBlocks
 
-// ALL LITERAL CAPTURES of `tsc --noEmit --pretty false` run against throwaway tsconfigs in this
-// repo. Paths are as tsc emitted them.
+// The DIAGNOSTIC-SHAPE fixtures below are literal captures of `tsc --noEmit --pretty false` run
+// against throwaway tsconfigs in this repo; paths are as tsc emitted them. The CRLF/Windows-path
+// and unindented-preamble fixtures are CONSTRUCTED — this repo cannot emit them — and are labelled
+// as such at each site. Saying "all captured" over a synthetic fixture is how the missing-config
+// regex in this file shipped broken; see the header.
 const TSC_DEEP = `.omc/.tmp-tsc-capture/a.ts(7,6): error TS2345: Argument of type '(v: Outer) => void' is not assignable to parameter of type '(v: OuterBad) => void'.
   Types of parameters 'v' and 'v' are incompatible.
     Type 'OuterBad' is not assignable to type 'Outer'.
@@ -234,15 +237,20 @@ test('splitTscBlocks yields nothing for a crash dump, so it stays a tool failure
   assert.deepEqual(splitTscBlocks(crash), []);
 });
 
+// CONSTRUCTED, not captured — this repo runs on macOS and cannot emit either shape.
 test('splitTscBlocks handles CRLF and Windows paths', () => {
   const win = `C:\\src\\x.ts(4,7): error TS2322: Type 'string' is not assignable to type 'number'.`;
   assert.deepEqual(splitTscBlocks(`${win}\r\n`), [win], 'the \\r must not survive into the block');
   assert.deepEqual(splitTscBlocks(`${win}\r\n  detail line\r\n`), [`${win}\n  detail line`]);
 });
 
-test('splitTscBlocks ignores an unindented preamble before any diagnostic', () => {
-  const captured = `Some unindented tool chatter\n${TSC_DEEP}`;
-  assert.deepEqual(splitTscBlocks(captured), [TSC_DEEP]);
+// CONSTRUCTED. Also pins the blank line the CALLER always manufactures: it joins stdout and stderr
+// with `\n`, and stdout already ends in one — so a blank line sits beside a diagnostic on every real
+// run. `^\s+\S` requires a non-space, which is what keeps that blank line out of the block.
+test('splitTscBlocks ignores an unindented preamble and blank lines around diagnostics', () => {
+  assert.deepEqual(splitTscBlocks(`Some unindented tool chatter\n${TSC_DEEP}`), [TSC_DEEP]);
+  assert.deepEqual(splitTscBlocks(`${TSC_DEEP}\n\n`), [TSC_DEEP], 'a trailing blank must not join the block');
+  assert.deepEqual(splitTscBlocks(`${TSC_DEEP}\n   \n`), [TSC_DEEP], 'nor a whitespace-only line');
 });
 
 // ------------------------------------------------------------------------------------ formatReport

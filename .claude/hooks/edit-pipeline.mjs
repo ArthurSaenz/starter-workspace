@@ -229,10 +229,15 @@ try {
 
       sections.push({
         title: 'ESLint:',
-        lines: [
-          '  inconclusive — the re-lint after reformatting did not complete, so line numbers were dropped.',
-          ...(rules.length > 0 ? [`  Rules reported before reformatting: ${rules.join(', ')}`] : []),
-        ],
+        // Worded from what actually happened: with no stage-2 findings there were no line numbers
+        // to drop, and claiming otherwise would report a loss that did not occur.
+        lines:
+          rules.length > 0
+            ? [
+                '  inconclusive — the re-lint after reformatting did not complete, so line numbers were dropped.',
+                `  Rules reported before reformatting: ${rules.join(', ')}`,
+              ]
+            : ['  inconclusive — the file was reformatted and could not be re-checked.'],
       });
       lintReport = null;
       lintFailed = true;
