@@ -189,6 +189,38 @@ const ASSEMBLED_NO_WRAPPER = [
   ['host + prefix in a variable, no wrapper', `A=${HOST}/repos/o/r ; curl "$A/actions/workflows/w.yml/dispatches"`],
 ];
 
+// C3: checkInfraKit scanned EVERY token after argv[0] against a bare `deliver`, so any command
+// under an infra-tool head that merely mentioned the word was denied. guard-policy.test.mjs
+// measures `deliver` as ordinary vocabulary in this repo, so the bare token may not deny alone.
+const ORDINARY_DELIVER = [
+  ['search', 'pnpm exec rg deliver src/'],
+  ['test filter', 'pnpm test -- --grep deliver'],
+  ['script argument', 'node scripts/build.js deliver'],
+  ['a package actually named deliver', 'pnpm add deliver'],
+];
+
+// The conjunction must still catch the real thing by BOTH routes: the positional sequence, and a
+// self-identifying prefixed name. Neither alone suffices — see RE_DELIVER_HEAD's own note.
+const REAL_DELIVER = [
+  ['ik release deliver', 'ik release deliver'],
+  ['infra-kit spelled out', 'pnpm exec infra-kit release deliver'],
+  ['prefixed script name', 'pnpm dx-release-deliver'],
+  ['prefixed via run', 'pnpm run dx-release-deliver'],
+  ['behind a value-taking prefix', 'timeout 60 ik release deliver'],
+];
+
+test('block-deploy allows ordinary commands that merely mention deliver', () => {
+  for (const [label, command] of ORDINARY_DELIVER) {
+    assert.equal(decision(command).denied, false, `should allow: ${label} — ${command}`);
+  }
+});
+
+test('block-deploy still denies a real delivery, by both routes', () => {
+  for (const [label, command] of REAL_DELIVER) {
+    assert.ok(decision(command).denied, `should deny: ${label} — ${command}`);
+  }
+});
+
 test('block-deploy denies an assembled dispatch endpoint with no shell wrapper present', () => {
   for (const [label, command] of ASSEMBLED_NO_WRAPPER) {
     assert.ok(decision(command).denied, `should deny: ${label} — ${command}`);

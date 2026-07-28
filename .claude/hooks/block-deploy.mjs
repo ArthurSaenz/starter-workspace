@@ -19,9 +19,6 @@ const RE_DISPATCH = /\/dispatches([/?"';&|]|\s|$)/i;
 const RE_GITHUB_API = /api\.github\.com/i;
 const RE_ENV_ASSIGN = /^[A-Za-z_][A-Za-z0-9_]*=/;
 
-// Anchored to one token, so `deploy-all` and `scripts/deliver` do not match.
-const RE_DELIVER = /^(dx-)?(release-)?deliver$/i;
-
 // A shell name ANYWHERE in a segment: every value-taking prefix (`nice -n 10`, `env -i`) leaves its
 // own value at argv[0], and no membership list fixes that arity problem.
 const SHELL_WRAPPERS = new Set(['bash', 'sh', 'zsh', 'dash', 'ksh', 'fish', 'csh', 'tcsh']);
@@ -73,8 +70,10 @@ const RE_RAW_DELIVER_PREFIXED = /(?<![\w/-])(dx-|release-)(release-)?deliver(?![
 const RE_BARE_DELIVER = /(?<![\w/-])deliver(?![\w/-])/i;
 const RE_INFRA_TOOL = /\b(ik|infra-kit|pnpm|npm|npx|pnpx|yarn|node)\b/i;
 
-// Not shared with checkInfraKit's RE_DELIVER: there argv[0] is already an infra tool, so this
-// stricter form would fail open on `ik release deliver`.
+// SELF-IDENTIFYING names only — the `dx-`/`release-` prefix is mandatory, so a bare `deliver`
+// never matches. Used for argv[0] and, inside checkInfraKit, as one of that function's two routes.
+// It cannot be the ONLY route there: `ik release deliver` carries its meaning in the sequence, not
+// in a prefixed name, so this form alone would fail open on the most ordinary way to deliver.
 const RE_DELIVER_HEAD = /^(dx-|release-)(release-)?deliver$/i;
 
 // exit 0, because the JSON channel is only read on exit 0. `reason` is surfaced to the model.
@@ -205,13 +204,27 @@ function checkHttp(segment) {
   }
 }
 
+// A bare `deliver` is ordinary product vocabulary — `pnpm exec rg deliver src/` is a search, and
+// scanning every token for it is what made this guard deny ordinary work. So it takes a
+// conjunction, by either of two routes. BOTH are required: the prefixed form alone fails open on
+// `ik release deliver` (see RE_DELIVER_HEAD's note), and the positional form alone misses
+// `pnpm dx-release-deliver`, whose name carries the whole meaning.
 function checkInfraKit(argv) {
-  for (const token of argv.slice(1)) {
-    if (RE_DELIVER.test(token)) {
-      deny(
-        `\`${token}\` merges the release PR into main and deploys prod — irreversible, and a human's call.`,
-      );
-    }
+  const rest = argv.slice(1);
+
+  const prefixed = rest.find((token) => RE_DELIVER_HEAD.test(basename(token)));
+  if (prefixed) {
+    deny(
+      `\`${prefixed}\` merges the release PR into main and deploys prod — irreversible, and a human's call.`,
+    );
+  }
+
+  // The SEQUENCE, not two loose tokens: `rg release src/ && rg deliver src/` must stay a search.
+  const at = rest.findIndex((token) => basename(token) === 'release');
+  if (at !== -1 && rest[at + 1] !== undefined && basename(rest[at + 1]) === 'deliver') {
+    deny(
+      "`release deliver` merges the release PR into main and deploys prod — irreversible, and a human's call.",
+    );
   }
 }
 
