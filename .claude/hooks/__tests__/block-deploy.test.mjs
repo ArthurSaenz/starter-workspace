@@ -146,13 +146,8 @@ const ALLOWED_DELIVER_BOUNDARY = [
   ['quote-boundary coherence', 'git commit -m "pin bash " && rg deliver .'],
 ];
 
-// A value-taking prefix with NO shell wrapper. `time` was in PREFIX_COMMANDS but `timeout` was
-// not, so the prefix survived to argv[0], the head switch had no case for it, and no wrapper token
-// was present to re-arm the raw scan — the command sailed past every check. The `+ wrapper` rows
-// above only ever proved the wrapper path.
-//
-// Option FLAGS are the part bare arity misses: `script -q /dev/null gh ...` leaves `-q` at argv[0],
-// as do `nice -n 10`, `timeout -k 5 60` and `flock -n`.
+// A value-taking prefix with NO shell wrapper — the `+ wrapper` rows above only proved the wrapper
+// path. Option flags are what bare arity misses (`script -q /dev/null gh ...` leaves `-q`).
 const PREFIX_BYPASS = [
   ['timeout', 'timeout 60 gh workflow run deploy.yml'],
   ['setsid', 'setsid gh workflow run deploy.yml'],
@@ -167,24 +162,20 @@ const PREFIX_BYPASS = [
   // sudo takes `-u <user>`, so without a spec its value lands at argv[0] just like timeout's.
   ['sudo with a detached user value', 'sudo -u root gh workflow run x'],
 
-  // The payload form. `-c` is not in flock's/script's valueOpts, so the option loop eats it and the
-  // positional value then swallows the OPENING QUOTE OF THE PAYLOAD — leaving `workflow` at argv[0],
-  // an ordinary word the leftover-value test does not recognise. Looking only at argv[0] misses it;
-  // the re-anchor has to search the original tokens.
+  // Payload form: `-c` is not in flock's/script's valueOpts, so the option loop eats it and the
+  // positional value swallows the payload's opening quote — leaving the ordinary word `workflow` at
+  // argv[0]. Pins the re-anchor, which must search the original tokens rather than argv.
   ['flock -c payload', 'flock -c "gh workflow run deploy.yml" /tmp/l'],
   ['script -c payload', 'script -c "gh workflow run x" /dev/null'],
   ['script --command payload', 'script --command "ik release deliver" /dev/null'],
 
-  // checkGh read argv[1]/argv[2] raw while argv[0] went through basename(), so quoting just the
-  // subcommand walked straight past it.
+  // checkGh read argv[1]/argv[2] raw while argv[0] used basename().
   ['quoted gh subcommand', 'gh "workflow" run deploy.yml'],
   ['quoted gh object', "gh workflow 'run' deploy.yml"],
 ];
 
-// Regressions introduced by adding the new prefixes: hooklib's splitter is quote-blind, so a `|`
-// inside a quoted regex manufactures a segment whose head is `timeout`/`script`/`flock`. Those
-// prefixes then consume a positional value and the segment fails closed — denying ordinary work.
-// These were found by the reviewer's own tool calls being blocked.
+// The splitter is quote-blind, so a `|` inside a quoted regex makes a segment headed by
+// `timeout`/`script`/`flock`, which then consumes a value and fails closed on ordinary work.
 const SPLIT_ARTEFACTS_AND_WRAPPERS = [
   ['alternation containing a prefix name', 'rg -n "fatal|timeout" .claude/hooks/'],
   ['alternation containing script', 'rg "hook|script" package.json'],
@@ -202,9 +193,8 @@ test('block-deploy allows split artefacts and ordinary wrapper usage', () => {
   }
 });
 
-// The other half of G1. The obvious fix — "unrecognised head plus a later `gh` token" — would deny
-// every one of these, because `git`, `rg` and `echo` are all unrecognised heads and basename()
-// strips quotes. They are the commands used to WRITE, verify and roll back the fix itself.
+// The obvious fix — "unrecognised head plus a later `gh` token" — denies every one of these, since
+// `git`/`rg`/`echo` are all unrecognised. They are how the fix itself gets written and rolled back.
 const EXECUTOR_CORPUS = [
   ['commit message naming the fix', 'git commit -m "fix: timeout gh workflow run now denies"'],
   ['grep for the guarded phrase', 'rg "gh workflow run" .claude/hooks/'],
@@ -214,18 +204,16 @@ const EXECUTOR_CORPUS = [
   ['env assignment before an ordinary command', 'env MSG=x git commit -m "note gh workflow run"'],
 ];
 
-// C2 / I2: the whole-command `/dispatches` catch-all lived INSIDE checkRawShell, so it ran only
-// when a shell wrapper happened to be present — while its own comment claimed this hook is the only
-// guard on that endpoint. checkHttp needs host and path in the SAME segment, and assembling them
-// through a variable puts them in different ones. Fail-open in a fail-closed guard.
+// C2 / I2: the catch-all lived inside checkRawShell, so it ran only when a wrapper was present,
+// while checkHttp needs host and path in the SAME segment. A variable splits them apart.
 const ASSEMBLED_NO_WRAPPER = [
   ['host in a variable, no wrapper anywhere', `A=${HOST} ; curl -X POST $A/${PATH}`],
   ['host + prefix in a variable, no wrapper', `A=${HOST}/repos/o/r ; curl "$A/actions/workflows/w.yml/dispatches"`],
 ];
 
-// C3: checkInfraKit scanned EVERY token after argv[0] against a bare `deliver`, so any command
-// under an infra-tool head that merely mentioned the word was denied. guard-policy.test.mjs
-// measures `deliver` as ordinary vocabulary in this repo, so the bare token may not deny alone.
+// C3: checkInfraKit scanned every token after argv[0] for a bare `deliver`, so any command under
+// an infra-tool head that mentioned the word was denied. guard-policy.test.mjs measures it as
+// ordinary vocabulary here, which is why the bare token cannot deny alone.
 const ORDINARY_DELIVER = [
   ['search', 'pnpm exec rg deliver src/'],
   ['test filter', 'pnpm test -- --grep deliver'],
@@ -261,8 +249,8 @@ test('block-deploy denies an assembled dispatch endpoint with no shell wrapper p
   }
 });
 
-// The conjunction is what keeps the fix from locking the room it is in. Searching for the token is
-// how anyone works on this guard; only the token TOGETHER WITH the host means execution.
+// The conjunction keeps the fix from locking the room it is in: only the token TOGETHER WITH the
+// host means execution.
 test('block-deploy still allows searching for the dispatch token alone', () => {
   for (const command of ['rg "/dispatches" .claude/', 'ls dispatches/', 'grep -rn /dispatches docs/']) {
     assert.equal(decision(command).denied, false, `should allow: ${command}`);

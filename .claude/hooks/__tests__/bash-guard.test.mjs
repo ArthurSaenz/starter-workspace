@@ -182,18 +182,14 @@ test('cmux: blocks bare dev server, allows cmux-wrapped', () => {
   assert.equal(action(cmux.check('cd apps/client && pnpm dev')), 'block');
 });
 
-// WHY cmux SEGMENTS INTERNALLY INSTEAD OF EXPORTING scope='segment'. The dispatcher hands a
-// segment-scoped guard one segment at a time, and hooklib's splitter is quote-blind — so the
-// payload below arrives as `cmux new-session -d -s dev "cd apps/client` and `pnpm dev"`, and the
-// second segment cannot see the `cmux` that authorises it. Exporting scope would block a
-// legitimate invocation. Written before the guard changed, for exactly that reason.
+// Why cmux segments internally rather than exporting scope='segment': the splitter is quote-blind,
+// so this payload splits and the half holding `pnpm dev` cannot see the `cmux` authorising it.
 test('cmux: a compound payload inside a cmux session is still allowed', () => {
   assert.equal(action(cmux.check('cmux new-session -d -s dev "cd apps/client && pnpm dev"')), null);
   assert.equal(action(cmux.check('cmux new-session -d -s api "pnpm --filter api dev"')), null);
 });
 
-// The guard BLOCKS, so a false positive is a hard stop on ordinary work. An unanchored match meant
-// any command merely naming the script was denied.
+// The guard BLOCKS, so a false positive is a hard stop on ordinary work.
 test('cmux: does not fire on commands that merely mention the dev script', () => {
   for (const command of [
     'rg "pnpm dev" docs/',

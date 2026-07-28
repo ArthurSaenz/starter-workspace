@@ -11,10 +11,8 @@ import { acquireLock, releaseLock } from '../lock.mjs';
 
 const REPO_ROOT = resolve(HOOKS_DIR, '..', '..');
 
-// The gate skips itself when CLAUDE_HOOK_QA_NESTED is set, and `helpers.mjs` merges `process.env` —
-// so when `test:hooks` runs UNDER a real gate, every case here would inherit the flag and see a
-// no-op. Blank it explicitly wherever the gate is expected to do real work. Empty string is falsy,
-// so the guard stays off.
+// `helpers.mjs` merges `process.env`, so under a real gate every case here would inherit the
+// descent flag and see a no-op. Blank it where the gate must do real work ('' is falsy).
 const gateEnv = (extra) => ({ CLAUDE_HOOK_QA_NESTED: '', ...extra });
 
 // MUST carry its own package.json: `pnpm run qa` walks upward, so a bare directory would find the
@@ -58,10 +56,9 @@ test('a qa failure with no output still produces a usable message', () => {
 // Refusing is correct: TaskCompleted must not pass unverified, and the alternative is a second
 // concurrent full-monorepo turbo run.
 //
-// CONTENDS IN A SCRATCH PROJECT, NEVER AT THE REPO ROOT. A live TaskCompleted gate holds
-// `claude-qa.lock` at the repo root for its whole run, and `qa` ends in `test:hooks` — so a
-// root-level acquire here failed its own precondition every time the real gate ran it, and the
-// gate reported that as a QA failure. Scratch keeps the meaning and drops the collision.
+// CONTENDS IN A SCRATCH PROJECT, NEVER AT THE REPO ROOT: a live gate holds `claude-qa.lock` there
+// for its whole run, and `qa` ends in `test:hooks` — so a root-level acquire failed its own
+// precondition whenever the real gate ran it, and the gate reported that as a QA failure.
 test('a second concurrent quality-gate is refused', () => {
   const project = makeScratchProject('echo scratch-qa-ok');
   const held = acquireLock(project.dir, { name: 'claude-qa.lock', waitMs: 0, staleMs: 900_000 });
@@ -83,9 +80,8 @@ test('a second concurrent quality-gate is refused', () => {
   }
 });
 
-// The CLASS behind that instance. `qa` ends in `test:hooks`, so any test taking the gate's own lock
-// name at the repo root breaks whenever a real gate is the thing running it. Scans sources rather
-// than hardcoding a list, so a new test file cannot reintroduce it unnoticed.
+// The CLASS behind that instance. Scans sources rather than hardcoding a list, so a new test file
+// cannot reintroduce it unnoticed.
 test('no test contends on the gate lock at the repo root', () => {
   const dir = import.meta.dirname;
 
@@ -103,11 +99,8 @@ test('no test contends on the gate lock at the repo root', () => {
   }
 });
 
-// The depth guard, which is what stops `gate -> qa -> test:hooks -> gate` from recursing. Distinct
-// from the lock: the lock serialises peers, this stops self-descent.
-// The scratch qa FAILS on purpose: a passing one produces no gate output, so the assertions below
-// would hold whether or not the guard exists. Failing makes the difference observable — unguarded,
-// the gate blocks with the marker in its report.
+// The depth guard: stops `gate -> qa -> test:hooks -> gate`. The scratch qa FAILS on purpose —
+// a passing one produces no gate output, so these assertions would hold guard or no guard.
 test('a nested gate returns without running qa at all', () => {
   const project = makeScratchProject('echo NESTED_QA_MUST_NOT_RUN && exit 1');
   try {

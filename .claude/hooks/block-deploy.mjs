@@ -4,16 +4,9 @@
 // or stripped exec bit turns a block into a silent pass. Denies via permissionDecision JSON, which
 // holds under bypassPermissions where a settings deny rule would not.
 //
-// Known gaps: `bash script.sh`, `$(which gh)`, encodings, aliases, a tool named through a variable
-// (`G=gh; $G workflow run x`), and URLs assembled without a literal `/dispatches`.
-//
-// An UNLISTED prefix command is the widest one: it is not stripped, so its own name sits at argv[0]
-// and matches no case — `ionice -c3 gh workflow run x`, `taskset`, `unbuffer`, `proxychains`. The
-// listed set is the common ones, not a closed set.
-//
-// A value-taking prefix whose arity PREFIX_SPECS models wrongly is NOT a gap: the residue triggers
-// a re-anchor on any guarded tool in the original tokens, so `flock -c "gh workflow run x" /tmp/l`
-// still denies even though the parse is wrong.
+// Known gaps: `bash script.sh`, `$(which gh)`, encodings, aliases, a tool named through a variable,
+// URLs without a literal `/dispatches`, and — widest — any prefix command absent from
+// PREFIX_COMMANDS (`ionice`, `taskset`, `unbuffer`): unstripped, its own name sits at argv[0].
 
 import { readFileSync } from 'node:fs';
 
@@ -27,22 +20,15 @@ const RE_ENV_ASSIGN = /^[A-Za-z_][A-Za-z0-9_]*=/;
 // own value at argv[0], and no membership list fixes that arity problem.
 const SHELL_WRAPPERS = new Set(['bash', 'sh', 'zsh', 'dash', 'ksh', 'fish', 'csh', 'tcsh']);
 
-// Stripped from the head so the real command reaches argv[0].
+// Stripped from the head so the real command reaches argv[0]. An omission is a bypass: `time` was
+// listed and `timeout` was not, so `timeout 60 gh workflow run x` matched no case at all.
 const PREFIX_COMMANDS = new Set([
   'sudo', 'doas', 'env', 'command', 'builtin', 'exec', 'eval', 'nohup', 'nice', 'stdbuf', 'time', 'xargs',
-  // `time` was here and `timeout` was not, which is the whole of the bypass: the prefix survived to
-  // argv[0], the head switch had no case for it, and with no wrapper token present nothing re-armed
-  // the raw scan.
   'timeout', 'setsid', 'flock', 'script', 'watch',
 ]);
 
-// What each prefix consumes before the real command. Bare arity is NOT enough — option flags leave
-// their own residue: `script -q /dev/null gh …` puts `-q` at argv[0], as do `nice -n 10`,
-// `timeout -k 5 60` and `flock -n`. Prefixes absent from this table are merely dropped; anything
-// the table models wrongly falls through to the leftover-value rescan below rather than passing.
-// Membership here also decides whether the leftover-value rescan may fire: only a prefix that
-// actually consumes something can leave residue at argv[0]. `command -v pnpm` must not trigger it —
-// there `-v` is the real command's own flag, and rescanning would deny an ordinary lookup.
+// What each prefix eats before the real command. Bare arity is not enough — option flags leave
+// their own residue (`script -q /dev/null gh …`, `nice -n 10`, `timeout -k 5 60`).
 const PREFIX_SPECS = {
   sudo: { valueOpts: ['-u', '--user', '-g', '--group', '-p', '--prompt'], values: 0 },
   timeout: { valueOpts: ['-k', '--kill-after', '-s', '--signal'], values: 1 },
@@ -55,18 +41,15 @@ const PREFIX_SPECS = {
   env: { valueOpts: ['-u', '--unset'], values: 0 },
 };
 
-// A segment that is nothing BUT one of these still does something we cannot characterise — bare
-// `env` prints the environment, bare `xargs` reads stdin — so it fails closed. `timeout`, `flock`,
-// `script`, `watch` and `setsid` with no operand run nothing at all, and the quote-blind splitter
-// manufactures exactly that shape from `rg "fatal|timeout" x`. Failing closed on those costs
-// ordinary work and buys no coverage.
+// Fail closed only for prefixes that DO something alone (bare `env` prints the environment). Bare
+// `timeout`/`flock`/`script` run nothing, and the quote-blind splitter manufactures exactly that
+// from `rg "fatal|timeout" x`.
 const BARE_PREFIX_FAILS_CLOSED = new Set([
   'sudo', 'doas', 'env', 'command', 'builtin', 'exec', 'eval', 'nohup', 'nice', 'stdbuf', 'time', 'xargs',
 ]);
 
-// Keyed on the TOOL, never on "any unrecognised head": `git`, `rg` and `echo` are all unrecognised,
-// and basename() strips quotes, so a head-based rule would deny
-// `git commit -m "…gh workflow run…"` — the commit that lands this very fix.
+// Keyed on the TOOL, never on "unrecognised head": `git`/`rg`/`echo` are all unrecognised, so a
+// head-based rule would deny `git commit -m "…gh workflow run…"`.
 const GUARDED_TOOLS = new Set(['gh', 'ik', 'infra-kit']);
 
 // Used ONLY when a shell wrapper is present — see checkRawShell.
@@ -80,10 +63,8 @@ const RE_RAW_DELIVER_PREFIXED = /(?<![\w/-])(dx-|release-)(release-)?deliver(?![
 const RE_BARE_DELIVER = /(?<![\w/-])deliver(?![\w/-])/i;
 const RE_INFRA_TOOL = /\b(ik|infra-kit|pnpm|npm|npx|pnpx|yarn|node)\b/i;
 
-// SELF-IDENTIFYING names only — the `dx-`/`release-` prefix is mandatory, so a bare `deliver`
-// never matches. Used for argv[0] and, inside checkInfraKit, as one of that function's two routes.
-// It cannot be the ONLY route there: `ik release deliver` carries its meaning in the sequence, not
-// in a prefixed name, so this form alone would fail open on the most ordinary way to deliver.
+// SELF-IDENTIFYING names only: the `dx-`/`release-` prefix is mandatory, so a bare `deliver` never
+// matches. One of checkInfraKit's two routes — never the only one, or `ik release deliver` passes.
 const RE_DELIVER_HEAD = /^(dx-|release-)(release-)?deliver$/i;
 
 // exit 0, because the JSON channel is only read on exit 0. `reason` is surfaced to the model.
@@ -170,8 +151,7 @@ function tokenise(segment) {
 
     const before = i;
 
-    // Option flags first — a flag's value is skipped only when the flag is known to take a
-    // detached one. `-I{}` and `-oL` carry theirs attached, so they consume nothing extra.
+    // A flag's value is skipped only when the flag takes a DETACHED one; `-I{}` carries its own.
     while (i < raw.length && raw[i].startsWith('-')) {
       const takesValue = spec.valueOpts.includes(raw[i]);
       i += 1;
@@ -180,20 +160,16 @@ function tokenise(segment) {
 
     for (let consumed = 0; consumed < spec.values && i < raw.length; consumed += 1) i += 1;
 
-    // ACTUAL consumption, not merely "this prefix has a spec". `env` on its own consumes nothing
-    // and must keep failing closed; `timeout 60` consumed its duration and is a different case.
+    // ACTUAL consumption, not just "has a spec": bare `env` must still fail closed.
     if (i > before) consumedValues = true;
   }
 
   const argv = raw.slice(i);
 
-  // The spec mis-modelled this prefix, so its residue is sitting where the command should be.
-  // Re-anchor on a guarded tool — searching the ORIGINAL tokens, not argv, because the mis-parse
-  // may have eaten the tool itself: in `flock -c "gh workflow run x" /tmp/l` the positional value
-  // consumes `"gh` and leaves the ordinary word `workflow` at argv[0].
-  //
-  // No guarded tool anywhere means there is nothing here to guard, so this does NOT fail closed —
-  // doing so denied `flock /tmp/build.lock -c "pnpm build"` and `sudo -v`.
+  // Residue is sitting where the command should be, so the spec mis-modelled this prefix. Re-anchor
+  // on a guarded tool in the ORIGINAL tokens, not argv — a mis-parse can eat the tool itself:
+  // `flock -c "gh workflow run x" /tmp/l` consumes `"gh` and leaves the word `workflow` at argv[0].
+  // No guarded tool anywhere means nothing to guard, so this does not fail closed.
   if (consumedValues) {
     const at = raw.findIndex((token, index) => index > 0 && GUARDED_TOOLS.has(basename(token)));
     if (at !== -1) return { argv: raw.slice(at), stripped, consumedValues, lastPrefix };
@@ -204,8 +180,7 @@ function tokenise(segment) {
 
 // Positional, never substring: `gh run rerun` re-runs a deploy, `gh run list` reads.
 function checkGh(argv, segment) {
-  // basename(), like argv[0] and checkInfraKit already use: reading these raw meant quoting just
-  // the subcommand — `gh "workflow" run x` — walked past the whole check.
+  // basename(), as argv[0] already does: raw reads let `gh "workflow" run x` walk straight past.
   const verb = basename(argv[1] ?? '');
   const object = basename(argv[2] ?? '');
 
@@ -227,11 +202,9 @@ function checkHttp(segment) {
   }
 }
 
-// A bare `deliver` is ordinary product vocabulary — `pnpm exec rg deliver src/` is a search, and
-// scanning every token for it is what made this guard deny ordinary work. So it takes a
-// conjunction, by either of two routes. BOTH are required: the prefixed form alone fails open on
-// `ik release deliver` (see RE_DELIVER_HEAD's note), and the positional form alone misses
-// `pnpm dx-release-deliver`, whose name carries the whole meaning.
+// A bare `deliver` is ordinary vocabulary, so it takes a conjunction by either of two routes. BOTH
+// are needed: the prefixed form alone fails open on `ik release deliver`, the positional form alone
+// misses `pnpm dx-release-deliver`.
 function checkInfraKit(argv) {
   const rest = argv.slice(1);
 
@@ -300,14 +273,10 @@ try {
   const command = input.tool_input?.command ?? '';
   if (!command) process.exit(0);
 
-  // UNCONDITIONALLY, before the segment loop. This is the last-resort check on the one endpoint
-  // this hook calls its reason to exist, and it used to sit inside checkRawShell — so it ran only
-  // when a shell wrapper happened to be present. `A=https://api.github.com ; curl $A/…/dispatches`
-  // splits host and path into different segments, so the per-segment call below never sees both.
-  //
-  // Still the host AND path conjunction, never a bare `/dispatches`: the token appears throughout
-  // this repo's own tests and docs, and denying it alone would block `rg "/dispatches" .claude/` —
-  // the search anyone working on this guard runs. See guard-policy.test.mjs for that measurement.
+  // UNCONDITIONAL: this catch-all used to sit inside checkRawShell, so it ran only when a wrapper
+  // happened to be present — and a host assembled through a variable lands in a different segment
+  // from the path. Keeps the host AND path conjunction; a bare token deny would block searching
+  // for it, which is what anyone working on this guard does. See guard-policy.test.mjs.
   checkHttp(command);
 
   for (const segment of splitIntoSegments(command)) {
@@ -315,13 +284,9 @@ try {
 
     const { argv, stripped, consumedValues, lastPrefix } = tokenise(segment);
 
-    // BARE prefixes all the way down (`env`, `time`) — we cannot say what would have run, so we do
-    // not guess. Accepted cost: `env | grep DOPPLER` denies.
-    //
-    // Not when a prefix consumed its own values first: then nothing would have run at all, and the
-    // quote-blind splitter manufactures exactly that shape. `rg -n "fatal|timeout" x` splits at the
-    // `|` into a segment headed by `timeout`, which swallows the path — an ordinary search that has
-    // no business failing closed.
+    // Bare prefixes all the way down (`env`, `time`): we cannot say what would have run. Not when
+    // values were consumed first — then nothing would have run, and that is exactly the shape the
+    // quote-blind splitter makes from `rg -n "fatal|timeout" x`.
     if (argv.length === 0) {
       if (stripped && !consumedValues && BARE_PREFIX_FAILS_CLOSED.has(lastPrefix)) {
         failClosed('command consumed entirely by prefix stripping');
@@ -331,11 +296,8 @@ try {
 
     const head = basename(argv[0]);
 
-    // Retained as documentation, not as coverage: the whole-command call above subsumes this one.
-    // A segment is a substring of the command with operators swapped for newlines, and every
-    // operator that could terminate a match is already in RE_DISPATCH's boundary class — so
-    // segment-match implies command-match, and this can never be the deciding check. Kept because
-    // it states the intent locally, where a reader of the segment loop will look for it.
+    // Subsumed by the whole-command call above (segment-match implies command-match); kept so the
+    // intent stays visible where a reader of this loop looks for it.
     checkHttp(segment);
 
     if (RE_DELIVER_HEAD.test(head)) {

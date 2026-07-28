@@ -5,14 +5,11 @@ import { HEAD_PREFIX, splitIntoSegments } from '../hooklib.mjs';
 
 export const name = 'cmux';
 
-// SEGMENTS INTERNALLY RATHER THAN EXPORTING scope = 'segment', which is why `scope` stays unset.
-// The dispatcher hands a segment-scoped guard one segment at a time, and hooklib's splitter is
-// quote-blind — so `cmux new-session -d -s dev "cd apps/client && pnpm dev"` arrives as two
-// segments, and the one carrying `pnpm dev` can no longer see the `cmux` that authorises it.
-// The escape needs the whole command, the match needs a head anchor; splitting here gets both.
-//
-// Head-anchored because this guard BLOCKS, and unanchored it stopped `rg "pnpm dev" docs/`.
-// No trailing token boundary, so `pnpm dev:client` keeps blocking exactly as it always did.
+// SEGMENTS INTERNALLY instead of exporting scope = 'segment', hence `scope` stays unset: the
+// splitter is quote-blind, so `cmux new-session -d -s dev "cd apps/client && pnpm dev"` splits and
+// the segment holding `pnpm dev` can no longer see the `cmux` authorising it. The escape needs the
+// whole command, the match needs a head anchor — unanchored, this blocked `rg "pnpm dev" docs/`.
+// No trailing boundary, so `pnpm dev:client` keeps blocking as before.
 const RE_DEV_SERVER = new RegExp(String.raw`${HEAD_PREFIX}pnpm\s+(run\s+)?dev`, 'i');
 
 export function check(command) {
