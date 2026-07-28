@@ -9,7 +9,6 @@ import { join, resolve } from 'node:path';
 import { runHook, edit, HOOKS_DIR } from './helpers.mjs';
 import {
   parseEslintJson,
-  parseTscDiagnostics,
   splitTscBlocks,
   extractToolError,
   isMissingConfig,
@@ -174,47 +173,6 @@ test('isMissingConfig matches the literal captured stderr, and both spellings', 
   assert.equal(isMissingConfig(''), false);
 });
 
-// ------------------------------------------------------------------------- parseTscDiagnostics
-
-// LITERAL capture of `tsc --noEmit --pretty false` against a tsconfig naming an unresolvable type
-// package. The exit code was 2, not 1 — which is why parse-presence decides, not the exit code.
-const TSC_PROGRAM_LEVEL = `error TS2688: Cannot find type definition file for 'vite/client'.
-  The file is in the program because:
-    Entry point of type library 'vite/client' specified in compilerOptions
-`;
-
-test('a program-level diagnostic parses as one entry with its continuation lines', () => {
-  const diagnostics = parseTscDiagnostics(TSC_PROGRAM_LEVEL);
-
-  assert.equal(diagnostics.length, 1, 'one diagnostic, not zero and not three');
-  assert.equal(diagnostics[0].file, null, 'program-level diagnostics carry no file(line,col) prefix');
-  assert.equal(diagnostics[0].code, 'TS2688');
-  // The continuations carry the ONLY actionable content — the headline just says a file is missing.
-  assert.equal(diagnostics[0].details.length, 2);
-  assert.match(diagnostics[0].details[0], /The file is in the program because/);
-  assert.match(diagnostics[0].details[1], /Entry point of type library/);
-});
-
-test('file-scoped diagnostics parse, and both forms coexist in one run', () => {
-  const diagnostics = parseTscDiagnostics(
-    `${TSC_PROGRAM_LEVEL}src/x.ts(4,7): error TS2322: Type 'string' is not assignable to type 'number'.\n`,
-  );
-
-  assert.equal(diagnostics.length, 2);
-  assert.equal(diagnostics[1].file, 'src/x.ts');
-  assert.equal(diagnostics[1].line, 4);
-  assert.equal(diagnostics[1].column, 7);
-  assert.equal(diagnostics[1].code, 'TS2322');
-});
-
-test('a tsc crash dump is not reported as type errors', () => {
-  // Nothing parseable means tsc failed to RUN; as type errors it would send the agent into source.
-  const crash = `Error: Cannot find module 'typescript/lib/tsc.js'
-    at Module._resolveFilename (node:internal/modules/cjs/loader:1234:15)
-`;
-  assert.deepEqual(parseTscDiagnostics(crash), []);
-});
-
 // --------------------------------------------------------------------------------- splitTscBlocks
 
 // ALL LITERAL CAPTURES of `tsc --noEmit --pretty false` run against throwaway tsconfigs in this
@@ -256,6 +214,17 @@ test('splitTscBlocks keeps a program-level diagnostic with its continuations', (
   The file is in the program because:
     Entry point of type library 'definitely-not-installed-xyz' specified in compilerOptions`;
   assert.deepEqual(splitTscBlocks(captured), [captured]);
+});
+
+// Both shapes in one run: tsc mixes them freely, and a splitter that handles only the file-scoped
+// form would silently drop whole-program conditions.
+test('splitTscBlocks keeps program-level and file-scoped diagnostics apart in one run', () => {
+  const program = `error TS2688: Cannot find type definition file for 'definitely-not-installed-xyz'.
+  The file is in the program because:
+    Entry point of type library 'definitely-not-installed-xyz' specified in compilerOptions`;
+  const scoped = `.omc/.tmp-tsc-capture/a.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.`;
+
+  assert.deepEqual(splitTscBlocks(`${program}\n${scoped}`), [program, scoped]);
 });
 
 test('splitTscBlocks yields nothing for a crash dump, so it stays a tool failure', () => {

@@ -10,10 +10,9 @@ import { readInput, block, allow, findPackageDir } from './hooklib.mjs';
 import { acquireLock, holdsLock, releaseLock } from './lock.mjs';
 import {
   parseEslintJson,
-  parseTscDiagnostics,
+  splitTscBlocks,
   extractToolError,
   isMissingConfig,
-  formatTscDiagnostic,
   formatReport,
 } from './lint-report.mjs';
 
@@ -266,14 +265,17 @@ try {
       } else if (!run.spawnFailed && run.status !== 0) {
         // Joined with a newline: bare concatenation fuses stdout's last line to stderr's first and
         // both stop matching.
-        const diagnostics = parseTscDiagnostics(`${run.stdout}\n${run.stderr}`);
+        const blocks = splitTscBlocks(`${run.stdout}\n${run.stderr}`);
 
-        if (diagnostics.length > 0) {
+        if (blocks.length > 0) {
           // Including diagnostics outside the edited file — tsc checks the whole program, and an
           // edit to A can break B.
           sections.push({
             title: 'TypeScript:',
-            lines: diagnostics.map((d) => `  ${formatTscDiagnostic(d).replaceAll('\n', '\n  ')}`),
+            // The 2-space section indent lands on every line uniformly, so tsc's own nesting depth
+            // survives intact — which is the point of passing its text through rather than
+            // re-rendering it.
+            lines: blocks.map((block) => `  ${block.replaceAll('\n', '\n  ')}`),
             maxChars: 2000, // sub-cap, so a type-error flood cannot crowd out the lint findings
           });
         } else {

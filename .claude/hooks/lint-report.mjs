@@ -79,76 +79,23 @@ export function isMissingConfig(stderr) {
   return /could ?n[o']?t find an eslint\.config/i.test(stderr ?? '');
 }
 
-// tsc emits TWO diagnostic shapes; knowing only the first downgrades real errors to "tool failure".
+// tsc emits TWO diagnostic shapes, and knowing only the first downgrades real errors to "tool
+// failure":
 //   file-scoped:    src/x.ts(4,7): error TS2322: Type 'string' is not assignable to type 'number'.
 //   program-level:  error TS2688: Cannot find type definition file for 'vite/client'.
-// The program-level form has no `file(line,col):` prefix — tsc uses it for whole-program conditions.
-const RE_TSC_FILE = /^(.+?)\((\d+),(\d+)\): error (TS\d+): (.*)$/;
-const RE_TSC_PROGRAM = /^error (TS\d+): (.*)$/;
-// An indented non-blank line is a continuation of the diagnostic above it.
-const RE_TSC_CONTINUATION = /^\s+\S/;
-
-export function parseTscDiagnostics(stdout) {
-  const diagnostics = [];
-
-  for (const raw of (stdout ?? '').split('\n')) {
-    const line = raw.replace(/\r$/, '');
-
-    const fileMatch = RE_TSC_FILE.exec(line);
-    if (fileMatch) {
-      diagnostics.push({
-        file: fileMatch[1],
-        line: Number(fileMatch[2]),
-        column: Number(fileMatch[3]),
-        code: fileMatch[4],
-        message: fileMatch[5],
-        details: [],
-      });
-      continue;
-    }
-
-    const programMatch = RE_TSC_PROGRAM.exec(line);
-    if (programMatch) {
-      diagnostics.push({
-        file: null,
-        line: null,
-        column: null,
-        code: programMatch[1],
-        message: programMatch[2],
-        details: [],
-      });
-      continue;
-    }
-
-    // For TS2688 the continuations carry the only actionable content; the headline just says a file
-    // is missing.
-    if (RE_TSC_CONTINUATION.test(line) && diagnostics.length > 0) {
-      diagnostics.at(-1).details.push(line.trim());
-    }
-  }
-
-  return diagnostics;
-}
-
-export function formatTscDiagnostic(diagnostic) {
-  const head =
-    diagnostic.file === null
-      ? `error ${diagnostic.code}: ${diagnostic.message}`
-      : `${diagnostic.file}(${diagnostic.line},${diagnostic.column}): error ${diagnostic.code}: ${diagnostic.message}`;
-
-  return [head, ...diagnostic.details.map((detail) => `    ${detail}`)].join('\n');
-}
-
-// GROUPS, never re-renders. Parsing tsc apart and printing it back was byte-identical except that it
-// flattened tsc's own 2/4/6/8 nesting to a uniform 4, which destroys the causal chain in a deep
-// mismatch. Blocks exist only so capLines cannot cut a diagnostic in half.
+// The program-level form has no `file(line,col):` prefix — tsc uses it for whole-program conditions,
+// hence the optional prefix group rather than two separate patterns.
 //
-// A head must NOT begin with whitespace — that single property is what stops an indented
-// continuation from being promoted to a diagnostic. `\S.*?` rather than `.+?` for the same reason:
-// `.+?` happily consumes leading indentation, which is how the old parser turned the continuation
-//   `    Type '"a.ts(1,1): error TS1005: injected"' is not assignable…`
-// into a phantom TS1005 at line 1 of a file that does not exist.
+// A head must NOT begin with whitespace: that single property is what stops an indented continuation
+// from being promoted to a diagnostic. `\S.*?` rather than `.+?` for the same reason — a lazy `.+?`
+// happily consumes leading indentation, which is how the previous parser turned the continuation
+//   `        Type '"a.ts(1,1): error TS1005: injected"' is not assignable…`
+// into a phantom TS1005 at line 1 of a file named `        Type '"a.ts`. Verified against real
+// captured output. (`$`-anchoring, which the previous pattern had, is inert on `\n`-split input.)
 const RE_TSC_HEAD = /^(?:\S.*?\(\d+,\d+\): )?error TS\d+: /;
+// An indented non-blank line is a continuation of the diagnostic above it. For TS2688 those
+// continuations carry the only actionable content; the headline just says a file is missing.
+const RE_TSC_CONTINUATION = /^\s+\S/;
 
 export function splitTscBlocks(stdout) {
   const blocks = [];
