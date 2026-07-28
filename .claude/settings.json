@@ -1,11 +1,14 @@
 {
   "permissions": {
     "deny": [
+      "Bash(doppler secrets:*)",
       "Bash(gh workflow run:*)",
       "Bash(gh run rerun:*)",
       "Bash(pnpm exec infra-kit release-deliver:*)",
       "Bash(pnpm exec infra-kit release deliver:*)",
       "Bash(pnpm exec ik release-deliver:*)",
+      "Bash(pnpm exec ik release deliver:*)",
+      "Bash(ik release deliver:*)",
       "Bash(pnpm run dx-release-deliver:*)",
       "Bash(pnpm dx-release-deliver:*)"
     ]
@@ -18,6 +21,61 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-deploy.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/bash-guard.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect-files.mjs"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/edit-pipeline.mjs",
+            "timeout": 90
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/quality-gate.mjs",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/setup-env.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'echo \"Reminder: Use pnpm (not npm/yarn). Run pnpm qa before committing. Current branch: $(git branch --show-current 2>/dev/null || echo unknown). Last commit: $(git log --oneline -1 2>/dev/null || echo none)\"'"
           }
         ]
       }

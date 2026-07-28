@@ -5,9 +5,17 @@ import { runHook, bash } from './helpers.mjs';
 const HOOK = 'block-deploy.mjs';
 
 // Denies via permissionDecision JSON on stdout with exit 0, so assert on the JSON, not the code.
+// `reason` is exposed because a verdict alone cannot see message regressions: a branch that only
+// produces a MORE SPECIFIC message than the catch-all below it looks dead to a boolean assertion.
 function decision(command, opts) {
   const res = runHook(HOOK, command === null ? '{bad json' : bash(command), opts);
-  return { denied: /"permissionDecision"\s*:\s*"deny"/.test(res.stdout), status: res.status };
+  let reason = '';
+  try {
+    reason = JSON.parse(res.stdout).hookSpecificOutput?.permissionDecisionReason ?? '';
+  } catch {
+    // Not a deny payload; `denied` below reports that.
+  }
+  return { denied: /"permissionDecision"\s*:\s*"deny"/.test(res.stdout), status: res.status, reason };
 }
 
 const HOST = 'https://api.github.com';
@@ -311,6 +319,38 @@ test('block-deploy fails closed when prefix stripping consumes the whole command
   ]) {
     assert.ok(decision(command).denied, `stripped-to-empty must deny, never silently pass: ${command}`);
   }
+});
+
+// THE GAP THIS CLOSES: every other assertion here reduces a deny to a boolean, so a branch whose
+// only contribution is a more specific message reads as dead. The `gh api` arm inside checkRawShell
+// is exactly that — verdict-identical to the catch-all beneath it, but distinct on ~600 commands.
+// A review nearly deleted it as redundant on boolean evidence alone.
+const MESSAGES = [
+  ['gh workflow run deploy.yml', /bypasses infra-kit and dispatches a workflow directly/],
+  ['gh run rerun 123', /re-executes a previous run/],
+  [`gh api ${PATH} -f ref=main`, /POSTs implicitly/],
+  [`bash -c "gh api ${PATH} -f a=1"`, /`gh api` against the workflow-dispatch endpoint inside a shell wrapper/],
+  [`bash -c "gh workflow run x"`, /inside a shell wrapper — dispatches a workflow directly/],
+  [`curl -X POST ${HOST}/${PATH}`, /direct HTTP call to the workflow-dispatch endpoint/],
+  ['ik release deliver', /merges the release PR into main and deploys prod/],
+  ['dx-release-deliver', /is infra-kit's delivery entrypoint/],
+  ['env', /failing closed/],
+];
+
+test('block-deploy names the specific rule it denied on, not just "denied"', () => {
+  for (const [command, expected] of MESSAGES) {
+    const d = decision(command);
+    assert.ok(d.denied, `precondition: must deny — ${command}`);
+    assert.match(d.reason, expected, `wrong or degraded message for: ${command}`);
+  }
+});
+
+// The deny text is the only thing the agent sees, so it must carry the way out, not just the refusal.
+test('every deny message points at the sanctioned alternative', () => {
+  const d = decision('gh workflow run deploy.yml');
+  assert.match(d.reason, /mcp__infra-kit__gh-release-deploy-all/, 'must name the MCP tool');
+  assert.match(d.reason, /pnpm exec infra-kit release-deploy-all/, 'and the CLI equivalent');
+  assert.match(d.reason, /gh run list/, 'and say which reads stay allowed');
 });
 
 test('block-deploy fails closed on malformed / empty / missing tool_name (deny JSON)', () => {

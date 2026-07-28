@@ -296,23 +296,103 @@ test('warnings are not reported', () => {
   }
 });
 
+// `eslint --fix` rewrites the arrow to a block on ONE line; prettier then splits that block across
+// three, pushing everything below it down by two. That shift is the whole point — the previous
+// fixture here reflowed without moving the reported line, so it passed with stage 3b deleted and
+// pinned nothing. Measured: with stage 3b the symbol is reported at line 4 and resolves; without it
+// at line 2, which holds `  return 1`.
+const FLAT_CONFIG_ARROW_BODY = `export default [
+  {
+    files: ['**/*.js'],
+    rules: { 'no-unused-vars': 'error', 'arrow-body-style': ['error', 'always'] },
+  },
+];
+`;
+
 test('line numbers survive a prettier reflow', () => {
   // Prettier runs after `eslint --fix`, so the coordinates must resolve in the final file.
-  const pkg = makeLintPackage('const   a=1;const   foo   =   2\n', {
-    eslintConfig: FLAT_CONFIG_UNUSED_ERROR,
+  const pkg = makeLintPackage('const f = () => 1\nconst unusedProbeValue = 2\n', {
+    eslintConfig: FLAT_CONFIG_ARROW_BODY,
     fileName: 'src.js',
   });
   try {
     const res = runHook('edit-pipeline.mjs', edit(pkg.file));
     assert.equal(res.status, 2);
 
-    const reported = /(\d+):(\d+)\s+error\s+'foo'/.exec(res.stderr);
-    assert.ok(reported, `expected a reported position for 'foo', got:\n${res.stderr}`);
+    const reported = /(\d+):(\d+)\s+error\s+'unusedProbeValue'/.exec(res.stderr);
+    assert.ok(reported, `expected a reported position for the unused symbol, got:\n${res.stderr}`);
 
     const finalLines = readFileSync(pkg.file, 'utf8').split('\n');
     const line = finalLines[Number(reported[1]) - 1];
     assert.ok(line !== undefined, 'the reported line must exist in the FINAL file');
-    assert.match(line, /foo/, 'and must actually be the line holding the reported symbol');
+    assert.match(
+      line,
+      /unusedProbeValue/,
+      'the reported line must hold the reported symbol in the FINAL file — a pre-reflow ' +
+        'coordinate points two lines up, at the arrow body prettier just expanded',
+    );
+
+    // Guards the fixture itself: if a future prettier/eslint stops expanding the arrow there is no
+    // reflow left to survive, and the assertion above would pass without testing anything.
+    assert.ok(finalLines.length >= 4, `fixture must actually reflow, got:\n${finalLines.join('\n')}`);
+  } finally {
+    pkg.cleanup();
+  }
+});
+
+// `probe/always` reports on every `probeSymbol` and offers a fix that rewrites the identifier to
+// itself. ESLint applies it, sees the text is unchanged, and stops — so the message survives
+// `--fix` while still carrying a `fix` property. That is the exact shape `survivedStage2` exists to
+// exclude. arrow-body-style supplies the reflow that makes stage 3b run at all.
+const FLAT_CONFIG_FIXABLE_BUT_UNFIXED = `const alwaysFixable = {
+  meta: { fixable: 'code' },
+  create(context) {
+    return {
+      Identifier(node) {
+        if (node.name === 'probeSymbol') {
+          context.report({
+            node,
+            message: 'probe rule always reports',
+            fix: (fixer) => fixer.replaceText(node, 'probeSymbol'),
+          });
+        }
+      },
+    };
+  },
+};
+
+export default [
+  {
+    files: ['**/*.js'],
+    plugins: { probe: { rules: { always: alwaysFixable } } },
+    rules: { 'probe/always': 'error', 'arrow-body-style': ['error', 'always'] },
+  },
+];
+`;
+
+// WITHOUT survivedStage2 this fixture is labelled "prettier reverts eslint's fix for probe/always"
+// and told to fix the config — a false accusation about something no config change would help.
+// "Fixable" alone cannot mean "eslint fixed it and prettier put it back".
+test('a fixable rule that --fix could not resolve is not blamed on prettier', () => {
+  const pkg = makeLintPackage('const f = () => 1\nconst probeSymbol = 2\nexport { probeSymbol }\n', {
+    eslintConfig: FLAT_CONFIG_FIXABLE_BUT_UNFIXED,
+    fileName: 'src.js',
+  });
+  try {
+    const res = runHook('edit-pipeline.mjs', edit(pkg.file));
+    assert.equal(res.status, 2, 'the probe rule must still be reported');
+    assert.match(res.stderr, /probe\/always/, 'precondition: the fixable-but-unfixed rule is reported');
+    assert.doesNotMatch(
+      res.stderr,
+      /prettier\/eslint conflict/,
+      'a rule that survived --fix is not a prettier standoff — it never got fixed in the first place',
+    );
+
+    // Pins the precondition: without a reflow, stage 3b never runs and this passes vacuously.
+    assert.ok(
+      readFileSync(pkg.file, 'utf8').split('\n').length >= 5,
+      'fixture must reflow, or stage 3b is skipped and nothing is being tested',
+    );
   } finally {
     pkg.cleanup();
   }
