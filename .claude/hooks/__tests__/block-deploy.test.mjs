@@ -321,10 +321,8 @@ test('block-deploy fails closed when prefix stripping consumes the whole command
   }
 });
 
-// THE GAP THIS CLOSES: every other assertion here reduces a deny to a boolean, so a branch whose
-// only contribution is a more specific message reads as dead. The `gh api` arm inside checkRawShell
-// is exactly that — verdict-identical to the catch-all beneath it, but distinct on ~600 commands.
-// A review nearly deleted it as redundant on boolean evidence alone.
+// Boolean assertions make a branch whose only contribution is a better MESSAGE look dead — the
+// `gh api` arm is verdict-identical to the catch-all below it, and was nearly deleted for that.
 const MESSAGES = [
   ['gh workflow run deploy.yml', /bypasses infra-kit and dispatches a workflow directly/],
   ['gh run rerun 123', /re-executes a previous run/],

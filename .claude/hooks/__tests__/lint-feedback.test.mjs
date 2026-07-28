@@ -175,11 +175,9 @@ test('isMissingConfig matches the literal captured stderr, and both spellings', 
 
 // --------------------------------------------------------------------------------- splitTscBlocks
 
-// The DIAGNOSTIC-SHAPE fixtures below are literal captures of `tsc --noEmit --pretty false` run
-// against throwaway tsconfigs in this repo; paths are as tsc emitted them. The CRLF/Windows-path
-// and unindented-preamble fixtures are CONSTRUCTED — this repo cannot emit them — and are labelled
-// as such at each site. Saying "all captured" over a synthetic fixture is how the missing-config
-// regex in this file shipped broken; see the header.
+// Diagnostic-shape fixtures are literal `tsc --noEmit --pretty false` captures, paths as emitted.
+// The CRLF/Windows and preamble ones are CONSTRUCTED, labelled at each site — this repo cannot
+// emit them, and a blanket "all captured" is how the missing-config regex shipped broken.
 const TSC_DEEP = `.omc/.tmp-tsc-capture/a.ts(7,6): error TS2345: Argument of type '(v: Outer) => void' is not assignable to parameter of type '(v: OuterBad) => void'.
   Types of parameters 'v' and 'v' are incompatible.
     Type 'OuterBad' is not assignable to type 'Outer'.
@@ -335,11 +333,9 @@ test('warnings are not reported', () => {
   }
 });
 
-// `eslint --fix` rewrites the arrow to a block on ONE line; prettier then splits that block across
-// three, pushing everything below it down by two. That shift is the whole point — the previous
-// fixture here reflowed without moving the reported line, so it passed with stage 3b deleted and
-// pinned nothing. Measured: with stage 3b the symbol is reported at line 4 and resolves; without it
-// at line 2, which holds `  return 1`.
+// eslint --fix collapses the arrow to one line, prettier splits it to three, so everything below
+// shifts by two. The previous fixture reflowed WITHOUT moving the reported line and so pinned
+// nothing. With stage 3b the symbol reports at line 4; without it at line 2, which is `  return 1`.
 const FLAT_CONFIG_ARROW_BODY = `export default [
   {
     files: ['**/*.js'],
@@ -379,10 +375,9 @@ test('line numbers survive a prettier reflow', () => {
   }
 });
 
-// `probe/always` reports on every `probeSymbol` and offers a fix that rewrites the identifier to
-// itself. ESLint applies it, sees the text is unchanged, and stops — so the message survives
-// `--fix` while still carrying a `fix` property. That is the exact shape `survivedStage2` exists to
-// exclude. arrow-body-style supplies the reflow that makes stage 3b run at all.
+// A fix that rewrites the identifier to itself: eslint applies it, sees no change, stops — so the
+// message survives --fix still carrying `fix`. Exactly what survivedStage2 must exclude.
+// arrow-body-style supplies the reflow that makes stage 3b run at all.
 const FLAT_CONFIG_FIXABLE_BUT_UNFIXED = `const alwaysFixable = {
   meta: { fixable: 'code' },
   create(context) {
@@ -437,16 +432,9 @@ test('a fixable rule that --fix could not resolve is not blamed on prettier', ()
   }
 });
 
-// C6. Once prettier reflows, stage 2's line:col are dead. Stage 3b re-derives them — but every path
-// out of stage 3b that fails to produce a fresh report used to leave the stale one in place, and it
-// was rendered anyway. The TIMEOUT path is the most reachable (load-dependent, not content-
-// dependent) and was the one previously described as correct: it emitted "inconclusive" AND the
-// stale coordinates together.
-//
-// `probe/hang` busy-waits only once the file has >= 4 lines, so it is quiet on the 2-line
-// pre-reflow file and hangs on the 5-line post-reflow one — a deterministic stage-3b-only failure
-// with stage 2 clean. Nothing else can produce that: any stage-2 failure sets lintFailed and skips
-// 3b entirely.
+// C6, timeout path — the most reachable one, and it used to print "inconclusive" AND the stale
+// coordinates together. `probe/hang` busy-waits only past 4 lines, so it is quiet before the reflow
+// and hangs after: a stage-3b-only failure with stage 2 clean, which nothing else produces.
 const FLAT_CONFIG_HANG_AFTER_REFLOW = `const hangOnBigFiles = {
   create(context) {
     return {

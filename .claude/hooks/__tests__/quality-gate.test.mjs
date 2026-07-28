@@ -53,12 +53,9 @@ test('a qa failure with no output still produces a usable message', () => {
 
 // -------------------------------------------------------------------------------- the qa lock
 
-// Refusing is correct: TaskCompleted must not pass unverified, and the alternative is a second
-// concurrent full-monorepo turbo run.
-//
-// CONTENDS IN A SCRATCH PROJECT, NEVER AT THE REPO ROOT: a live gate holds `claude-qa.lock` there
-// for its whole run, and `qa` ends in `test:hooks` — so a root-level acquire failed its own
-// precondition whenever the real gate ran it, and the gate reported that as a QA failure.
+// Refusing is correct: the alternative is a second concurrent full-monorepo turbo run.
+// SCRATCH PROJECT, NEVER THE REPO ROOT — a live gate holds that lock while running `qa`, which ends
+// in `test:hooks`, so a root-level acquire here failed its own precondition. That was C1.
 test('a second concurrent quality-gate is refused', () => {
   const project = makeScratchProject('echo scratch-qa-ok');
   const held = acquireLock(project.dir, { name: 'claude-qa.lock', waitMs: 0, staleMs: 900_000 });

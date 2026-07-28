@@ -1,12 +1,9 @@
 // Pure parsing/formatting for the edit pipeline's report. Two rules throughout: "failed to run" and
 // "found problems" are never collapsed, and PARSE-PRESENCE decides which, not the exit code.
 
-// Tolerant by contract — status 2 gives empty stdout, a crash gives anything, and both must yield
-// "no findings" rather than throw the whole report away.
-//
-// STDOUT IS NOT PURE JSON HERE: pnpm's catalog resolution prints `Dependency "react" could not be
-// resolved…` ahead of the array. The scan is LINE-ORIENTED, not a `[`-to-`]` slice, because the
-// array is on ONE line and a bracket in pnpm's warning text would defeat a slice.
+// Must never throw: status 2 gives empty stdout, a crash gives anything.
+// pnpm's catalog warnings precede the array on stdout, so a strict parse fails. Line-oriented,
+// not a `[`-to-`]` slice — the array is one line and a bracket in the noise would defeat a slice.
 function extractJsonPayload(stdout) {
   const text = (stdout ?? '').trim();
   if (!text) return null;
@@ -79,32 +76,16 @@ export function isMissingConfig(stderr) {
   return /could ?n[o']?t find an eslint\.config/i.test(stderr ?? '');
 }
 
-// tsc emits TWO diagnostic shapes, and knowing only the first downgrades real errors to "tool
-// failure":
-//   file-scoped:    src/x.ts(4,7): error TS2322: Type 'string' is not assignable to type 'number'.
-//   program-level:  error TS2688: Cannot find type definition file for 'vite/client'.
-// The program-level form has no `file(line,col):` prefix — tsc uses it for whole-program conditions,
-// hence the optional prefix group rather than two separate patterns.
-//
-// A head must NOT begin with whitespace: that single property is what stops an indented continuation
-// from being promoted to a diagnostic. `\S.*?` rather than `.+?` for the same reason — a lazy `.+?`
-// happily consumes leading indentation, which is how the previous parser turned the continuation
-//   `        Type '"a.ts(1,1): error TS1005: injected"' is not assignable…`
-// into a phantom TS1005 at line 1 of a file named `        Type '"a.ts`. Verified against real
-// captured output. (`$`-anchoring, which the previous pattern had, is inert on `\n`-split input.)
-//
-// PRICE OF THAT ANCHOR: a path whose first character is whitespace yields no blocks, so the caller
-// reports "TypeScript failed to run" instead of the diagnostics. Accepted — no such path exists
-// here, and the failure is loud rather than silent.
+// Prefix is optional: tsc omits `file(line,col):` for whole-program conditions like TS2688.
+// `^\S` and the lazy `\S.*?` both reject leading whitespace — without that an indented
+// continuation reads as a diagnostic. Cost: a path starting with a space yields no blocks.
 const RE_TSC_HEAD = /^(?:\S.*?\(\d+,\d+\): )?error TS\d+: /;
-// An indented non-blank line is a continuation of the diagnostic above it. For TS2688 those
-// continuations carry the only actionable content; the headline just says a file is missing.
+// Indented non-blank => continuation. For TS2688 these carry the only actionable content.
 const RE_TSC_CONTINUATION = /^\s+\S/;
 
 export function splitTscBlocks(stdout) {
   const blocks = [];
-  // A BOM is matched by `\s`, so an unstripped one would fail the `^\S` head test, fall through to
-  // the continuation test, and silently delete the first diagnostic along with its detail lines.
+  // `\s` matches a BOM, so an unstripped one would hide the first diagnostic entirely.
   const text = (stdout ?? '').replace(/^\uFEFF/, '');
 
   for (const raw of text.split('\n')) {

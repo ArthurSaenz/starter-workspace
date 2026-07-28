@@ -165,10 +165,9 @@ function tokenise(segment) {
 
   const argv = raw.slice(i);
 
-  // Residue is sitting where the command should be, so the spec mis-modelled this prefix. Re-anchor
-  // on a guarded tool in the ORIGINAL tokens, not argv — a mis-parse can eat the tool itself:
-  // `flock -c "gh workflow run x" /tmp/l` consumes `"gh` and leaves the word `workflow` at argv[0].
-  // No guarded tool anywhere means nothing to guard, so this does not fail closed.
+  // Spec mis-modelled the prefix, so re-anchor on a guarded tool in the ORIGINAL tokens — a
+  // mis-parse can eat the tool itself (`flock -c "gh …"` consumes `"gh`). None found => nothing
+  // to guard, so no fail-closed.
   if (consumedValues) {
     const at = raw.findIndex((token, index) => index > 0 && GUARDED_TOOLS.has(basename(token)));
     if (at !== -1) return { argv: raw.slice(at), consumedValues, lastPrefix };
@@ -272,10 +271,9 @@ try {
   const command = input.tool_input?.command ?? '';
   if (!command) process.exit(0);
 
-  // UNCONDITIONAL: this catch-all used to sit inside checkRawShell, so it ran only when a wrapper
-  // happened to be present — and a host assembled through a variable lands in a different segment
-  // from the path. Keeps the host AND path conjunction; a bare token deny would block searching
-  // for it, which is what anyone working on this guard does. See guard-policy.test.mjs.
+  // UNCONDITIONAL: nested inside checkRawShell it only ran when a wrapper happened to be present,
+  // and a host assembled via a variable splits away from the path. Host AND path stays — a bare
+  // token deny would block searching for it. See guard-policy.test.mjs.
   checkHttp(command);
 
   for (const segment of splitIntoSegments(command)) {

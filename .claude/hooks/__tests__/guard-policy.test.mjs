@@ -1,12 +1,7 @@
-// The over-blocking policy, made executable. `block-deploy` holds that a false deny announces
-// itself while a false allow is silent; `cmux` treats a false deny as a defect. Both are
-// defensible — holding both with no boundary is what denied `pnpm exec rg deliver src/`.
-//
-// I1 — for an irreversible-action guard, a false block on a read-only command is acceptable when
-//      the matched string has one purpose, and not when it is ordinary vocabulary. Decided by
-//      measurement below rather than by opinion.
-// I2 — a last-resort catch-all must not be nested inside a conditional arm. Asserted behaviourally
-//      by the no-shell-wrapper dispatch case in block-deploy.test.mjs.
+// The over-blocking policy, made executable. block-deploy treats a false deny as correct, cmux as
+// a defect — holding both with no boundary is what denied `pnpm exec rg deliver src/`.
+// I1: over-blocking is fine when the matched string has one purpose, not when it is vocabulary.
+// I2: a last-resort catch-all must not be nested in a conditional arm (asserted in block-deploy.test).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

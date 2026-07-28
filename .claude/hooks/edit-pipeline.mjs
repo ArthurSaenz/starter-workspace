@@ -204,15 +204,9 @@ try {
 
       if (!run.timedOut && !run.missing && !run.spawnFailed && run.status !== 2) {
         lintReport = parseEslintJson(run.stdout);
-        // Fixable AND absent from stage 2 => eslint fixed it and prettier put it back. "Fixable"
-        // alone would also name rules `--fix` never resolved.
-        //
-        // MEASURED, so removal is not reproposed on a hunch: only 2 fixable rules fire anywhere in
-        // this repo (react/exhaustive-deps, jsdoc/check-param-names), and across all 11 real files
-        // where they fire this yields ZERO conflicts. It is insurance, not a working detector —
-        // base.ts already disabled the rules that used to collide (see its unicorn/number-literal-case
-        // note), so what remains is cover for config drift re-introducing one. Kept because that
-        // failure is silent and repeats on every edit: the agent fixes the file, prettier undoes it.
+        // Fixable AND absent from stage 2 => eslint fixed it, prettier put it back.
+        // Measured: 0 conflicts across every real candidate today. Insurance against config drift,
+        // not a live detector — the failure it catches is silent and repeats on every edit.
         conflictRules = [
           ...new Set(
             lintReport.messages
@@ -226,18 +220,14 @@ try {
       // falls through to the discard below
     }
 
-    // Stage 2's line:col died with the reflow above, so a re-lint that produced no fresh report
-    // must DISCARD them rather than print findings at positions that no longer resolve. All three
-    // failure paths land here — timed out, status 2 / missing / spawn failure, and a throw. Each
-    // used to leave the stale report in place, and the timeout path printed the marker beside it.
-    // The findings were real; only their coordinates died, so the rules are still named.
+    // The reflow killed stage 2's line:col, so no fresh report means DISCARD — never print findings
+    // at positions that no longer resolve. Catches all three failures: timeout, status 2, throw.
+    // The rules were real, only their coordinates died, so they are still named.
     if (!refreshed) {
       const rules = [...survivedStage2].filter(Boolean).sort();
 
       sections.push({
         title: 'ESLint:',
-        // Worded from what actually happened: with no stage-2 findings there were no line numbers
-        // to drop, and claiming otherwise would report a loss that did not occur.
         lines:
           rules.length > 0
             ? [
@@ -303,9 +293,7 @@ try {
           // edit to A can break B.
           sections.push({
             title: 'TypeScript:',
-            // The 2-space section indent lands on every line uniformly, so tsc's own nesting depth
-            // survives intact — which is the point of passing its text through rather than
-            // re-rendering it.
+            // Uniform 2-space indent, so tsc's own nesting depth survives.
             lines: blocks.map((block) => `  ${block.replaceAll('\n', '\n  ')}`),
             maxChars: 2000, // sub-cap, so a type-error flood cannot crowd out the lint findings
           });
