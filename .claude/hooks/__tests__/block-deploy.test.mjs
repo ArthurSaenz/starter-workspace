@@ -166,7 +166,41 @@ const PREFIX_BYPASS = [
   ['flock with a bare flag', 'flock -n /tmp/l gh workflow run x'],
   // sudo takes `-u <user>`, so without a spec its value lands at argv[0] just like timeout's.
   ['sudo with a detached user value', 'sudo -u root gh workflow run x'],
+
+  // The payload form. `-c` is not in flock's/script's valueOpts, so the option loop eats it and the
+  // positional value then swallows the OPENING QUOTE OF THE PAYLOAD — leaving `workflow` at argv[0],
+  // an ordinary word the leftover-value test does not recognise. Looking only at argv[0] misses it;
+  // the re-anchor has to search the original tokens.
+  ['flock -c payload', 'flock -c "gh workflow run deploy.yml" /tmp/l'],
+  ['script -c payload', 'script -c "gh workflow run x" /dev/null'],
+  ['script --command payload', 'script --command "ik release deliver" /dev/null'],
+
+  // checkGh read argv[1]/argv[2] raw while argv[0] went through basename(), so quoting just the
+  // subcommand walked straight past it.
+  ['quoted gh subcommand', 'gh "workflow" run deploy.yml'],
+  ['quoted gh object', "gh workflow 'run' deploy.yml"],
 ];
+
+// Regressions introduced by adding the new prefixes: hooklib's splitter is quote-blind, so a `|`
+// inside a quoted regex manufactures a segment whose head is `timeout`/`script`/`flock`. Those
+// prefixes then consume a positional value and the segment fails closed — denying ordinary work.
+// These were found by the reviewer's own tool calls being blocked.
+const SPLIT_ARTEFACTS_AND_WRAPPERS = [
+  ['alternation containing a prefix name', 'rg -n "fatal|timeout" .claude/hooks/'],
+  ['alternation containing script', 'rg "hook|script" package.json'],
+  ['alternation containing flock', 'rg -n "mutex|flock" src/lib.ts'],
+  ['test filter with an alternation', 'pnpm test -- --grep "retry|timeout"'],
+  ['flock guarding an ordinary build', 'flock /tmp/build.lock -c "pnpm build"'],
+  ['flock with a wait and a lockfile', 'flock -w 5 /var/lock/x -c "pnpm build"'],
+  ['timeout with a -- separator', 'timeout 30 -- pnpm test'],
+  ['sudo credential refresh', 'sudo -v'],
+];
+
+test('block-deploy allows split artefacts and ordinary wrapper usage', () => {
+  for (const [label, command] of SPLIT_ARTEFACTS_AND_WRAPPERS) {
+    assert.equal(decision(command).denied, false, `should allow: ${label} — ${command}`);
+  }
+});
 
 // The other half of G1. The obvious fix — "unrecognised head plus a later `gh` token" — would deny
 // every one of these, because `git`, `rg` and `echo` are all unrecognised heads and basename()
@@ -282,9 +316,10 @@ test('block-deploy applies one consistent theory of "deliver" (bare vs self-iden
 test('block-deploy fails closed when prefix stripping consumes the whole command', () => {
   // Accepted cost: the bare-prefix family fail-closes, so `env | grep DOPPLER` denies.
   for (const command of [
+    // Only prefixes that DO something on their own. `timeout`/`flock`/`script`/`watch`/`setsid`
+    // with no operand run nothing, and the quote-blind splitter manufactures exactly that shape
+    // from `rg "fatal|timeout" x` — see SPLIT_ARTEFACTS_AND_WRAPPERS.
     'echo x | xargs', 'env | grep DOPPLER', 'env | sort', 'env', 'time', 'sudo',
-    // The wrappers added for G1 join the same family.
-    'timeout', 'setsid', 'flock', 'script', 'watch',
   ]) {
     assert.ok(decision(command).denied, `stripped-to-empty must deny, never silently pass: ${command}`);
   }

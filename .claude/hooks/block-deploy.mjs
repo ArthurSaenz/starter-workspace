@@ -4,12 +4,16 @@
 // or stripped exec bit turns a block into a silent pass. Denies via permissionDecision JSON, which
 // holds under bypassPermissions where a settings deny rule would not.
 //
-// Known gaps: `bash script.sh`, `env -i gh workflow run x`, a quoted argv[0], `$(which gh)`,
-// encodings, aliases, and URLs assembled without a literal `/dispatches`. Also: a value-taking
-// prefix whose option arity PREFIX_SPECS models wrongly — that residue lands at argv[0], where the
-// leftover-value rescan re-anchors on a guarded tool or fails closed, so it over-blocks rather than
-// passing. An unlisted prefix command is a real gap: it is not stripped, and its own name at argv[0]
-// matches no case.
+// Known gaps: `bash script.sh`, `$(which gh)`, encodings, aliases, a tool named through a variable
+// (`G=gh; $G workflow run x`), and URLs assembled without a literal `/dispatches`.
+//
+// An UNLISTED prefix command is the widest one: it is not stripped, so its own name sits at argv[0]
+// and matches no case — `ionice -c3 gh workflow run x`, `taskset`, `unbuffer`, `proxychains`. The
+// listed set is the common ones, not a closed set.
+//
+// A value-taking prefix whose arity PREFIX_SPECS models wrongly is NOT a gap: the residue triggers
+// a re-anchor on any guarded tool in the original tokens, so `flock -c "gh workflow run x" /tmp/l`
+// still denies even though the parse is wrong.
 
 import { readFileSync } from 'node:fs';
 
@@ -51,8 +55,14 @@ const PREFIX_SPECS = {
   env: { valueOpts: ['-u', '--unset'], values: 0 },
 };
 
-// Cannot be a command name: an option, or a bare number/duration a value-taking prefix left behind.
-const RE_LEFTOVER_VALUE = /^-|^\d+(\.\d+)?[smhd]?$/;
+// A segment that is nothing BUT one of these still does something we cannot characterise — bare
+// `env` prints the environment, bare `xargs` reads stdin — so it fails closed. `timeout`, `flock`,
+// `script`, `watch` and `setsid` with no operand run nothing at all, and the quote-blind splitter
+// manufactures exactly that shape from `rg "fatal|timeout" x`. Failing closed on those costs
+// ordinary work and buys no coverage.
+const BARE_PREFIX_FAILS_CLOSED = new Set([
+  'sudo', 'doas', 'env', 'command', 'builtin', 'exec', 'eval', 'nohup', 'nice', 'stdbuf', 'time', 'xargs',
+]);
 
 // Keyed on the TOOL, never on "any unrecognised head": `git`, `rg` and `echo` are all unrecognised,
 // and basename() strips quotes, so a head-based rule would deny
@@ -140,6 +150,7 @@ function tokenise(segment) {
   let i = 0;
   let stripped = false;
   let consumedValues = false;
+  let lastPrefix = null;
 
   while (i < raw.length) {
     if (RE_ENV_ASSIGN.test(raw[i])) {
@@ -151,11 +162,13 @@ function tokenise(segment) {
     if (!PREFIX_COMMANDS.has(name)) break;
 
     stripped = true;
+    lastPrefix = name;
     i += 1;
 
     const spec = PREFIX_SPECS[name];
     if (!spec) continue;
-    consumedValues = true;
+
+    const before = i;
 
     // Option flags first — a flag's value is skipped only when the flag is known to take a
     // detached one. `-I{}` and `-oL` carry theirs attached, so they consume nothing extra.
@@ -166,25 +179,35 @@ function tokenise(segment) {
     }
 
     for (let consumed = 0; consumed < spec.values && i < raw.length; consumed += 1) i += 1;
+
+    // ACTUAL consumption, not merely "this prefix has a spec". `env` on its own consumes nothing
+    // and must keep failing closed; `timeout 60` consumed its duration and is a different case.
+    if (i > before) consumedValues = true;
   }
 
   const argv = raw.slice(i);
 
-  // argv[0] is still one of the prefix's own values, so the table did not fully model it. Guessing
-  // would fail open; instead re-anchor on a guarded tool further along, and if there is none let
-  // the caller fail closed on the empty argv.
-  if (consumedValues && argv.length > 0 && RE_LEFTOVER_VALUE.test(argv[0])) {
-    const at = argv.findIndex((token) => GUARDED_TOOLS.has(basename(token)));
-    return { argv: at === -1 ? [] : argv.slice(at), stripped };
+  // The spec mis-modelled this prefix, so its residue is sitting where the command should be.
+  // Re-anchor on a guarded tool — searching the ORIGINAL tokens, not argv, because the mis-parse
+  // may have eaten the tool itself: in `flock -c "gh workflow run x" /tmp/l` the positional value
+  // consumes `"gh` and leaves the ordinary word `workflow` at argv[0].
+  //
+  // No guarded tool anywhere means there is nothing here to guard, so this does NOT fail closed —
+  // doing so denied `flock /tmp/build.lock -c "pnpm build"` and `sudo -v`.
+  if (consumedValues) {
+    const at = raw.findIndex((token, index) => index > 0 && GUARDED_TOOLS.has(basename(token)));
+    if (at !== -1) return { argv: raw.slice(at), stripped, consumedValues, lastPrefix };
   }
 
-  return { argv, stripped };
+  return { argv, stripped, consumedValues, lastPrefix };
 }
 
 // Positional, never substring: `gh run rerun` re-runs a deploy, `gh run list` reads.
 function checkGh(argv, segment) {
-  const verb = (argv[1] ?? '').toLowerCase();
-  const object = (argv[2] ?? '').toLowerCase();
+  // basename(), like argv[0] and checkInfraKit already use: reading these raw meant quoting just
+  // the subcommand — `gh "workflow" run x` — walked past the whole check.
+  const verb = basename(argv[1] ?? '');
+  const object = basename(argv[2] ?? '');
 
   if (verb === 'workflow' && object === 'run') {
     deny('`gh workflow run` bypasses infra-kit and dispatches a workflow directly.');
@@ -290,19 +313,29 @@ try {
   for (const segment of splitIntoSegments(command)) {
     if (!segment.trim()) continue;
 
-    const { argv, stripped } = tokenise(segment);
+    const { argv, stripped, consumedValues, lastPrefix } = tokenise(segment);
 
-    // Prefixes all the way down (`env`, `time`) — we cannot say what would have run, so we do not
-    // guess. Accepted cost: `env | grep DOPPLER` denies.
+    // BARE prefixes all the way down (`env`, `time`) — we cannot say what would have run, so we do
+    // not guess. Accepted cost: `env | grep DOPPLER` denies.
+    //
+    // Not when a prefix consumed its own values first: then nothing would have run at all, and the
+    // quote-blind splitter manufactures exactly that shape. `rg -n "fatal|timeout" x` splits at the
+    // `|` into a segment headed by `timeout`, which swallows the path — an ordinary search that has
+    // no business failing closed.
     if (argv.length === 0) {
-      if (stripped) failClosed('command consumed entirely by prefix stripping');
+      if (stripped && !consumedValues && BARE_PREFIX_FAILS_CLOSED.has(lastPrefix)) {
+        failClosed('command consumed entirely by prefix stripping');
+      }
       continue;
     }
 
     const head = basename(argv[0]);
 
-    // Every segment, not just curl/wget heads: it needs no argv, so gating on a head only loses
-    // coverage. Before the wrapper arm, to catch a wrapped curl whose URL survived the split.
+    // Retained as documentation, not as coverage: the whole-command call above subsumes this one.
+    // A segment is a substring of the command with operators swapped for newlines, and every
+    // operator that could terminate a match is already in RE_DISPATCH's boundary class — so
+    // segment-match implies command-match, and this can never be the deciding check. Kept because
+    // it states the intent locally, where a reader of the segment loop will look for it.
     checkHttp(segment);
 
     if (RE_DELIVER_HEAD.test(head)) {
