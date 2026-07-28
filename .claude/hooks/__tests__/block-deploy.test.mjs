@@ -142,6 +142,52 @@ const ALLOWED_DELIVER_BOUNDARY = [
   ['quote-boundary coherence', 'git commit -m "pin bash " && rg deliver .'],
 ];
 
+// A value-taking prefix with NO shell wrapper. `time` was in PREFIX_COMMANDS but `timeout` was
+// not, so the prefix survived to argv[0], the head switch had no case for it, and no wrapper token
+// was present to re-arm the raw scan — the command sailed past every check. The `+ wrapper` rows
+// above only ever proved the wrapper path.
+//
+// Option FLAGS are the part bare arity misses: `script -q /dev/null gh ...` leaves `-q` at argv[0],
+// as do `nice -n 10`, `timeout -k 5 60` and `flock -n`.
+const PREFIX_BYPASS = [
+  ['timeout', 'timeout 60 gh workflow run deploy.yml'],
+  ['setsid', 'setsid gh workflow run deploy.yml'],
+  ['flock', 'flock /tmp/l gh workflow run deploy.yml'],
+  ['script', 'script -q /dev/null gh workflow run deploy.yml'],
+  ['watch', 'watch gh workflow run deploy.yml'],
+  ['timeout + rerun', 'timeout 60 gh run rerun 123'],
+  ['timeout + ik deliver', 'timeout 60 ik release deliver'],
+  ['nice with a value flag', 'nice -n 10 gh workflow run x'],
+  ['timeout with -k and a duration', 'timeout -k 5 60 gh workflow run x'],
+  ['flock with a bare flag', 'flock -n /tmp/l gh workflow run x'],
+  // sudo takes `-u <user>`, so without a spec its value lands at argv[0] just like timeout's.
+  ['sudo with a detached user value', 'sudo -u root gh workflow run x'],
+];
+
+// The other half of G1. The obvious fix — "unrecognised head plus a later `gh` token" — would deny
+// every one of these, because `git`, `rg` and `echo` are all unrecognised heads and basename()
+// strips quotes. They are the commands used to WRITE, verify and roll back the fix itself.
+const EXECUTOR_CORPUS = [
+  ['commit message naming the fix', 'git commit -m "fix: timeout gh workflow run now denies"'],
+  ['grep for the guarded phrase', 'rg "gh workflow run" .claude/hooks/'],
+  ['log search for deliver', 'git log --oneline | rg -i deliver'],
+  ['rollback', 'git revert --no-edit abc1234'],
+  ['the suite itself', 'pnpm run test:hooks'],
+  ['env assignment before an ordinary command', 'env MSG=x git commit -m "note gh workflow run"'],
+];
+
+test('block-deploy denies a guarded command behind a value-taking prefix (no wrapper)', () => {
+  for (const [label, command] of PREFIX_BYPASS) {
+    assert.ok(decision(command).denied, `should deny: ${label} — ${command}`);
+  }
+});
+
+test('block-deploy allows ordinary commands that merely name a guarded token', () => {
+  for (const [label, command] of EXECUTOR_CORPUS) {
+    assert.equal(decision(command).denied, false, `should allow: ${label} — ${command}`);
+  }
+});
+
 test('block-deploy DENIES every bypass via permissionDecision (exit 0 + deny JSON)', () => {
   for (const [label, command] of BLOCKED) {
     const d = decision(command);
@@ -176,7 +222,11 @@ test('block-deploy applies one consistent theory of "deliver" (bare vs self-iden
 
 test('block-deploy fails closed when prefix stripping consumes the whole command', () => {
   // Accepted cost: the bare-prefix family fail-closes, so `env | grep DOPPLER` denies.
-  for (const command of ['echo x | xargs', 'env | grep DOPPLER', 'env | sort', 'env', 'time', 'sudo']) {
+  for (const command of [
+    'echo x | xargs', 'env | grep DOPPLER', 'env | sort', 'env', 'time', 'sudo',
+    // The wrappers added for G1 join the same family.
+    'timeout', 'setsid', 'flock', 'script', 'watch',
+  ]) {
     assert.ok(decision(command).denied, `stripped-to-empty must deny, never silently pass: ${command}`);
   }
 });

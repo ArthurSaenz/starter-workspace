@@ -5,7 +5,11 @@
 // holds under bypassPermissions where a settings deny rule would not.
 //
 // Known gaps: `bash script.sh`, `env -i gh workflow run x`, a quoted argv[0], `$(which gh)`,
-// encodings, aliases, and URLs assembled without a literal `/dispatches`.
+// encodings, aliases, and URLs assembled without a literal `/dispatches`. Also: a value-taking
+// prefix whose option arity PREFIX_SPECS models wrongly — that residue lands at argv[0], where the
+// leftover-value rescan re-anchors on a guarded tool or fails closed, so it over-blocks rather than
+// passing. An unlisted prefix command is a real gap: it is not stripped, and its own name at argv[0]
+// matches no case.
 
 import { readFileSync } from 'node:fs';
 
@@ -22,11 +26,41 @@ const RE_DELIVER = /^(dx-)?(release-)?deliver$/i;
 // own value at argv[0], and no membership list fixes that arity problem.
 const SHELL_WRAPPERS = new Set(['bash', 'sh', 'zsh', 'dash', 'ksh', 'fish', 'csh', 'tcsh']);
 
-// Stripped from the head so the real command reaches argv[0]. Value-taking members are included
-// even though stripping leaves their value behind — the wrapper gate covers that.
+// Stripped from the head so the real command reaches argv[0].
 const PREFIX_COMMANDS = new Set([
   'sudo', 'doas', 'env', 'command', 'builtin', 'exec', 'eval', 'nohup', 'nice', 'stdbuf', 'time', 'xargs',
+  // `time` was here and `timeout` was not, which is the whole of the bypass: the prefix survived to
+  // argv[0], the head switch had no case for it, and with no wrapper token present nothing re-armed
+  // the raw scan.
+  'timeout', 'setsid', 'flock', 'script', 'watch',
 ]);
+
+// What each prefix consumes before the real command. Bare arity is NOT enough — option flags leave
+// their own residue: `script -q /dev/null gh …` puts `-q` at argv[0], as do `nice -n 10`,
+// `timeout -k 5 60` and `flock -n`. Prefixes absent from this table are merely dropped; anything
+// the table models wrongly falls through to the leftover-value rescan below rather than passing.
+// Membership here also decides whether the leftover-value rescan may fire: only a prefix that
+// actually consumes something can leave residue at argv[0]. `command -v pnpm` must not trigger it —
+// there `-v` is the real command's own flag, and rescanning would deny an ordinary lookup.
+const PREFIX_SPECS = {
+  sudo: { valueOpts: ['-u', '--user', '-g', '--group', '-p', '--prompt'], values: 0 },
+  timeout: { valueOpts: ['-k', '--kill-after', '-s', '--signal'], values: 1 },
+  nice: { valueOpts: ['-n', '--adjustment'], values: 0 },
+  flock: { valueOpts: ['-w', '--timeout', '-E', '--conflict-exit-code'], values: 1 },
+  script: { valueOpts: ['-c', '--command'], values: 1 },
+  watch: { valueOpts: ['-n', '--interval'], values: 0 },
+  xargs: { valueOpts: ['-n', '-P', '-I'], values: 0 },
+  stdbuf: { valueOpts: ['-i', '-o', '-e'], values: 0 },
+  env: { valueOpts: ['-u', '--unset'], values: 0 },
+};
+
+// Cannot be a command name: an option, or a bare number/duration a value-taking prefix left behind.
+const RE_LEFTOVER_VALUE = /^-|^\d+(\.\d+)?[smhd]?$/;
+
+// Keyed on the TOOL, never on "any unrecognised head": `git`, `rg` and `echo` are all unrecognised,
+// and basename() strips quotes, so a head-based rule would deny
+// `git commit -m "…gh workflow run…"` — the commit that lands this very fix.
+const GUARDED_TOOLS = new Set(['gh', 'ik', 'infra-kit']);
 
 // Used ONLY when a shell wrapper is present — see checkRawShell.
 const RE_RAW_WF_RUN = /\bgh\s+workflow\s+run\b/i;
@@ -104,20 +138,45 @@ function basename(token) {
 // all-prefix segment fail closed; assignments do not set it, since `FOO=bar && pnpm test` is benign.
 function tokenise(segment) {
   const raw = segment.trim().split(/\s+/).filter(Boolean);
-  const argv = [];
-  let stripping = true;
+  let i = 0;
   let stripped = false;
+  let consumedValues = false;
 
-  for (const token of raw) {
-    if (stripping) {
-      if (PREFIX_COMMANDS.has(basename(token))) {
-        stripped = true;
-        continue;
-      }
-      if (RE_ENV_ASSIGN.test(token)) continue;
-      stripping = false;
+  while (i < raw.length) {
+    if (RE_ENV_ASSIGN.test(raw[i])) {
+      i += 1;
+      continue;
     }
-    argv.push(token);
+
+    const name = basename(raw[i]);
+    if (!PREFIX_COMMANDS.has(name)) break;
+
+    stripped = true;
+    i += 1;
+
+    const spec = PREFIX_SPECS[name];
+    if (!spec) continue;
+    consumedValues = true;
+
+    // Option flags first — a flag's value is skipped only when the flag is known to take a
+    // detached one. `-I{}` and `-oL` carry theirs attached, so they consume nothing extra.
+    while (i < raw.length && raw[i].startsWith('-')) {
+      const takesValue = spec.valueOpts.includes(raw[i]);
+      i += 1;
+      if (takesValue && i < raw.length) i += 1;
+    }
+
+    for (let consumed = 0; consumed < spec.values && i < raw.length; consumed += 1) i += 1;
+  }
+
+  const argv = raw.slice(i);
+
+  // argv[0] is still one of the prefix's own values, so the table did not fully model it. Guessing
+  // would fail open; instead re-anchor on a guarded tool further along, and if there is none let
+  // the caller fail closed on the empty argv.
+  if (consumedValues && argv.length > 0 && RE_LEFTOVER_VALUE.test(argv[0])) {
+    const at = argv.findIndex((token) => GUARDED_TOOLS.has(basename(token)));
+    return { argv: at === -1 ? [] : argv.slice(at), stripped };
   }
 
   return { argv, stripped };
