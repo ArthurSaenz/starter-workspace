@@ -124,12 +124,12 @@ function basename(token) {
   return unquoted.slice(unquoted.lastIndexOf('/') + 1).toLowerCase();
 }
 
-// Without this, argv[0] is "GH_TOKEN=x" or "env" and every check misses. `stripped` lets an
-// all-prefix segment fail closed; assignments do not set it, since `FOO=bar && pnpm test` is benign.
+// Without this, argv[0] is "GH_TOKEN=x" or "env" and every check misses. `lastPrefix` is non-null
+// exactly when a prefix was stripped, and it names which one — an all-prefix segment fails closed
+// on that. Assignments do not set it, since `FOO=bar && pnpm test` is benign.
 function tokenise(segment) {
   const raw = segment.trim().split(/\s+/).filter(Boolean);
   let i = 0;
-  let stripped = false;
   let consumedValues = false;
   let lastPrefix = null;
 
@@ -142,7 +142,6 @@ function tokenise(segment) {
     const name = basename(raw[i]);
     if (!PREFIX_COMMANDS.has(name)) break;
 
-    stripped = true;
     lastPrefix = name;
     i += 1;
 
@@ -172,10 +171,10 @@ function tokenise(segment) {
   // No guarded tool anywhere means nothing to guard, so this does not fail closed.
   if (consumedValues) {
     const at = raw.findIndex((token, index) => index > 0 && GUARDED_TOOLS.has(basename(token)));
-    if (at !== -1) return { argv: raw.slice(at), stripped, consumedValues, lastPrefix };
+    if (at !== -1) return { argv: raw.slice(at), consumedValues, lastPrefix };
   }
 
-  return { argv, stripped, consumedValues, lastPrefix };
+  return { argv, consumedValues, lastPrefix };
 }
 
 // Positional, never substring: `gh run rerun` re-runs a deploy, `gh run list` reads.
@@ -282,23 +281,19 @@ try {
   for (const segment of splitIntoSegments(command)) {
     if (!segment.trim()) continue;
 
-    const { argv, stripped, consumedValues, lastPrefix } = tokenise(segment);
+    const { argv, consumedValues, lastPrefix } = tokenise(segment);
 
     // Bare prefixes all the way down (`env`, `time`): we cannot say what would have run. Not when
     // values were consumed first — then nothing would have run, and that is exactly the shape the
     // quote-blind splitter makes from `rg -n "fatal|timeout" x`.
     if (argv.length === 0) {
-      if (stripped && !consumedValues && BARE_PREFIX_FAILS_CLOSED.has(lastPrefix)) {
+      if (!consumedValues && BARE_PREFIX_FAILS_CLOSED.has(lastPrefix)) {
         failClosed('command consumed entirely by prefix stripping');
       }
       continue;
     }
 
     const head = basename(argv[0]);
-
-    // Subsumed by the whole-command call above (segment-match implies command-match); kept so the
-    // intent stays visible where a reader of this loop looks for it.
-    checkHttp(segment);
 
     if (RE_DELIVER_HEAD.test(head)) {
       deny(
