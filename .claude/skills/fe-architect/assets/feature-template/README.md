@@ -78,8 +78,8 @@ After creating your feature, validate it:
 # Complete feature validation
 node .claude/skills/fe-architect/scripts/validate_feature.mjs features/[feature-name]
 
-# Check cross-feature imports
-node .claude/skills/fe-architect/scripts/analyze_imports.mjs features/[feature-name]
+# Check cross-feature imports (pass the features parent directory)
+node .claude/skills/fe-architect/scripts/analyze_imports.mjs features
 
 # Verify structure
 node .claude/skills/fe-architect/scripts/check_structure.mjs features/[feature-name]

@@ -43,8 +43,8 @@ export async function updateData(
   const response = await httpClient.fetch<FeatureNameData>(
     `/api/feature-name/${id}`,
     {
-      method: 'PUT',
-      body: JSON.stringify(data),
+      method: 'PATCH',
+      body: data,
     }
   )
 
@@ -86,7 +86,7 @@ export async function createData(
     '/api/feature-name',
     {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: data,
     }
   )
 

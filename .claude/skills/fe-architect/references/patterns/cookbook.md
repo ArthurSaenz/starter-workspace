@@ -49,7 +49,7 @@ export const createTaskFx = atom(null, async (get, set, args: CreateTaskFxArgs) 
   set($isLoading, true)
   set($error, null)
   try {
-    const response = await httpClient.fetch<Task>('/api/tasks', { method: 'POST', body: JSON.stringify(args) })
+    const response = await httpClient.fetch<Task>('/api/tasks', { method: 'POST', body: args })
     set($tasks, [...get($tasks), response.body])
   } catch (err) {
     set($error, err as Error)
@@ -62,7 +62,7 @@ export const updateTaskFx = atom(null, async (get, set, args: UpdateTaskFxArgs) 
   set($isLoading, true)
   set($error, null)
   try {
-    const response = await httpClient.fetch<Task>(`/api/tasks/${args.taskId}`, { method: 'PATCH', body: JSON.stringify(args.updates) })
+    const response = await httpClient.fetch<Task>(`/api/tasks/${args.taskId}`, { method: 'PATCH', body: args.updates })
     set($tasks, get($tasks).map((t) => (t.id === args.taskId ? response.body : t)))
   } catch (err) {
     set($error, err as Error)
@@ -400,7 +400,7 @@ export const loginFx = atom(null, async (get, set, args: LoginFxArgs) => {
   try {
     const response = await httpClient.fetch<{ user: User; token: AuthToken }>('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify(args.credentials),
+      body: args.credentials,
     })
     set($authToken, response.body.token)
     set($currentUser, response.body.user)

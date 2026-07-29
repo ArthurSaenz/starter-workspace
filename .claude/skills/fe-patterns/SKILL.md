@@ -40,11 +40,11 @@ See [cross-feature.md](./references/cross-feature.md) for full examples, pros/co
 
 ### Blocking (STOP immediately)
 
-All 7 rules from [fe-architect rules.md](../fe-architect/references/core/rules.md) are blocking. The two rules most often requiring expanded context:
+All 7 rules from the `fe-architect` skill (its `references/core/rules.md` is the canonical rule list) are blocking. The two rules most often requiring expanded context:
 
 | Rule | Summary | Common Trigger |
 |------|---------|----------------|
-| Rule 5 | Dumb component purity — no atoms, services, API calls | Importing `useAtomValue` in a `-component.tsx` file |
+| Rule 6 | Dumb component purity + `className`/`cn()` — no atoms, services, API calls | Importing `useAtomValue` in a `-component.tsx` file |
 | Rule 7 | Container state handling — loading/error/empty guards | Missing guard clauses, using loading for refetch |
 
 ### Warning (flag but don't block)
@@ -54,7 +54,7 @@ All 7 rules from [fe-architect rules.md](../fe-architect/references/core/rules.m
 - Props interface with 8+ properties (composition candidate)
 - Inline types instead of named interfaces for public APIs
 
-See [enforcement.md](./references/enforcement.md) for expanded Rule 5, Rule 7, WHY rationale for all rules, and the 6-step enforcement workflow.
+See [enforcement.md](./references/enforcement.md) for expanded Rule 6, Rule 7, WHY rationale for all rules, and the 6-step enforcement workflow.
 
 ## Decision Trees
 
@@ -88,5 +88,5 @@ See [cross-feature.md](./references/cross-feature.md) for code examples and the 
 | Reference | Content | When to Read | Search Hints |
 |-----------|---------|--------------|--------------|
 | [cross-feature.md](./references/cross-feature.md) | 5 golden rules, 3 injection patterns with code, type extraction variants, service access pattern, common mistakes | Cross-feature communication analysis | `## 5 Golden Rules`, `## 3 Component Injection`, `## Type Extraction`, `## Common Mistakes`, `## Service Access` |
-| [enforcement.md](./references/enforcement.md) | 6-step enforcement workflow, expanded Rule 5 + Rule 7, blocking vs warning, WHY rationale | Rule violation review, understanding enforcement depth | `## 6-Step Enforcement`, `## Rule 5 Expanded`, `## Rule 7 Expanded`, `## Rules 1–4, 6` |
+| [enforcement.md](./references/enforcement.md) | 6-step enforcement workflow, expanded Rule 6 + Rule 7, blocking vs warning, WHY rationale | Rule violation review, understanding enforcement depth | `## 6-Step Enforcement`, `## Rule 6 Expanded`, `## Rule 7 Expanded`, `## Rules 1–6` |
 | [decisions.md](./references/decisions.md) | 8 decision trees: dumb vs smart, state scope, services split, props interface, shared components, splitting, error handling, optimistic updates | Architectural decision-making | `## 1. Dumb vs Smart`, `## 3. State Scope`, `## 7. Error Handling`, `## 8. Optimistic` |

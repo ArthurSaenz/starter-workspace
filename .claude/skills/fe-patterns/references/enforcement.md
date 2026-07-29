@@ -1,6 +1,6 @@
 # Enforcement Rules — Expanded Rationale & Workflow
 
-This document provides the WHY behind each enforcement rule and expands the two most commonly misunderstood rules (5 and 7). For condensed rule definitions and fix recipes, see [fe-architect rules.md](../../fe-architect/references/core/rules.md).
+This document provides the WHY behind each enforcement rule and expands the two most commonly misunderstood rules (6 and 7). For condensed rule definitions and fix recipes, see the `fe-architect` skill's `references/core/rules.md` (the canonical rule list).
 
 ---
 
@@ -21,7 +21,7 @@ Name the specific rule violated (Rule 1–7) and the tier (blocking).
 Quote the exact line(s) that violate the rule. Include the file path.
 
 ```
-Rule 5 violation in features/user/components/user-card-component.tsx:
+Rule 6 violation in features/user/components/user-card-component.tsx:
   import { useAtomValue } from 'jotai'  ← prohibited in dumb component
 ```
 
@@ -49,8 +49,8 @@ Do not continue generating code until the violation is resolved. If the user ins
 | 2 | Service export naming | Ambiguous API, merge conflicts |
 | 3 | Atom `$` prefix | Indistinguishable from regular variables |
 | 4 | Async write-only `Fx` suffix | Cannot tell sync from async at call site |
-| 5 | Dumb component purity | Untestable, unreusable component |
-| 6 | Dumb component `className` + `cn()` | Cannot compose styles from parent |
+| 5 | Object arguments for write-only atoms | Primitive/positional args — brittle call sites, unsafe refactors |
+| 6 | Dumb component `className` + `cn()` (incl. purity) | Cannot compose styles; impure components untestable, unreusable |
 | 7 | Container state handling | Runtime crashes, poor UX |
 
 ### Warning Indicators (flag, don't block)
@@ -71,7 +71,7 @@ Do not continue generating code until the violation is resolved. If the user ins
 
 ---
 
-## Rule 5 Expanded: Dumb Component Purity
+## Rule 6 Expanded: Dumb Component Purity
 
 ### The Rule
 
@@ -311,9 +311,9 @@ export const ProjectListContainer = () => {
 
 ---
 
-## Rules 1–4, 6: WHY Rationale
+## Rules 1–6: WHY Rationale
 
-Fix recipes for these rules are in [fe-architect rules.md](../../fe-architect/references/core/rules.md). Below is the expanded rationale for WHY each rule exists.
+Fix recipes for these rules are in the `fe-architect` skill's `references/core/rules.md`. Below is the expanded rationale for WHY each rule exists (Rule 6's purity aspect and Rule 7 also have full Expanded sections above).
 
 ### Rule 1: No Cross-Feature Imports — WHY
 
@@ -339,6 +339,12 @@ Fix recipes for these rules are in [fe-architect rules.md](../../fe-architect/re
 - **Async awareness** — `getUserFx` tells the developer at the call site that this is async (needs error handling, may be slow, returns a promise)
 - **Sync vs async distinction** — `resetDataAtom` (sync, instant) vs `resetDataFx` (async, may fail) require different handling patterns
 - **Error handling obligation** — The `Fx` suffix is a reminder that the call may fail and the error must be handled somewhere
+
+### Rule 5: Object Arguments for Write-Only Atoms — WHY
+
+- **Named parameters** — `updateUserFx({ userId, name })` is self-documenting at the call site; positional primitives (`updateUserFx(id, name)`) invite argument-order bugs
+- **Safe evolution** — Adding a field to a `{AtomName}Args` interface is non-breaking; changing a positional signature silently breaks every call site
+- **Type extraction** — `ExtractAtomActionArgs<typeof updateUserFx>` yields a usable named type for cross-feature props only when the atom takes a single typed object
 
 ### Rule 6: Dumb Component `className` + `cn()` — WHY
 

@@ -30,12 +30,12 @@ Before creating or modifying features, discover the actual project structure:
 
 ## Enforcement Rules (BLOCKING)
 
-All 7 rules are mandatory. Violation = STOP and fix. See [rules.md](./references/core/rules.md) for detailed examples and fix recipes.
+All 7 rules are mandatory. Violation = STOP and fix. See [rules.md](./references/core/rules.md) for detailed examples and fix recipes. For expanded WHY rationale, cross-feature pattern analysis, and architectural decision trees, use the `fe-patterns` skill (the analysis/review counterpart to this one).
 
 1. **No cross-feature imports** — Features never import from other features (except `import type`). Fix: pass data via props at page level.
 2. **Service export naming** — Must follow `[featureName]Service` pattern. Fix: rename to camelCase feature name + "Service".
 3. **Atom `$` prefix** — All state/derived atoms must have `$` prefix. Fix: add `$` prefix.
-4. **Async write-only `Fx` suffix** — Async write-only atoms must have `Fx` suffix. Fix: add `Fx` suffix.
+4. **Async write-only `Fx` suffix** — Async write-only atoms must have `Fx` suffix; sync write-only atoms use the `Atom` suffix. Fix: add the suffix.
 5. **Object arguments for write-only atoms** — Must use object with typed interface, not primitives. Fix: create `{AtomName}Args` interface.
 6. **Dumb component `className` + `cn()`** — All dumb components must accept `className?` prop and use `cn()` from `#root/lib/utils`. Fix: add prop and wrap root element.
 7. **Container state handling** — Smart components must handle loading, error, and empty states. Fix: add guards before rendering content.
@@ -125,7 +125,7 @@ Features communicate only at the page level. Three patterns:
 - **Component pattern:** `<Container SidebarComponent={OtherFeature} />` — parent controls props
 - **Render function:** `<Container renderSection={(props) => <OtherFeature {...props} />} />` — full control
 
-For type extraction across features, use `ExtractedAtomType`, `ExtractWriteOnlyAtomArgs`, `ExtractAtomSetter` from `@wl/web-toolkit`.
+For type extraction across features, use `ExtractedAtomType`, `ExtractAtomActionArgs`, `ExtractAtomSetter` from `@wl/web-toolkit`.
 
 See [rules.md](./references/core/rules.md) for cross-feature details.
 
@@ -150,8 +150,8 @@ After implementing or modifying a feature, run:
 # Complete feature validation
 node .claude/skills/fe-architect/scripts/validate_feature.mjs [features-path]/[feature-name]
 
-# Cross-feature import analysis
-node .claude/skills/fe-architect/scripts/analyze_imports.mjs [features-path]/[feature-name]
+# Cross-feature import analysis (pass the features parent directory)
+node .claude/skills/fe-architect/scripts/analyze_imports.mjs [features-path]
 
 # Directory structure check
 node .claude/skills/fe-architect/scripts/check_structure.mjs [features-path]/[feature-name]

@@ -67,8 +67,8 @@ export const updateFeatureNameFx = atom(
       const response = await httpClient.fetch<FeatureNameData>(
         `/api/feature-name/${id}`,
         {
-          method: 'PUT',
-          body: JSON.stringify(data),
+          method: 'PATCH',
+          body: data,
         }
       )
       set($data, response.body)

@@ -21,7 +21,8 @@
     "docs": "pnpm --filter @wl/docs-ui dev",
     "storybook": "pnpm exec turbo run storybook --concurrency=24 --env-mode=loose",
     "storybook-build": "pnpm exec turbo run storybook-build --env-mode=loose",
-    "qa": "pnpm run vendor:check && pnpm exec turbo run test ts-check prettier-check eslint-check infra-kit-check --continue --output-logs=errors-only",
+    "qa": "pnpm exec turbo run test ts-check prettier-check eslint-check infra-kit-check --continue --output-logs=errors-only --log-prefix=task --log-order=grouped && pnpm run test:hooks",
+    "test:hooks": "node --test --test-concurrency=1 '.claude/hooks/__tests__/*.test.mjs'",
     "fix": "pnpm run eslint-fix && pnpm run prettier-fix",
     "vendor:check": "infra-kit vendor check",
     "eslint-check": "pnpm exec turbo run eslint-check --continue",
@@ -38,11 +39,11 @@
     "infra-kit-check": "pnpm exec turbo run infra-kit-check --continue --output-logs=errors-only && pnpm run infra-kit-check-root"
   },
   "devDependencies": {
-    "@slip-stream-kit/config": "^0.3.0",
+    "@slip-stream-kit/config": "^0.3.3",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@wl/prettier-config": "workspace:*",
-    "shadcn": "^4.13.0",
+    "shadcn": "^4.15.0",
     "turbo": "2.10.3",
     "typescript": "catalog:"
   },

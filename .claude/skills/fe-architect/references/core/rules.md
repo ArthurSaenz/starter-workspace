@@ -96,13 +96,13 @@ export const FeatureAContainer = (props: FeatureAContainerProps) => {
 Use `@wl/web-toolkit` utilities for type-safe cross-feature props:
 
 ```typescript
-import type { ExtractedAtomType, ExtractWriteOnlyAtomArgs, ExtractAtomSetter } from '@wl/web-toolkit'
+import type { ExtractedAtomType, ExtractAtomActionArgs, ExtractAtomSetter } from '@wl/web-toolkit'
 
 interface FeatureAContainerProps {
   // Read-only atom value
   userData: ExtractedAtomType<typeof import('#root/features/feature-b').featureBService.$userData>
   // Write-only atom args
-  onUpdate: (args: ExtractWriteOnlyAtomArgs<typeof import('#root/features/feature-b').featureBService.updateUserFx>) => void
+  onUpdate: (args: ExtractAtomActionArgs<typeof import('#root/features/feature-b').featureBService.updateUserFx>) => void
   // Read-write atom setter
   onFilterChange: ExtractAtomSetter<typeof import('#root/features/feature-c').featureCService.$filterAtom>
 }
