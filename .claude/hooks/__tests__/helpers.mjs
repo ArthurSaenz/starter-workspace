@@ -21,10 +21,11 @@ export function runHook(file, event, { chmodStrip = false, env = {} } = {}) {
     chmodSync(path, 0o644);
   }
 
+  // Re-arms block-deploy's BLOCK, so the suite tests the guard's logic, not today's setting.
   const r = spawnSync('node', [path], {
     input: stdin,
     encoding: 'utf8',
-    env: { ...process.env, ...env },
+    env: { ...process.env, BLOCK_DEPLOY_TEST_ALL: '1', ...env },
   });
   return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
 }

@@ -83,6 +83,12 @@ const BLOCKED = [
   ['bare dx-release-deliver as argv[0]', 'dx-release-deliver'],
   ['release-deliver as argv[0]', 'release-deliver'],
 
+  // Wrapped AND path-qualified: RE_RAW_DELIVER_PREFIXED is the only check here, and its lookbehind
+  // once included `/`, so the path separator let prod delivery through.
+  ['wrapped absolute path to the deliver binary', 'bash -c "/usr/local/bin/dx-release-deliver"'],
+  ['wrapped relative path to a deliver script', 'bash -c "./scripts/dx-release-deliver"'],
+  ['sh -c with a path-qualified deliver', 'sh -c "/opt/bin/release-deliver"'],
+
   // --- prefix commands: stripped so the real command reaches argv[0] ---
   ['env gh', 'env gh workflow run x'],
   ['/usr/bin/env gh', '/usr/bin/env gh workflow run x'],

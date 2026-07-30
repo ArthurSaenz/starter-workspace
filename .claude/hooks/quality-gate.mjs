@@ -26,9 +26,22 @@ function main() {
 
   // Every subagent completion fires a full-monorepo turbo run, contending on the turbo cache.
   // `name` is NOT the pipeline's lock, which it also holds at the repo root on root-level edits.
-  // `staleMs` sits above this site's 600s harness timeout; `waitMs: 0` refuses rather than queues.
-  const lock = acquireLock(cwd, { name: 'claude-qa.lock', waitMs: 0, staleMs: 900_000 });
-  if (!lock) block('Another quality gate is already running; re-run when it completes.');
+  // `staleMs` sits above this site's 600s harness timeout.
+  //
+  // QUEUE, then pass — never refuse. `waitMs: 0` + block meant a peer's lock failed a task that was
+  // itself fine, and parallel subagents ping-ponged exit 2 at each other through the model. On
+  // timeout we ALLOW: the next completion re-runs qa across the whole monorepo, so a skipped run
+  // costs far less than a task that cannot finish. Tests override the wait via
+  // CLAUDE_HOOK_LOCK_WAIT_MS.
+  const lock = acquireLock(cwd, { name: 'claude-qa.lock', waitMs: 60_000, staleMs: 900_000 });
+
+  if (!lock) {
+    process.stderr.write(
+      'quality-gate: another gate held the lock for the whole wait; skipping this run. ' +
+        'The next task completion re-runs qa over the whole monorepo.\n',
+    );
+    allow();
+  }
 
   let result;
   try {

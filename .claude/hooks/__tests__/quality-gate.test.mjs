@@ -6,10 +6,31 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { spawn } from 'node:child_process';
 import { runHook, HOOKS_DIR } from './helpers.mjs';
 import { acquireLock, releaseLock } from '../lock.mjs';
 
 const REPO_ROOT = resolve(HOOKS_DIR, '..', '..');
+
+// Async twin of `runHook`, for the one case that must observe the hook WHILE it waits: the lock has
+// to be released mid-acquire, which spawnSync cannot express.
+function runHookAsync(file, event, env) {
+  const child = spawn('node', [join(HOOKS_DIR, file)], { env: { ...process.env, ...env } });
+  let stdout = '';
+  let stderr = '';
+
+  child.stdout.on('data', (chunk) => {
+    stdout += chunk;
+  });
+  child.stderr.on('data', (chunk) => {
+    stderr += chunk;
+  });
+  child.stdin.end(JSON.stringify(event));
+
+  return new Promise((resolve_) => {
+    child.on('close', (status) => resolve_({ status, stdout, stderr }));
+  });
+}
 
 // `helpers.mjs` merges `process.env`, so under a real gate every case here would inherit the
 // descent flag and see a no-op. Blank it where the gate must do real work ('' is falsy).
@@ -53,11 +74,13 @@ test('a qa failure with no output still produces a usable message', () => {
 
 // -------------------------------------------------------------------------------- the qa lock
 
-// Refusing is correct: the alternative is a second concurrent full-monorepo turbo run.
-// SCRATCH PROJECT, NEVER THE REPO ROOT — a live gate holds that lock while running `qa`, which ends
-// in `test:hooks`, so a root-level acquire here failed its own precondition. That was C1.
-test('a second concurrent quality-gate is refused', () => {
-  const project = makeScratchProject('echo scratch-qa-ok');
+// SKIPS rather than refuses: a peer's lock used to fail a task that was itself fine, and parallel
+// subagents ping-ponged exit 2 at each other through the model. The scratch qa FAILS on purpose —
+// a passing one produces no output, so "did not run qa" would hold guard or no guard.
+// SCRATCH PROJECT, NEVER THE REPO ROOT — a live gate holds that lock while running `qa`, so a
+// root-level acquire here failed its own precondition. That was C1.
+test('a gate that cannot get the lock skips its run instead of failing the task', () => {
+  const project = makeScratchProject('echo CONTENDED_QA_MUST_NOT_RUN && exit 1');
   const held = acquireLock(project.dir, { name: 'claude-qa.lock', waitMs: 0, staleMs: 900_000 });
   assert.ok(held, 'precondition: the test holds the qa lock');
 
@@ -65,16 +88,63 @@ test('a second concurrent quality-gate is refused', () => {
     const res = runHook(
       'quality-gate.mjs',
       { tool_name: 'Stop' },
-      { env: gateEnv({ CLAUDE_PROJECT_DIR: project.dir }) },
+      { env: gateEnv({ CLAUDE_PROJECT_DIR: project.dir, CLAUDE_HOOK_LOCK_WAIT_MS: '0' }) },
     );
-    assert.equal(res.status, 2, 'a busy gate must block, never pass unverified');
-    assert.match(res.stderr, /another quality gate is already running/i);
-    // Two subagents in lockstep can ping-pong refusals; the way out is the agent's own retry.
-    assert.match(res.stderr, /re-run when it completes/i);
+    assert.equal(res.status, 0, 'a busy gate must not fail a task that is itself fine');
+    assert.doesNotMatch(
+      `${res.stdout}${res.stderr}`,
+      /CONTENDED_QA_MUST_NOT_RUN/,
+      'and must not have run qa — the marker proves the script never ran',
+    );
+    assert.match(res.stderr, /skipping this run/i, 'the skip must be visible, not silent');
   } finally {
     releaseLock(held);
     project.cleanup();
   }
+});
+
+// The QUEUE half of the contract. Without it a regression to `waitMs: 0` still passes: skipping
+// immediately and skipping after a wait are indistinguishable from the timeout test alone.
+test('a gate waits for a busy lock and then runs, rather than skipping immediately', async () => {
+  const project = makeScratchProject('echo QUEUED_QA_RAN && exit 1');
+  const held = acquireLock(project.dir, { name: 'claude-qa.lock', waitMs: 0, staleMs: 900_000 });
+  assert.ok(held, 'precondition: the test holds the qa lock');
+
+  const pending = runHookAsync(
+    'quality-gate.mjs',
+    { tool_name: 'Stop' },
+    { CLAUDE_HOOK_QA_NESTED: '', CLAUDE_PROJECT_DIR: project.dir, CLAUDE_HOOK_LOCK_WAIT_MS: '10000' },
+  );
+
+  try {
+    // Long enough that the gate is provably inside its acquire loop, short enough to stay well
+    // under the wait budget.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    releaseLock(held);
+
+    const res = await pending;
+    assert.match(res.stderr, /QUEUED_QA_RAN/, 'the gate must have waited, then run qa');
+    assert.equal(res.status, 2, 'and reported the scratch failure it found');
+  } finally {
+    project.cleanup();
+  }
+});
+
+// lock.mjs lets CLAUDE_HOOK_LOCK_WAIT_MS override the literal, and both behaviour tests above set
+// it — so neither can see the SOURCE default, and a regression to `waitMs: 0` passes both. This
+// reads the literal instead. Window bounded by length, matching the call-site scan in
+// hook-lock.test.mjs.
+test('the gate queues on a busy lock: its waitMs literal is positive, never 0', () => {
+  const source = readFileSync(join(HOOKS_DIR, 'quality-gate.mjs'), 'utf8');
+  const call = /\bacquireLock\(/.exec(source);
+  assert.ok(call, 'precondition: the gate acquires a lock');
+
+  const waitMs = /waitMs:\s*([\d_]+)/.exec(source.slice(call.index, call.index + 400));
+  assert.ok(waitMs, 'the call site must declare a literal waitMs');
+  assert.ok(
+    Number(waitMs[1].replaceAll('_', '')) > 0,
+    `waitMs must queue rather than refuse — found ${waitMs[1]}`,
+  );
 });
 
 // The CLASS behind that instance. Scans sources rather than hardcoding a list, so a new test file

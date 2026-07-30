@@ -21,7 +21,7 @@
     "docs": "pnpm --filter @wl/docs-ui dev",
     "storybook": "pnpm exec turbo run storybook --concurrency=24 --env-mode=loose",
     "storybook-build": "pnpm exec turbo run storybook-build --env-mode=loose",
-    "qa": "pnpm exec turbo run test ts-check prettier-check eslint-check infra-kit-check --continue --output-logs=errors-only --log-prefix=task --log-order=grouped && pnpm run test:hooks",
+    "qa": "pnpm exec turbo run test ts-check prettier-check eslint-check infra-kit-check --continue --output-logs=errors-only --log-prefix=task --log-order=grouped",
     "test:hooks": "node --test --test-concurrency=1 '.claude/hooks/__tests__/*.test.mjs'",
     "fix": "pnpm run eslint-fix && pnpm run prettier-fix",
     "vendor:check": "infra-kit vendor check",

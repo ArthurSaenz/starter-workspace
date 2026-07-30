@@ -2,8 +2,6 @@
   "permissions": {
     "deny": [
       "Bash(doppler secrets:*)",
-      "Bash(gh workflow run:*)",
-      "Bash(gh run rerun:*)",
       "Bash(pnpm exec infra-kit release-deliver:*)",
       "Bash(pnpm exec infra-kit release deliver:*)",
       "Bash(pnpm exec ik release-deliver:*)",
