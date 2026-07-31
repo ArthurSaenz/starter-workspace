@@ -10,8 +10,9 @@ import { acquireLock, releaseLock } from './lock.mjs';
 const TAIL_CHARS = 4000;
 
 function main() {
-  // SELF-DESCENT GUARD, before anything else so there is no lock to unwind. `pnpm run qa` ends in
-  // `test:hooks`, which spawns this hook again. The lock serialises peers; this stops recursion.
+  // SELF-DESCENT GUARD, before anything else so there is no lock to unwind. `qa` does not run the
+  // `.claude` suite today; if it ever does, that suite spawns this hook again. Lock serialises
+  // peers; this stops recursion. Covered by quality-gate.test.mjs, which sets the flag directly.
   if (process.env.CLAUDE_HOOK_QA_NESTED) allow();
 
   let input;
@@ -48,7 +49,7 @@ function main() {
     result = spawnSync('pnpm', ['run', 'qa'], {
       cwd,
       encoding: 'utf8',
-      // Marks the descent for the gate `test:hooks` will spawn. See the guard in main().
+      // Marks the descent for any gate a nested `.claude` suite would spawn. See the guard in main().
       env: { ...process.env, CLAUDE_HOOK_QA_NESTED: '1' },
       // Full-monorepo output exceeds spawnSync's 1MB default and would ENOBUFS.
       maxBuffer: 32 * 1024 * 1024,

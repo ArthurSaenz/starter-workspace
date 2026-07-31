@@ -214,7 +214,7 @@ const EXECUTOR_CORPUS = [
   ['grep for the guarded phrase', 'rg "gh workflow run" .claude/hooks/'],
   ['log search for deliver', 'git log --oneline | rg -i deliver'],
   ['rollback', 'git revert --no-edit abc1234'],
-  ['the suite itself', 'pnpm run test:hooks'],
+  ['the suite itself', 'pnpm run test:claude'],
   ['env assignment before an ordinary command', 'env MSG=x git commit -m "note gh workflow run"'],
 ];
 

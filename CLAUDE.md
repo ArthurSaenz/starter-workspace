@@ -41,12 +41,17 @@ When a release is ready, stop and hand off:
 The human runs it from their own terminal or the GitHub UI. These rules bind agents only; they
 do not change how a person deploys.
 
-## Hook test suite
+## .claude test suite
 
-`.claude/hooks/**` is covered by `pnpm run test:hooks`, deliberately **not** part of `pnpm run qa`:
-the quality-gate hook runs `qa` on every task completion, so folding its own suite in made each
-completion pay ~65s to re-verify the hooks. CI runs it as a separate step. If you change a hook, run
-`pnpm run test:hooks` yourself — nothing else will.
+Everything under `.claude/**/__tests__/` — hooks and skill scripts alike — is covered by
+`pnpm run test:claude`, deliberately **not** part of `pnpm run qa`: the quality-gate hook runs `qa`
+on every task completion, so folding its own suite in made each completion pay ~65s to re-verify the
+hooks. CI runs it as a separate step. If you change a hook or a skill script, run
+`pnpm run test:claude` yourself — nothing else will.
+
+One glob, one script: a second parallel convention would mean two CI concerns and two places to
+forget. New project skills that ship scripts get picked up by putting their tests in
+`.claude/skills/<name>/__tests__/`.
 
 <!-- infra-kit:begin -->
 <!-- infra-kit:version 0.3.0 -->

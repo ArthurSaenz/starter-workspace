@@ -38,6 +38,10 @@ jobs:
       - name: Run QA
         run: pnpm run qa
 
+      # Deliberately separate from qa — see "## .claude test suite" in CLAUDE.md.
+      - name: Run .claude test suites
+        run: pnpm run test:claude
+
       - name: Notify Slack of failure
         if: failure()
         uses: rtCamp/action-slack-notify@v2

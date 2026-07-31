@@ -166,8 +166,10 @@ test('no test contends on the gate lock at the repo root', () => {
   }
 });
 
-// The depth guard: stops `gate -> qa -> test:hooks -> gate`. The scratch qa FAILS on purpose —
-// a passing one produces no gate output, so these assertions would hold guard or no guard.
+// The depth guard, which would stop `gate -> qa -> .claude suite -> gate` if qa ever ran that
+// suite. It does not today, so this covers the guard's early return only — the flag is injected
+// directly rather than reached through a real descent. The scratch qa FAILS on purpose: a passing
+// one produces no gate output, so these assertions would hold guard or no guard.
 test('a nested gate returns without running qa at all', () => {
   const project = makeScratchProject('echo NESTED_QA_MUST_NOT_RUN && exit 1');
   try {
