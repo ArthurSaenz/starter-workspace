@@ -2,12 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { runHook, bash } from './helpers.mjs';
 
-import * as doppler from '../guards/doppler.mjs';
-import * as destructive from '../guards/destructive.mjs';
-import * as packageManager from '../guards/package-manager.mjs';
-import * as style from '../guards/style.mjs';
-import * as cmux from '../guards/cmux.mjs';
-import * as worktree from '../guards/worktree.mjs';
+// Guards were six files under guards/ until they were inlined into bash-guard.mjs. They are still
+// named exports, so these unit tests reach each one directly; the file's dispatcher sits behind an
+// `import.meta.main` guard, so importing it here does not read fd 0.
+import { doppler, destructive, packageManager, style, cmux, worktree } from '../bash-guard.mjs';
 
 const action = (decision) => decision?.action ?? null;
 

@@ -34,8 +34,8 @@ export function splitIntoSegments(command) {
     .filter(Boolean);
 }
 
-// Tokens sitting in front of the real command. Shared, so adding one covers every guard at once.
-// `worktree` keeps its own variant, which also swallows `-C <path>` and `--git-dir=<path>`.
+// Tokens sitting in front of the real command. A prefix with its own args (`nice -n 10 npm i`)
+// still slips through; advisory-only, so not worth block-deploy's PREFIX_SPECS table here.
 export const HEAD_PREFIX = String.raw`^([A-Za-z_][A-Za-z0-9_]*=\S+\s+|(sudo|doas|env|command|builtin|exec|eval|time|nice|nohup|stdbuf|xargs)\s+)*`;
 
 // HEAD_PREFIX stripped, so argv[0] is the command that will actually run.

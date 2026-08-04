@@ -64,19 +64,16 @@ const RE_INFRA_TOOL = /\b(ik|infra-kit|pnpm|npm|npx|pnpx|yarn|node)\b/i;
 const RE_DELIVER_HEAD = /^(dx-|release-)(release-)?deliver$/i;
 
 // The switch: flip a line to open a rule. Delivery is deliberately absent, so no line opens prod.
-// Sole source of truth — the matching settings.json deny rules were removed because that layer
-// matches a command prefix only, and would disagree with this one on wrapped or prefixed forms.
+// The more precise of two layers: settings.json also carries `permissions.deny` entries for
+// delivery and `doppler secrets`. They are kept as defence in depth — a deny rule survives this
+// file being deleted, which is the one gap a hook cannot cover — but they match a command prefix
+// only, so on wrapped or prefixed forms this file is the layer that decides.
 const BLOCK = {
   ghWorkflowRun: false,
   ghRunRerun: true,
   ghApiDispatch: true,
   httpDispatch: true,
 };
-
-// Tests exercise the guard's logic, not today's setting. Only __tests__/helpers.mjs sets this.
-if (process.env.BLOCK_DEPLOY_TEST_ALL === '1') {
-  for (const rule of Object.keys(BLOCK)) BLOCK[rule] = true;
-}
 
 // exit 0, because the JSON channel is only read on exit 0. `reason` is surfaced to the model.
 function denyDecision(reason) {

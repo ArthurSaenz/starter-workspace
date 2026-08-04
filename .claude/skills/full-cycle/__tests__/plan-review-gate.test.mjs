@@ -4,12 +4,21 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { runScript, scratchDir, sha256 } from './helpers.mjs';
+const SCRIPT = join(import.meta.dirname, '..', 'scripts', 'plan-review-gate.mjs');
 
-const run = (planPath) => runScript('plan-review-gate.mjs', [`--plan=${planPath}`]);
+const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
+const scratchDir = () => mkdtempSync(join(tmpdir(), 'full-cycle-'));
+
+function run(planPath, args = [`--plan=${planPath}`]) {
+  const r = spawnSync('node', [SCRIPT, ...args], { encoding: 'utf8' });
+  return { status: r.status, stdout: (r.stdout ?? '').trim(), stderr: (r.stderr ?? '').trim() };
+}
 
 test('fresh plan, no review -> exit 0, writes a skipped review with the plan digest', () => {
   const dir = scratchDir();
@@ -186,7 +195,7 @@ test('malformed JSON review file -> exit 1, file is not overwritten', () => {
 });
 
 test('missing --plan -> exit 2', () => {
-  const r = runScript('plan-review-gate.mjs', []);
+  const r = run(null, []);
   assert.equal(r.status, 2);
   assert.match(r.stderr, /--plan/);
 });

@@ -10,10 +10,16 @@ Deploys belong to **infra-kit**, which owns the rules — notably that `prod` is
 deployed ad-hoc (`assertDeployable` refuses it). Reaching the workflow-dispatch endpoint directly
 skips every one of those rules, so a raw dispatch is not a shortcut — it is a way to get them wrong.
 
-`.claude/hooks/block-deploy.mjs` is the **sole source of truth** for what is refused. The matching
-`settings.json` deny rules were removed because that layer matches a command prefix only and
-disagreed with the hook on wrapped or prefixed forms. The list below describes that hook: if the two
-ever diverge, the hook wins and this text is the bug.
+`.claude/hooks/README.md` is the map: every hook, what it refuses, which way it fails, and where each
+rule switch lives. It is pinned by `__tests__/hook-map.test.mjs`, so it cannot drift from the code —
+read it first.
+
+Two layers refuse deploys, and both are live. `.claude/hooks/block-deploy.mjs` (behind
+`bash-launcher.mjs`) is the **precise** layer and wins wherever they disagree, because it parses argv
+positionally and sees through env prefixes, `sudo`, and shell wrappers. The `permissions.deny`
+entries in `settings.json` are **defence in depth**: they match a command prefix only, but they
+survive the hook file being deleted, which is the one gap the hook cannot cover. The list below
+describes the hook; if it and the hook ever diverge, the hook wins and this text is the bug.
 
 **Allowed:**
 
