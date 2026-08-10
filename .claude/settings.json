@@ -1,13 +1,12 @@
 {
   "permissions": {
     "deny": [
-      "Bash(gh workflow run:*)",
-      "Bash(gh run rerun:*)",
+      "Bash(doppler secrets:*)",
       "Bash(pnpm exec infra-kit release-deliver:*)",
       "Bash(pnpm exec infra-kit release deliver:*)",
       "Bash(pnpm exec ik release-deliver:*)",
-      "Bash(pnpm run dx-release-deliver:*)",
-      "Bash(pnpm dx-release-deliver:*)"
+      "Bash(pnpm exec ik release deliver:*)",
+      "Bash(ik release deliver:*)"
     ]
   },
   "hooks": {
@@ -17,21 +16,87 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-deploy.mjs"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/bash-launcher.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/bash-guard.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect-files.mjs"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/edit-pipeline.mjs",
+            "timeout": 90
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/quality-gate.mjs",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/setup-env.mjs"
           }
         ]
       }
     ]
   },
   "enabledPlugins": {
+    "oh-my-claudecode@omc": true,
+    "chrome-devtools-mcp@chrome-devtools-plugins": true,
     "playwright@claude-plugins-official": true,
     "context7@claude-plugins-official": true,
-    "chrome-devtools-mcp@chrome-devtools-plugins": true,
     "atlassian@claude-plugins-official": true,
     "commit-commands@claude-plugins-official": true,
     "frontend-design@claude-plugins-official": true,
-    "oh-my-claudecode@omc": true,
     "context-mode@context-mode": true,
     "typescript-lsp@claude-plugins-official": true
+  },
+  "extraKnownMarketplaces": {
+    "context-mode": {
+      "source": {
+        "source": "github",
+        "repo": "mksglu/context-mode"
+      }
+    },
+    "chrome-devtools-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "ChromeDevTools/chrome-devtools-mcp"
+      }
+    },
+    "omc": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/Yeachan-Heo/oh-my-claudecode.git"
+      }
+    }
   }
 }

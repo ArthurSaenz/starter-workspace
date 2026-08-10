@@ -2,48 +2,62 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Ticket Naming Convention
-
-Tickets are prefixed by area:
-
-- `[FE]` — frontend
-- `[BE]` — backend
-- `[DO]` — DevOps / infra
-- `[APP]` — mobile app
-- `[IDEA]` — proposal, not yet actionable
-- `[ROOT]` — cross-cutting / monorepo root
-
-Pick one — the dominant area.
+Ticket prefixes and infra-kit commands are in the generated block below — not repeated here.
 
 ## Deployments: agents prepare, humans launch
 
-Deploys go through **infra-kit**, never through raw `gh`. infra-kit owns the deploy rules —
-notably that `prod` is *delivered*, never deployed ad-hoc (`assertDeployable` refuses it).
-Reaching the workflow-dispatch endpoint directly would skip every one of those rules, so a
-raw dispatch is not a shortcut — it is a way to get the rules wrong.
+Deploys belong to **infra-kit**, which owns the rules — notably that `prod` is *delivered*, never
+deployed ad-hoc (`assertDeployable` refuses it). Reaching the workflow-dispatch endpoint directly
+skips every one of those rules, so a raw dispatch is not a shortcut — it is a way to get them wrong.
 
-**You may:**
+`.claude/hooks/README.md` is the map: every hook, what it refuses, which way it fails, and where each
+rule switch lives. It is pinned by `__tests__/hook-map.test.mjs`, so it cannot drift from the code —
+read it first.
+
+Two layers refuse deploys, and both are live. `.claude/hooks/block-deploy.mjs` (behind
+`bash-launcher.mjs`) is the **precise** layer and wins wherever they disagree, because it parses argv
+positionally and sees through env prefixes, `sudo`, and shell wrappers. The `permissions.deny`
+entries in `settings.json` are **defence in depth**: they match a command prefix only, but they
+survive the hook file being deleted, which is the one gap the hook cannot cover. The list below
+describes the hook; if it and the hook ever diverge, the hook wins and this text is the bug.
+
+**Allowed:**
 
 - read workflow state freely — `gh run list` / `view` / `watch`, `gh workflow view`, `gh api` GETs
-- **deploy to non-prod environments** — this is allowed and expected. Either the MCP tools
-  `mcp__infra-kit__gh-release-deploy-all` / `mcp__infra-kit__gh-release-deploy-selected`, or the
-  CLI `ik release deploy-all` / `ik release deploy-selected`. Both enforce the same rules —
-  `prod` is refused (`assertDeployable`), every other environment is fair game.
+- **deploy to non-prod** — expected, not merely tolerated. MCP `mcp__infra-kit__gh-release-deploy-all`
+  / `mcp__infra-kit__gh-release-deploy-selected`, or CLI `ik release deploy-all` /
+  `ik release deploy-selected`. Both enforce the same rules: `prod` is refused, every other
+  environment is fair game.
 
-**You may not:**
+**Refused by the hook:**
 
-- `gh workflow run` — blocked. Every legitimate dispatch has an infra-kit command.
-- reach `/dispatches` via `gh api` or `curl` — same thing, wearing a hat.
-- `ik release deliver` — it merges the release PR into `main` with `--admin` and deploys to
-  `prod`. Irreversible, and a human's call.
+- the `/dispatches` endpoint by any route — `gh api`, `curl`, `wget`, or a URL assembled from
+  variables.
+- `gh run rerun` — the run being repeated may have been a deploy, so re-running one deploys.
+- `ik release deliver`, `dx-release-deliver`, `release-deliver` — delivery merges the release PR into
+  `main` with `--admin` and deploys `prod`. Irreversible, and a human's call.
 
-There is deliberately **no agent escape hatch** — no env var, no flag. When a release is ready,
-stop and hand off:
+`gh workflow run` is **not** currently refused (`BLOCK.ghWorkflowRun` is off in the hook), but prefer
+the infra-kit command regardless — that is the path carrying the rules.
+
+When a release is ready, stop and hand off:
 
 > Release is ready, CI is green. To deliver: `pnpm dx-release-deliver`
 
 The human runs it from their own terminal or the GitHub UI. These rules bind agents only; they
 do not change how a person deploys.
+
+## .claude test suite
+
+Everything under `.claude/**/__tests__/` — hooks and skill scripts alike — is covered by
+`pnpm run test:claude`, deliberately **not** part of `pnpm run qa`: the quality-gate hook runs `qa`
+on every task completion, so folding its own suite in made each completion pay ~65s to re-verify the
+hooks. CI runs it as a separate step. If you change a hook or a skill script, run
+`pnpm run test:claude` yourself — nothing else will.
+
+One glob, one script: a second parallel convention would mean two CI concerns and two places to
+forget. New project skills that ship scripts get picked up by putting their tests in
+`.claude/skills/<name>/__tests__/`.
 
 <!-- infra-kit:begin -->
 <!-- infra-kit:version 0.3.0 -->

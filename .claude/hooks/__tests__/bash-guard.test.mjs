@@ -2,34 +2,173 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { runHook, bash } from './helpers.mjs';
 
-import * as destructive from '../guards/destructive.mjs';
-import * as suggest from '../guards/suggest.mjs';
-import * as cmux from '../guards/cmux.mjs';
-import * as worktree from '../guards/worktree.mjs';
+// Guards were six files under guards/ until they were inlined into bash-guard.mjs. They are still
+// named exports, so these unit tests reach each one directly; the file's dispatcher sits behind an
+// `import.meta.main` guard, so importing it here does not read fd 0.
+import { doppler, destructive, packageManager, style, cmux, worktree } from '../bash-guard.mjs';
 
 const action = (decision) => decision?.action ?? null;
 
 // -------------------------------------------------------------- unit: guard functions
 
-test('destructive: blocks rm -rf / force push / SQL drops, ignores safe commands', () => {
+test('destructive: blocks rm -rf / bare force push / SQL drops, ignores safe commands', () => {
   assert.equal(action(destructive.check('rm -rf /tmp/x')), 'block');
+  assert.equal(action(destructive.check('rm -fr /tmp/x')), 'block');
+  assert.equal(action(destructive.check('sudo rm -rf /tmp/x')), 'block');
   assert.equal(action(destructive.check('git push origin main --force')), 'block');
+  assert.equal(action(destructive.check('git push -f origin main')), 'block'); // was missed entirely
   assert.equal(action(destructive.check('drop table users')), 'block');
   assert.equal(action(destructive.check('truncate foo')), 'block');
-  assert.equal(action(destructive.check('echo "rm -rf /"')), 'block'); // known substring false-positive, preserved
   assert.equal(action(destructive.check('git status')), null);
 });
 
-test('suggest: blocks npm/yarn/grep/find, respects the exact subcommand allowlist', () => {
-  assert.equal(action(suggest.check('npm install')), 'block');
-  assert.equal(action(suggest.check('npm run build')), 'block');
-  assert.equal(action(suggest.check('yarn add foo')), 'block');
-  assert.equal(action(suggest.check('grep foo file')), 'block');
-  assert.equal(action(suggest.check('find . -name "*.ts"')), 'block');
-  assert.equal(action(suggest.check('npm ci')), null); // not install|run|test
-  assert.equal(action(suggest.check('yarn install')), null); // not add|run|test
-  assert.equal(action(suggest.check('grep foo file | wc -l')), null); // piped -> no nudge
-  assert.equal(action(suggest.check('pnpm build')), null);
+// Flags are scanned as a set, not just the token right after `rm` — `-\S*[rR]` only ever saw the
+// first one, so the ordinary `rm -f -r ./dist` walked past a guard built to catch exactly it.
+test('destructive: rm force+recursive in any order or spelling', () => {
+  for (const command of [
+    'rm -rf x',
+    'rm -fr x',
+    'rm -Rf x',
+    'rm -r -f x',
+    'rm -f -r x',
+    'rm --recursive --force x',
+    'env FOO=1 rm -rf x',
+  ]) {
+    assert.equal(action(destructive.check(command)), 'block', command);
+  }
+});
+
+// BOTH flags are required. Plain recursive delete is routine in a monorepo, and blocking it under
+// a "force-remove" label would describe a flag the user did not pass.
+test('destructive: recursive without force is allowed', () => {
+  assert.equal(action(destructive.check('rm -r dir')), null);
+  assert.equal(action(destructive.check('rm -i -r dir')), null);
+  assert.equal(action(destructive.check('rm --recursive dir')), null);
+  assert.equal(action(destructive.check('rm file.txt')), null);
+});
+
+// The guard is now head-anchored, so a pattern quoted INSIDE an argument is no longer mistaken for
+// the command being run. Both of these blocked before and were false positives.
+test('destructive: no longer fires on its own patterns quoted inside an argument', () => {
+  assert.equal(action(destructive.check('echo "rm -rf /"')), null);
+  assert.equal(action(destructive.check('git commit -m "remove truncate stuff"')), null);
+});
+
+// --force-with-lease is the SAFE force push; blocking it drove people to bare --force.
+test('destructive: allows --force-with-lease', () => {
+  assert.equal(action(destructive.check('git push --force-with-lease origin main')), null);
+  assert.equal(action(destructive.check('git push --force-with-lease')), null);
+  assert.equal(action(destructive.check('git push --force-with-lease=origin/main')), null);
+  assert.equal(action(destructive.check('git push --force-if-includes')), null);
+  assert.equal(action(destructive.check('git push origin my-f-branch')), null); // -f inside a name
+});
+
+test('package-manager: blocks every npm/yarn/npx entrypoint, not a hand-picked few', () => {
+  for (const command of [
+    'npm install',
+    'npm i',
+    'npm ci', // all three were allowed before
+    'npm add lodash',
+    'npm exec tsc',
+    'npm run build',
+    'npm test',
+    'npm update',
+    'npm uninstall foo',
+    'yarn install', // allowed before
+    'yarn build', // allowed before
+    'yarn add foo',
+    'npx tsc', // allowed before
+  ]) {
+    assert.equal(action(packageManager.check(command)), 'block', command);
+  }
+});
+
+// Wrapper words shared via hooklib's HEAD_PREFIX. `env FOO=1 npm i` was the sharp one: the bare
+// `FOO=1 npm i` spelling was already covered, so missing the `env` form was an inconsistency.
+test('package-manager: sees through wrapper-word prefixes', () => {
+  for (const command of [
+    'env FOO=1 npm i',
+    'command npm install',
+    'time npm install',
+    'nice npm i',
+    'exec npm ci',
+    'xargs npm install',
+    'CI=1 npm ci',
+    'sudo npm i -g x',
+  ]) {
+    assert.equal(action(packageManager.check(command)), 'block', command);
+  }
+});
+
+// The subcommand IS the unit: `--plain` only drops formatting, so the bare `secrets get X` prints
+// the value too. A flag-based rule would block the long spelling and pass the short one.
+test('doppler: blocks every secrets read path, flags or not', () => {
+  for (const command of [
+    'doppler secrets',
+    'doppler secrets --only-names',
+    'doppler secrets get API_KEY',
+    'doppler secrets get API_KEY --plain',
+    'doppler secrets get API_KEY --json',
+    'doppler secrets download',
+    'doppler secrets download --no-file --format env',
+    'doppler secrets set FOO=bar',
+    'doppler secrets upload .env',
+    'env FOO=1 doppler secrets get X', // wrapper words via HEAD_PREFIX
+    'sudo doppler secrets download',
+  ]) {
+    assert.equal(action(doppler.check(command)), 'block', command);
+  }
+});
+
+// `run` is out of scope in BOTH spellings: `run -- env` leaks exactly as `run --command 'env'`
+// does, so blocking one is theater — and blocking both takes out `run -- pnpm build`.
+test('doppler: leaves run and the metadata subcommands alone', () => {
+  for (const command of [
+    'doppler run -- pnpm build',
+    'doppler run --command "pnpm build"',
+    'doppler setup',
+    'doppler me',
+    'doppler projects',
+    'doppler configure',
+    'doppler --version',
+    'git commit -m "use doppler secrets get"', // head anchor: quoted, not run
+    'rg doppler docs/',
+    'cat .doppler.yaml',
+  ]) {
+    assert.equal(action(doppler.check(command)), null, command);
+  }
+});
+
+// style must never export scope: its piped-grep allowance depends on reading the whole line.
+test('guard scope contracts are what the dispatcher expects', () => {
+  assert.equal(doppler.scope, 'segment');
+  assert.equal(packageManager.scope, 'segment');
+  assert.equal(destructive.scope, 'segment');
+  assert.equal(style.scope, undefined);
+  assert.equal(cmux.scope, undefined);
+});
+
+test('package-manager: does not fire on pnpm, or on the word npm inside another token', () => {
+  for (const command of [
+    'pnpm build',
+    'pnpm install',
+    'pnpx foo',
+    'pnpm exec tsc',
+    'pnpm dlx foo',
+    'pnpm exec npm-run-all', // token boundary, not \b
+    'cat /etc/npmrc',
+    'rg npm docs/',
+    './node_modules/.bin/tsc',
+  ]) {
+    assert.equal(action(packageManager.check(command)), null, command);
+  }
+});
+
+test('style: advises (never blocks) on grep/find, stays quiet on piped grep', () => {
+  assert.equal(action(style.check('grep foo file')), 'advise');
+  assert.equal(action(style.check('find . -name "*.ts"')), 'advise');
+  assert.equal(action(style.check('grep foo file | wc -l')), null); // piped -> no nudge
+  assert.equal(action(style.check('rg foo')), null);
 });
 
 test('cmux: blocks bare dev server, allows cmux-wrapped', () => {
@@ -37,6 +176,27 @@ test('cmux: blocks bare dev server, allows cmux-wrapped', () => {
   assert.equal(action(cmux.check('pnpm run dev')), 'block');
   assert.equal(action(cmux.check('cmux new-session -d -s dev "pnpm dev"')), null);
   assert.equal(action(cmux.check('pnpm build')), null);
+  // Still the command being RUN, once segmenting moved inside the guard.
+  assert.equal(action(cmux.check('cd apps/client && pnpm dev')), 'block');
+});
+
+// Why cmux segments internally rather than exporting scope='segment': the splitter is quote-blind,
+// so this payload splits and the half holding `pnpm dev` cannot see the `cmux` authorising it.
+test('cmux: a compound payload inside a cmux session is still allowed', () => {
+  assert.equal(action(cmux.check('cmux new-session -d -s dev "cd apps/client && pnpm dev"')), null);
+  assert.equal(action(cmux.check('cmux new-session -d -s api "pnpm --filter api dev"')), null);
+});
+
+// The guard BLOCKS, so a false positive is a hard stop on ordinary work.
+test('cmux: does not fire on commands that merely mention the dev script', () => {
+  for (const command of [
+    'rg "pnpm dev" docs/',
+    'echo "run pnpm dev in cmux"',
+    'git commit -m "docs: explain pnpm dev"',
+    'cat notes-pnpm-dev.md',
+  ]) {
+    assert.equal(action(cmux.check(command)), null, command);
+  }
 });
 
 test('worktree: blocks add/remove at any path (incl. -C / env prefixes), advises list', () => {
@@ -63,15 +223,36 @@ test('bash-guard blocks when any guard blocks (exit 2)', () => {
     'rm -rf /tmp/x && npm install', // multiple guards -> first block wins
     'cd /repo && git worktree add ../repo-worktrees/x', // segment-scoped: ^ anchor survives the &&
     'echo hi; git worktree add ../adhoc',
+    'cd apps/client && npm install', // segment-scoped: the hole that motivated the split
+    'echo hi; yarn install',
+    'doppler secrets get API_KEY',
+    'cd apps/api && doppler secrets download --no-file', // segment-scoped: ^ anchor survives the &&
   ]) {
     assert.equal(runHook('bash-guard.mjs', bash(command)).status, 2, command);
   }
 });
 
 test('bash-guard allows clean commands (exit 0)', () => {
-  for (const command of ['git status', 'ls -la', 'pnpm build', 'grep foo file | wc -l']) {
+  for (const command of [
+    'git status',
+    'ls -la',
+    'pnpm build',
+    'grep foo file | wc -l',
+    'git push --force-with-lease origin main',
+    'pnpm exec npm-run-all',
+    'doppler run -- pnpm build',
+    'doppler setup',
+  ]) {
     assert.equal(runHook('bash-guard.mjs', bash(command)).status, 0, command);
   }
+});
+
+// A style tip must cost nothing: the command still runs, the advice rides along as context.
+test('bash-guard advises rather than blocks on grep (exit 0 + additionalContext)', () => {
+  const res = runHook('bash-guard.mjs', bash('grep foo file'));
+  assert.equal(res.status, 0);
+  assert.match(res.stdout, /additionalContext/);
+  assert.match(res.stdout, /ripgrep/);
 });
 
 // Segmentation is opt-in per guard: whole-line guards must keep reading the whole line, or their
