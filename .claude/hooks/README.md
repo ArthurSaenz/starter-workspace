@@ -12,10 +12,17 @@ rule is enforced, the suite fails. Run it with `pnpm run test:claude` — delibe
 |---|---|---|---|---|
 | `PreToolUse` / `Bash` | `bash-launcher.mjs` → `block-deploy.mjs` | deploy guard | deny via JSON | **closed** |
 | `PreToolUse` / `Bash` | `bash-guard.mjs` | advisory guards | block (exit 2) / advise | **open** |
-| `PreToolUse` / `Edit\|Write` | `protect-files.mjs` | protected paths | block (exit 2) | closed |
+| `PreToolUse` / `Edit\|Write` | `protect-files.mjs` | protected paths | block (exit 2) | policy closed, **load open** |
 | `PostToolUse` / `Edit\|Write` | `edit-pipeline.mjs` | format + typecheck + lint feedback | context | open |
-| `TaskCompleted` | `quality-gate.mjs` | runs `pnpm run qa` | block (exit 2) | closed |
+| `TaskCompleted` | `quality-gate.mjs` | runs `pnpm run qa` | block (exit 2) | policy closed, **timeout + load open** |
 | `SessionStart` | `setup-env.mjs` | env bootstrap | context | open |
+
+Only the deploy lane is fail-closed *end to end*, and only because `bash-launcher.mjs` turns a load
+failure into a deny. The two rows above marked **policy closed** are closed on the thing they judge —
+a protected path, a failing `qa` — and open in their degraded modes: a malformed event or an
+unparseable `hooklib.mjs` exits non-2, and non-2 does not block. This column said plain `closed` for
+both until it was measured; `printf 'not json' | node protect-files.mjs` exits 0. Known limit #4 is
+the shared cause, and the launcher is the shape of the fix.
 
 Libraries, imported rather than registered: `hooklib.mjs` (event parsing, allow/block/context,
 segment splitting), `lock.mjs` (cross-hook mutex), `lint-report.mjs` (lint output shaping).
@@ -86,8 +93,10 @@ matches in `cd apps/client && npm install`. `style` and `cmux` deliberately read
 segmenting would strip the pipe that makes `grep foo | wc -l` acceptable, and the `cmux` that
 authorises a wrapped `pnpm dev`.
 
-The dispatcher sits behind `if (import.meta.main)`, so the unit tests import the guards directly
-without the file reading stdin.
+The dispatcher sits behind `invokedDirectly()`, so the unit tests import the guards directly without
+the file reading stdin. Deliberately not `import.meta.main`, which only exists from Node 24.2 and is
+`undefined` below it — every guard here would no-op with the suite still green, because the tests
+never reach that line. `hook-map.test.mjs` refuses the spelling.
 
 ## Tests
 
@@ -127,7 +136,36 @@ fine. Parallel subagents then ping-ponged exit 2 at each other through the model
 60s and allows on timeout — the next completion re-runs `qa` over the whole monorepo anyway, so a
 skipped run is far cheaper than a task that cannot finish.
 
-### Stage 3b has never fired, and stays (`edit-pipeline.mjs:207`)
+### `waitMs` means what it says, and for a while did not (`lock.mjs:113`)
+
+The acquire loop was bounded by an attempt count *as well as* by the deadline, and the count was
+almost always the smaller of the two: 100 attempts x a 50ms poll capped **every** wait at ~5s. So the
+paragraph above described behaviour the code did not have — the gate asked for 60s, gave up after
+5.4s, and skipped `qa` under exactly the parallel subagents it was written for. Measured, not
+inferred: at `waitMs: 60_000` the call returned null after 5385ms.
+
+It survived because the suite pinned `waitMs: 0` and nothing else, so every larger value was
+unverified. The loop is bounded by the deadline now, the count survives as `MAX_STEALS` bounding
+steal churn only — its stated job all along — and `hook-lock.test.mjs` pins the contract.
+
+### A skipped check has to be audible (`edit-pipeline.mjs:103`)
+
+Losing the lock skipped every stage and printed nothing. To the agent that is indistinguishable from
+a clean run: a false negative from the one hook whose job is catching its mistakes, arriving exactly
+when parallelism is highest. `waitMs` was also below the measured hold — 2000ms against 2.6s warm
+and 4.6s cold — so on a contended package the skip was the common path, not the rare one.
+
+Now it reports through `additionalContext` and still exits 0. Not exit 2: blocking on contention is
+the ping-pong incident above, and repeating it in the faster loop would be worse. Not stderr either,
+which is the obvious spelling and the wrong one — measured by holding the lock and editing a real
+file, a PostToolUse hook's stderr is **dropped** on exit 0 while `additionalContext` arrives
+verbatim. The test that used to assert "a contended edit degrades to silence" was the defect written
+down; it now asserts the opposite, channel included.
+
+The same measurement puts a question over `quality-gate.mjs`'s skip notice, which is a plain
+`process.stderr.write` on a hook that then exits 0.
+
+### Stage 3b has never fired, and stays (`edit-pipeline.mjs:217`)
 
 The re-lint after reformatting looks for rules ESLint fixed and Prettier put back. Measured across
 every real candidate in this repo: **zero conflicts.** It is insurance against config drift, not a

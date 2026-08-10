@@ -6,7 +6,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { readInput, block, allow, findPackageDir } from './hooklib.mjs';
+import { readInput, block, allow, addContext, findPackageDir } from './hooklib.mjs';
 import { acquireLock, holdsLock, releaseLock } from './lock.mjs';
 import {
   parseEslintJson,
@@ -93,13 +93,22 @@ function readBytes(path) {
 
 // --------------------------------------------------------------------------------------- the run
 
-// staleMs > harness timeout (90s) > stage budget (70s). See lock.mjs.
-const lock = acquireLock(pkgDir, { waitMs: 2000, staleMs: 120_000 });
+// staleMs (120s) > harness timeout (90s) > waitMs + stage budget (8 + 70). See lock.mjs.
+// waitMs was missing from that chain at 2000ms — under the measured hold, 2.6s warm / 4.6s cold.
+const lock = acquireLock(pkgDir, { waitMs: 8000, staleMs: 120_000 });
 
 // No lock => skip everything, prettier included: it is a whole-file writer, so running it unlocked
-// is the concurrent-truncation case itself.
-if (!lock) allow();
-if (!holdsLock(lock)) allow(); // steal-and-restore window; see holdsLock in lock.mjs
+// is the concurrent-truncation case itself. The skip must reach the MODEL — silence reads as clean.
+// Not exit 2 (the ping-pong incident, README) and not stderr (dropped on exit 0; measured).
+function skip(reason) {
+  addContext(
+    `Checks after editing ${abs}: SKIPPED — ${reason}. Nothing was verified — treat this file as unchecked, and re-check with: pnpm run qa`,
+    'PostToolUse',
+  );
+}
+
+if (!lock) skip(`another hook held the lock on ${pkgDir} for the whole wait`);
+if (!holdsLock(lock)) skip('the lock was lost to a concurrent hook'); // steal-and-restore; see lock.mjs
 
 const sections = [];
 
@@ -310,8 +319,9 @@ try {
   releaseLock(lock); // latency only; correctness is lock.mjs's stale-steal
 }
 
-// exit 2 + stderr is the only PostToolUse channel that reaches Claude. Tool failures ride it too,
-// kept honest by their section title so the agent never gets a toolchain problem dressed as its bug.
+// exit 2 + stderr is the only PostToolUse channel that BLOCKS (additionalContext reaches the model
+// but cannot stop the turn). Tool failures ride it too, kept honest by their section title so the
+// agent never gets a toolchain problem dressed as its bug.
 if (sections.length > 0) {
   const report = formatReport(sections, { maxChars: 4000 });
   if (report) block(`Checks after editing ${abs}:\n\n${report}`);

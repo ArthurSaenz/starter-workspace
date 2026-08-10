@@ -37,6 +37,26 @@ test('bash-launcher.mjs has zero relative imports — the sole basis of its fail
   }
 });
 
+// A version floor nothing else can see: below Node 24.2 `import.meta.main` is `undefined`, not an
+// error, so a dispatcher gated on it never runs. bash-guard.mjs shipped that — six guards no-op,
+// suite green, because these tests import the guards and never reach the gate. Comments are
+// stripped first, so the fix may still name the identifier it warns about.
+test('no hook gates its entrypoint on import.meta.main — undefined below Node 24.2', () => {
+  const offenders = readdirSync(HOOKS_DIR)
+    .filter((name) => name.endsWith('.mjs'))
+    .filter((name) => {
+      const source = readFileSync(join(HOOKS_DIR, name), 'utf8').replace(/^\s*\/\/.*$/gm, '');
+      return /import\.meta\.main/.test(source);
+    });
+
+  assert.deepEqual(
+    offenders,
+    [],
+    `these hooks disarm themselves on Node < 24.2: ${offenders.join(', ')}. Compare ` +
+      `import.meta.url against pathToFileURL(realpathSync(process.argv[1])).href instead.`,
+  );
+});
+
 // ---------------------------------------------------------------- 2. registration actually resolves
 
 // helpers.runHook invokes hooks by path, so nothing else catches a registration pointing at nothing.

@@ -7,7 +7,7 @@
 // optimization, since `finally` does not run on the SIGKILL the harness sends at its timeout.
 
 import { randomUUID } from 'node:crypto';
-import { closeSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 // There is no stdlib sync sleep, and a spin loop would fight the tool processes for the same core.
@@ -33,10 +33,31 @@ function readRecord(path) {
   }
 }
 
+// `wx` creates the file EMPTY and writes the record a syscall later, so every healthy acquire is
+// briefly unreadable. mtime separates "died mid-acquire" (steal) from "still mid-acquire" (leave).
+const ACQUIRE_GRACE_MS = 1_000;
+
+// Wrong here means a lock nobody can acquire, so every branch fails toward NOT protecting.
+function writtenWithinGrace(lockPath) {
+  try {
+    // lstat, not stat: a symlink to any fresh file would pose as a holder, and never expire.
+    const stats = lstatSync(lockPath);
+    if (!stats.isFile()) return false; // a directory here is an fs fault — let it throw upstream
+
+    // Symmetric: `>= 0` would reject a just-created file, whose mtime can sit a fraction of a ms
+    // ahead of a truncated Date.now(); one-sided `< GRACE` lets a skewed clock hold forever.
+    return Math.abs(Date.now() - stats.mtimeMs) < ACQUIRE_GRACE_MS;
+  } catch {
+    return false; // gone: no holder left to protect
+  }
+}
+
 // `process.kill(pid, 0)` sends no signal, it only asks whether the pid is signalable. ESRCH means
 // gone (steal); EPERM means alive under another user, so NOT stale.
-function isStale(record, staleMs) {
-  if (!record || typeof record.pid !== 'number' || typeof record.startedAt !== 'number') return true;
+function isStale(record, staleMs, lockPath) {
+  if (!record || typeof record.pid !== 'number' || typeof record.startedAt !== 'number') {
+    return !writtenWithinGrace(lockPath);
+  }
   if (Date.now() - record.startedAt > staleMs) return true;
 
   try {
@@ -54,7 +75,7 @@ function isStale(record, staleMs) {
 // two-syscall window below, which cannot be raced reliably nor reproduced single-threaded.
 export function trySteal(lockPath, staleMs, { onClaimed } = {}) {
   const observedBefore = readRecord(lockPath);
-  if (!isStale(observedBefore, staleMs)) return false;
+  if (!isStale(observedBefore, staleMs, lockPath)) return false;
 
   // Our OWN fresh nonce, never the observed one: with the observed nonce two stealers rename to the
   // same target, and POSIX rename-over-existing succeeds silently — so both believe they won.
@@ -87,8 +108,12 @@ export function trySteal(lockPath, staleMs, { onClaimed } = {}) {
   }
 }
 
-// Bounds the one unbounded shape: steal succeeds, a third party wins the `wx`, repeat.
-const MAX_ATTEMPTS = 100;
+// Bounds the one unbounded shape: steal succeeds, a third party wins the `wx`, repeat. Counts
+// STEALS, not attempts — as an attempt cap it capped the WAIT too: 60s asked, 5.4s given.
+const MAX_STEALS = 100;
+
+// Overridable so a test can pin the waitMs contract in ms rather than seconds.
+const POLL_MS = 50;
 
 /**
  * Acquire the lock at `<dir>/node_modules/.cache/<name>`; null if not taken within `waitMs`.
@@ -112,8 +137,12 @@ export function acquireLock(dir, { name = 'claude-hook.lock', waitMs = 2000, sta
   mkdirSync(dirname(lockPath), { recursive: true });
 
   const deadline = Date.now() + effectiveWaitMs;
+  // Floored at 1ms: a 0 would spin, fighting the tool processes for the same core.
+  const pollMs = Math.max(1, envInt('CLAUDE_HOOK_LOCK_POLL_MS', POLL_MS));
+  let steals = 0;
 
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+  // Deadline-bound, not attempt-bound: an attempt count is a second, invisible ceiling on the wait.
+  for (;;) {
     const nonce = randomUUID();
     let fd;
 
@@ -125,11 +154,14 @@ export function acquireLock(dir, { name = 'claude-hook.lock', waitMs = 2000, sta
 
       // A steal winner comes back through this same `wx` rather than renaming its way in: a third
       // process may have acquired cleanly in the gap, and rename-then-write would clobber it.
-      if (trySteal(lockPath, effectiveStaleMs)) continue;
+      if (trySteal(lockPath, effectiveStaleMs)) {
+        steals += 1;
+        if (steals >= MAX_STEALS) return null; // stealable records keep appearing; give up
+        continue;
+      }
       // Only consulted when steal declines, so `waitMs: 0` means "wait for nobody", not "try once".
-      // MAX_ATTEMPTS bounds the case where stealable records keep appearing.
       if (Date.now() >= deadline) return null;
-      sleepSync(50);
+      sleepSync(pollMs);
       continue;
     }
 
@@ -142,8 +174,6 @@ export function acquireLock(dir, { name = 'claude-hook.lock', waitMs = 2000, sta
 
     return { lockPath, nonce };
   }
-
-  return null;
 }
 
 // Call immediately after acquire, BEFORE the first stage: a stealer can move a live record off the

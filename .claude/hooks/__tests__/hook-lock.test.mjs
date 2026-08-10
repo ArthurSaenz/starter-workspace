@@ -4,7 +4,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -49,6 +60,42 @@ test('a second acquire at waitMs 0 returns null', () => {
     assert.equal(acquireLock(dir, { waitMs: 0, staleMs: 60_000 }), null, 'second must be refused');
     assert.ok(holdsLock(first), 'the first holder still owns the record');
   } finally {
+    cleanup();
+  }
+});
+
+// The missing companion to the test above: `waitMs: 0` was pinned, every larger value was not, so
+// an attempt cap silently capped every wait (60s asked, 5.4s given, suite green, QA skipped).
+// Polling is dialled down so this costs ms — the old ceiling at 1ms polling would be ~100ms.
+test('acquireLock waits the full waitMs before giving up — no hidden attempt ceiling', () => {
+  const { dir, cleanup } = makeLockDir();
+  const previousPoll = process.env.CLAUDE_HOOK_LOCK_POLL_MS;
+  const previousWait = process.env.CLAUDE_HOOK_LOCK_WAIT_MS;
+
+  process.env.CLAUDE_HOOK_LOCK_POLL_MS = '1';
+  delete process.env.CLAUDE_HOOK_LOCK_WAIT_MS; // an inherited override would defeat the measurement
+
+  try {
+    // Live pid, fresh record, huge staleMs: the holder is never stealable, so the contender can
+    // only ever leave through the deadline.
+    const holder = acquireLock(dir, { waitMs: 0, staleMs: 900_000 });
+    assert.ok(holder, 'precondition: the holder must take the lock');
+
+    const startedAt = Date.now();
+    const contender = acquireLock(dir, { waitMs: 400, staleMs: 900_000 });
+    const waited = Date.now() - startedAt;
+
+    assert.equal(contender, null, 'a healthy holder must not be displaced');
+    assert.ok(
+      waited >= 400,
+      `asked for 400ms, gave up after ${waited}ms — something is capping the wait again`,
+    );
+
+    releaseLock(holder);
+  } finally {
+    if (previousPoll === undefined) delete process.env.CLAUDE_HOOK_LOCK_POLL_MS;
+    else process.env.CLAUDE_HOOK_LOCK_POLL_MS = previousPoll;
+    if (previousWait !== undefined) process.env.CLAUDE_HOOK_LOCK_WAIT_MS = previousWait;
     cleanup();
   }
 });
@@ -117,10 +164,94 @@ test('a truncated or garbage record is stolen, not fatal', () => {
   try {
     // What a process that died mid-acquire leaves. Throwing would make the lock permanently
     // unacquirable — every hook silently disabled.
-    plantRecord(dir, '{"pid":123,"star');
+    const path = plantRecord(dir, '{"pid":123,"star');
+
+    // AGED: unreadable only proves a DEAD writer once it is too old to be one still mid-acquire.
+    // See writtenWithinGrace in lock.mjs.
+    const longAgo = new Date(Date.now() - 60_000);
+    utimesSync(path, longAgo, longAgo);
+
     const handle = acquireLock(dir, { waitMs: 0, staleMs: 3_600_000 });
     assert.ok(handle, 'an unparseable record must be treated as absent');
     assert.ok(holdsLock(handle));
+  } finally {
+    cleanup();
+  }
+});
+
+// The other half of the case above: `wx` leaves the file EMPTY for one syscall, so every healthy
+// acquire is briefly unreadable. That window used to be stolen from — mutual exclusion survived,
+// but the victim then skipped its work in silence.
+test('a holder caught mid-acquire, before its record is written, is NOT stolen from', () => {
+  const { dir, cleanup } = makeLockDir();
+  try {
+    mkdirSync(join(dir, 'node_modules', '.cache'), { recursive: true });
+
+    // Byte-for-byte the state acquireLock occupies between openSync(wx) and writeFileSync.
+    const lockPath = cachePath(dir);
+    const fd = openSync(lockPath, 'wx');
+
+    try {
+      assert.equal(trySteal(lockPath, 900_000), false, 'a live mid-acquire holder must survive');
+      assert.ok(existsSync(lockPath), 'and its lock file must still be at the lock path');
+    } finally {
+      closeSync(fd);
+    }
+  } finally {
+    cleanup();
+  }
+});
+
+// The grace can only make a lock HARDER to steal, so anything it gets wrong turns a transient skip
+// into a permanent one. These three pin the ways it must still let go.
+
+test('an unreadable record with a FUTURE mtime is still stolen — a clock ahead must not hold the lock', () => {
+  const { dir, cleanup } = makeLockDir();
+  try {
+    const path = plantRecord(dir, '{"pid":123,"star');
+    const future = new Date(Date.now() + 3_600_000);
+    utimesSync(path, future, future);
+
+    // A negative age also satisfies `< GRACE`, so a one-sided window protects this for the hour.
+    const handle = acquireLock(dir, { waitMs: 0, staleMs: 3_600_000 });
+    assert.ok(handle, 'a clock an hour ahead must not make the lock un-acquirable');
+    releaseLock(handle);
+  } finally {
+    cleanup();
+  }
+});
+
+test('a symlink at the lock path is stolen, not mistaken for a holder mid-acquire', () => {
+  const { dir, cleanup } = makeLockDir();
+  try {
+    const cacheDir = join(dir, 'node_modules', '.cache');
+    mkdirSync(cacheDir, { recursive: true });
+    const target = join(cacheDir, 'target');
+    writeFileSync(target, 'fresh');
+    symlinkSync(target, cachePath(dir));
+
+    // `stat` follows the link to a fresh file whose mtime can be refreshed forever, so it never
+    // self-heals. `lstat` sees the link, fails isFile(), and lets it be stolen on first contact.
+    const handle = acquireLock(dir, { waitMs: 0, staleMs: 3_600_000 });
+    assert.ok(handle, 'a symlink must not be able to pose as a live mid-acquire holder');
+    releaseLock(handle);
+  } finally {
+    cleanup();
+  }
+});
+
+test('the grace EXPIRES: a fresh unreadable record becomes acquirable, not never', () => {
+  const { dir, cleanup } = makeLockDir();
+  try {
+    plantRecord(dir, ''); // empty — exactly what `wx` leaves before the record is written
+
+    const startedAt = Date.now();
+    const handle = acquireLock(dir, { waitMs: 5_000, staleMs: 3_600_000 });
+    const waited = Date.now() - startedAt;
+
+    assert.ok(handle, 'the grace must expire — otherwise it is a permanent lock, not a window');
+    assert.ok(waited >= 500, `expected a real wait while the grace held, got ${waited}ms`);
+    releaseLock(handle);
   } finally {
     cleanup();
   }
@@ -305,7 +436,7 @@ test('a non-EEXIST fs error propagates and is never treated as a retry condition
 });
 
 // The same at the open: the lock path is a DIRECTORY, so `wx` cannot create a file. Swallowed as a
-// retry it would spin to MAX_ATTEMPTS and return a null meaning "someone else holds it".
+// retry it would spin out the whole waitMs and return a null meaning "someone else holds it".
 test('ENOENT-class open failures are not swallowed as EEXIST', () => {
   const { dir, cleanup } = makeLockDir();
   try {
@@ -326,7 +457,10 @@ test('ENOENT-class open failures are not swallowed as EEXIST', () => {
 
 // Losing the lock skips EVERYTHING, prettier included: two whole-file rewrites interleaving on one
 // path can truncate each other, so the bytes must survive a contended edit untouched.
-test('the pipeline skips all stages while the lock is held externally', () => {
+//
+// The skip must also be AUDIBLE. This test once asserted the opposite — "degrades to silence" —
+// which was the defect written down: to the agent, silence reads as a clean check.
+test('the pipeline skips all stages while the lock is held externally, and says so', () => {
   const pkgDir = join(REPO_ROOT, '.omc', '.tmp-writesafety-test');
   rmSync(pkgDir, { recursive: true, force: true });
   mkdirSync(pkgDir, { recursive: true });
@@ -350,12 +484,23 @@ test('the pipeline skips all stages while the lock is held externally', () => {
       const res = spawnSync('node', [join(HOOKS_DIR, 'edit-pipeline.mjs')], {
         input: JSON.stringify({ tool_name: 'Write', tool_input: { file_path: file } }),
         encoding: 'utf8',
-        // A short wait so the test does not sit through the real 2s budget.
+        // A short wait so the test does not sit through the real 8s budget.
         env: { ...process.env, CLAUDE_HOOK_LOCK_WAIT_MS: '200' },
       });
 
-      assert.equal(res.status, 0, 'a contended edit degrades to silence, it does not fail the edit');
-      assert.equal(res.stdout + res.stderr, '', 'and reports nothing it could not verify');
+      assert.equal(res.status, 0, 'a contended edit must not fail the edit, and must not block');
+      assert.match(
+        res.stdout,
+        /SKIPPED/,
+        'the skip must announce itself — silence is indistinguishable from a clean check',
+      );
+      // The CHANNEL, not just the words: stderr is dropped on exit 0, so asserting on it would
+      // pass while the agent saw nothing.
+      assert.match(
+        res.stdout,
+        /"hookEventName":\s*"PostToolUse"/,
+        'and must ride additionalContext, the exit-0 channel that actually reaches the model',
+      );
       assert.equal(readFileSync(file, 'utf8'), original, 'THE BYTES MUST BE UNTOUCHED');
     } finally {
       releaseLock(held);

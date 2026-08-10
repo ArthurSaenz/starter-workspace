@@ -2,6 +2,8 @@
 // Every advisory Bash rule, in one file. First block wins; a guard that throws fails open.
 // Deploy guard is a separate process on purpose — see README.md.
 
+import { realpathSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { readInput, block, addContext, allow, splitIntoSegments, HEAD_PREFIX, argvAfterPrefix } from './hooklib.mjs';
 
 // ------------------------------------------------------------------ doppler
@@ -222,5 +224,18 @@ const main = () => {
   allow();
 };
 
-// So the unit tests can import the guards without this reading fd 0.
-if (import.meta.main) main();
+// So the tests can import the guards without this reading fd 0. NOT `import.meta.main`: Node 24.2+
+// only, `undefined` below it, so every guard would no-op with the suite green. Pinned by hook-map.
+const invokedDirectly = () => {
+  const entry = process.argv[1];
+  if (!entry) return false;
+
+  try {
+    // realpath: Node resolves symlinks when it loads the module, so argv[1] must be resolved too.
+    return import.meta.url === pathToFileURL(realpathSync(entry)).href;
+  } catch {
+    return false;
+  }
+};
+
+if (invokedDirectly()) main();
