@@ -6,10 +6,35 @@ import util from 'node:util'
 
 const execFn = util.promisify(exec)
 
-const PROJECT_ROOT = join(process.env.HOME, 'projects')
-const WORKSPACE_ROOT = join(PROJECT_ROOT, 'starter-workspace')
+// The machine-local factory config owned by `infra-kit vendor config`. Reading the consumer list
+// from there — rather than keeping a second copy here — means onboarding a repo is one edit. When
+// the two lists were separate, `bridge-monorepo` sat in vendor.json but not here, so it silently
+// stopped receiving syncs while still being checked by `infra-kit vendor check`.
+const VENDOR_CONFIG_PATH = join(process.env.HOME, '.infra-kit', 'vendor.json')
+const SOURCE_REPO = 'starter-workspace'
 
-const TARGET_REPOS = ['travelist-monorepo', 'hulyo-monorepo', 'sandbox-workspace', 'infra-kit', 'nomadream-monorepo']
+const expandHome = (path) => (path.startsWith('~/') ? join(process.env.HOME, path.slice(2)) : path)
+
+const readVendorConfig = () => {
+  if (!existsSync(VENDOR_CONFIG_PATH)) {
+    throw new Error(`Missing ${VENDOR_CONFIG_PATH} — scaffold it with \`infra-kit vendor config --init\`.`)
+  }
+
+  const { workspaceDir, targets } = JSON.parse(readFileSync(VENDOR_CONFIG_PATH, 'utf8'))
+
+  if (!Array.isArray(targets) || targets.length === 0) {
+    throw new Error(`No "targets" in ${VENDOR_CONFIG_PATH} — nothing to sync.`)
+  }
+
+  return { projectRoot: expandHome(workspaceDir ?? '~/projects'), targets }
+}
+
+const { projectRoot: PROJECT_ROOT, targets: CONFIGURED_TARGETS } = readVendorConfig()
+const WORKSPACE_ROOT = join(PROJECT_ROOT, SOURCE_REPO)
+
+// Syncing the source onto itself would delete the very tree being mirrored, so it is never a target
+// even if vendor.json lists it. Repos not checked out on this machine are skipped, not an error.
+const TARGET_REPOS = CONFIGURED_TARGETS.filter((repo) => repo !== SOURCE_REPO && existsSync(join(PROJECT_ROOT, repo)))
 
 const EXCLUDED_PATTERNS = [
   'node_modules',
