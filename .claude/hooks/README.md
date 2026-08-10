@@ -96,6 +96,8 @@ without the file reading stdin.
 | `block-deploy.test.mjs` | the deploy lane's corpus — named command tables plus `reason` assertions |
 | `bash-guard.test.mjs` | each advisory guard as a unit, plus dispatcher integration |
 | `bash-guard-corpus.test.mjs` | frozen snapshot of advisory verdicts; catches a rule lost in a move |
+| `block-deploy-coverage.test.mjs` | every guarded literal in the deploy lane is named by a test command; catches a `SHELL_WRAPPERS` entry added without a row |
+| `design-notes.test.mjs` | the `## Design notes` sections above cite real files at reachable lines |
 | `hook-map.test.mjs` | this README, settings paths, the launcher's zero-import rule, lane isolation |
 | `guard-policy.test.mjs` | the over-blocking policy (I1/I2) as an executable invariant |
 | `edit-hooks.test.mjs`, `lint-feedback.test.mjs`, `hook-lock.test.mjs`, `quality-gate.test.mjs`, `process-containment.test.mjs` | the Edit/Write and TaskCompleted lanes |
@@ -111,3 +113,42 @@ without the file reading stdin.
 4. **`hooklib.mjs` is a shared load-time failure domain.** Four hooks import it, three of which
    block; a parse error there takes all four down at once, silently. The launcher does not cover
    this. Tracked as follow-up work.
+
+## Design notes
+
+Why a few things are the way they are. Kept here rather than inline because each is a *story* — an
+incident, a measurement — and the code sites only need the rule. Anything a person editing a
+specific line must know stayed in that line's comment.
+
+### The quality gate queues, it never refuses (`quality-gate.mjs:35`)
+
+`waitMs: 0` plus a block on contention meant a peer holding the lock failed a task that was itself
+fine. Parallel subagents then ping-ponged exit 2 at each other through the model. The gate now waits
+60s and allows on timeout — the next completion re-runs `qa` over the whole monorepo anyway, so a
+skipped run is far cheaper than a task that cannot finish.
+
+### Stage 3b has never fired, and stays (`edit-pipeline.mjs:207`)
+
+The re-lint after reformatting looks for rules ESLint fixed and Prettier put back. Measured across
+every real candidate in this repo: **zero conflicts.** It is insurance against config drift, not a
+live detector. It stays because the failure it catches is silent and would repeat on every single
+edit — the one shape where a never-firing check earns its keep.
+
+### The deploy lane is tested by mutation, not by reading (`__tests__/block-deploy-coverage.test.mjs:1`)
+
+Every literal in `SHELL_WRAPPERS`, `PREFIX_COMMANDS`, `BARE_PREFIX_FAILS_CLOSED`, `GUARDED_TOOLS`
+and the dispatch switch was deleted in turn from a copy of the tree, with `block-deploy.test.mjs`
+run against each mutant. Twenty-two of them could be deleted with the whole suite still green —
+including `dash`, `ksh`, `fish`, `csh`, `tcsh`, bare `infra-kit` as argv[0], and the `npm`/`npx`/
+`pnpx`/`yarn` dispatch heads. Those rows exist now.
+
+Two traps that make this measurement lie, both worth knowing before repeating it:
+
+- **A row naming a literal does not test it.** `stdbuf -oL bash -c "…"` names `stdbuf`, but with
+  `stdbuf` deleted from the set the *wrapper* scan still denies the command, so the row passes
+  either way. Prefix rows must carry no shell wrapper.
+- **A mutation that breaks parsing fails every test, which reads as "covered".** Removing
+  `case 'gh':` orphans its body and does exactly this. Check the mutant parses first.
+
+The static test only pins that each literal is *named* somewhere. Proving path-exercise needs the
+mutation run — roughly 49 x 4s, which is why it is a one-off instrument and not a suite member.

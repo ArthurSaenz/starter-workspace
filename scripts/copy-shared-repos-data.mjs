@@ -56,7 +56,15 @@ const MANIFEST_SKIP_DIRS = new Set([
   '.nitro',
   '.tanstack',
 ])
-const MANIFEST_SKIP_FILES = new Set(['.sync-manifest.json', '.eslintcache', 'log.txt'])
+// Generated files that are still mirrored (a fresh consumer needs them to type-check before it has
+// ever run a build) but must not be checksummed or drift-checked: the tool that writes them rewrites
+// them on every dev run and build, in an order that is not stable across machines, so a consumer who
+// merely opened the app would fail the integrity check on a file nobody edited.
+// `routeTree.gen.ts` — TanStack Router. Kept in step with infra-kit's `MANIFEST_SKIP_FILES`, which
+// is what `pnpm vendor:check` actually reads.
+const GENERATED_FILES = ['routeTree.gen.ts']
+
+const MANIFEST_SKIP_FILES = new Set(['.sync-manifest.json', '.eslintcache', 'log.txt', ...GENERATED_FILES])
 const MANIFEST_SKIP_SUFFIXES = ['.tsbuildinfo']
 
 // Configuration for files and folders to copy. `vendored: true` marks workspace packages that
@@ -243,7 +251,8 @@ const parseArgs = (argv) => {
   return flags
 }
 
-const excludeFlags = () => EXCLUDED_PATTERNS.map((p) => `--exclude='${p}'`).join(' ')
+const excludeFlags = (extraPatterns = []) =>
+  [...EXCLUDED_PATTERNS, ...extraPatterns].map((p) => `--exclude='${p}'`).join(' ')
 
 const copyDirectory = async (source, target, displayTarget) => {
   if (!existsSync(source)) {
@@ -296,11 +305,15 @@ const copyFile = async (source, target, displayTarget) => {
 
 // Dry-run rsync that reports whether the target has drifted from the source. Returns the list of
 // itemized changes (empty = in sync). `--delete` surfaces files that exist only in the consumer.
+// `GENERATED_FILES` are excluded from the comparison only — the sync still copies them; they are
+// regenerated per machine, so reporting them here would be reporting noise.
 const diffDirectory = async (source, target) => {
   if (!existsSync(source)) return []
   if (!existsSync(target)) return [`missing target: ${target}`]
 
-  const { stdout } = await execFn(`rsync -ai --dry-run --delete ${excludeFlags()} "${source}/" "${target}/"`)
+  const { stdout } = await execFn(
+    `rsync -ai --dry-run --delete ${excludeFlags(GENERATED_FILES)} "${source}/" "${target}/"`,
+  )
 
   return stdout
     .split('\n')

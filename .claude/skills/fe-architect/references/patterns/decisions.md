@@ -1,6 +1,12 @@
 # Architectural Decision Trees
 
-8 decision trees for recurring architectural choices. Each tree provides a flowchart, rationale, and concrete thresholds.
+7 decision trees for recurring choices inside a feature. Each provides a flowchart, rationale, and
+concrete thresholds.
+
+Deciding whether a component belongs to a feature or to a shared location is a *boundary* question,
+so it lives with the cross-feature material in the `fe-patterns` skill
+([cross-feature.md](../../../fe-patterns/references/cross-feature.md) → "Shared vs Feature
+Component").
 
 ---
 
@@ -45,12 +51,14 @@ Default to **dumb**. Extract to container only when the component demonstrably n
 
 ```
 Count API endpoints in this feature:
-├─ > 3 endpoints → services/ folder
-└─ <= 3 endpoints
+├─ >= 3 endpoints → services/ folder
+└─ < 3 endpoints
    └─ Estimate total lines (atoms + API calls + helpers):
       ├─ > 250 lines → services/ folder
       └─ <= 250 lines → services.ts (single file)
 ```
+
+A feature must never ship both variants.
 
 ### services/ Folder Structure
 
@@ -65,7 +73,7 @@ services/
 
 Convert `services.ts` → `services/` when ANY is true:
 - [ ] File exceeds 250 lines
-- [ ] More than 3 API endpoints
+- [ ] Reaches 3 or more API endpoints
 - [ ] Business logic functions exceed 50 lines combined
 - [ ] Multiple developers need to edit services simultaneously (merge conflict frequency)
 
@@ -152,37 +160,7 @@ const Divider = (props: { spacing?: 'sm' | 'md' }) => { ... }
 
 ---
 
-## 5. Shared Component vs Feature Component
-
-**Question:** Should this component live in a shared location or inside a feature?
-
-```
-Is the component used by 3+ features?
-├─ YES → Does it contain ZERO business logic?
-│  ├─ YES → Shared component (e.g., packages/ui or shared/components)
-│  └─ NO → Split: dumb part → shared, logic → each feature's container
-└─ NO → Is it used by exactly 2 features?
-   ├─ YES → Keep in one feature, pass to the other via injection pattern
-   │        Promote to shared only if a 3rd consumer appears
-   └─ NO → Feature component (stays in the feature)
-```
-
-### Promotion Checklist
-
-Before promoting a component to shared:
-- [ ] Zero imports from any feature (no atoms, services, feature types)
-- [ ] Accepts `className` prop with `cn()` (Rule 6 compliant)
-- [ ] Has comprehensive tests and stories
-- [ ] Props interface is generic enough (no feature-specific types)
-- [ ] At least 3 consumers exist or are planned
-
-### Why Wait for 3 Consumers
-
-Premature abstraction creates components that satisfy no consumer perfectly. With 3 consumers, the common patterns become clear, and the abstraction has a solid foundation. Two consumers might have coincidentally similar needs.
-
----
-
-## 6. Component Splitting
+## 5. Component Splitting
 
 **Question:** Should this component be split into smaller components?
 
@@ -222,14 +200,14 @@ Parent: UserProfileComponent
 
 ---
 
-## 7. Error Handling Strategy
+## 6. Error Handling Strategy
 
 **Question:** What error handling approach should this code use?
 
 ```
 What type of error?
 ├─ Network error (fetch failure, timeout, 5xx)
-│  └─ Catch in service api.ts → set $error atom → container shows ErrorMessage
+│  └─ Catch in service api.ts → set $error atom → container shows the error state
 ├─ Validation error (user input, 4xx with field errors)
 │  └─ Parse response → set field-level error atoms → dumb component shows inline errors
 ├─ ServerError (status 570)
@@ -238,7 +216,7 @@ What type of error?
 ├─ Unexpected error (programming bug, unhandled case)
 │  └─ Let it propagate → React error boundary catches → Sentry reports
 └─ Optimistic update failure
-   └─ Rollback atom to previous value → show toast notification
+   └─ Rollback atom to previous value → notify non-intrusively
 ```
 
 ### Error Handling Layers
@@ -253,35 +231,30 @@ What type of error?
 
 ### ServerError Pattern
 
+`api.ts` needs no error code of its own: `httpClient.fetch` already throws `ServerError` on status
+570. (`httpClient` is the app-level singleton built from `HttpClient`, and `fetch` is its only
+method — see [api-layer.md](../implementation/api-layer.md).) The decision lives entirely in the
+`Fx` atom's `catch`:
+
 ```typescript
-import { ServerError } from '#root/lib/http-client'
+import { ServerError } from '@wl/web-toolkit'
 
-// In api.ts — httpClient already throws ServerError for status 570
-export const updateUser = async (args: UpdateUserArgs) => {
-  return httpClient.put(`/api/users/${args.userId}`, { body: args.data })
-}
-
-// In main.ts — catch and handle
-export const updateUserFx = atom(null, async (get, set, args: UpdateUserFxArgs) => {
-  try {
-    const result = await updateUser(args)
-    set($userData, result)
-  } catch (error) {
-    if (error instanceof ServerError) {
-      // ServerError has a user-facing message from the backend
-      set($error, error.message)
-    } else {
-      // Unexpected error — set generic message, let Sentry capture
-      set($error, 'An unexpected error occurred')
-      throw error  // Re-throw for error boundary / Sentry
-    }
+// main.ts — inside updateUserFx
+try {
+  set($userData, await updateUser(args))
+} catch (error) {
+  if (error instanceof ServerError) {
+    set($error, error.message)      // backend supplied a user-facing message
+  } else {
+    set($error, 'An unexpected error occurred')
+    throw error                     // re-throw → error boundary → Sentry
   }
-})
+}
 ```
 
 ---
 
-## 8. Optimistic Updates
+## 7. Optimistic Updates
 
 **Question:** Should this action use optimistic updates?
 
@@ -293,7 +266,7 @@ Is the action user-initiated (click, submit, toggle)?
    └─ YES → Is the UI change immediately visible and meaningful?
       ├─ NO → Standard async flow (no UX benefit)
       └─ YES → Optimistic update
-         └─ Apply immediately, rollback on failure, show toast on error
+         └─ Apply immediately, rollback on failure, notify on error
 ```
 
 ### When to Use Optimistic Updates
@@ -311,28 +284,18 @@ Is the action user-initiated (click, submit, toggle)?
 ### Optimistic Update Pattern
 
 ```typescript
-// In main.ts
-export const toggleFavoriteFx = atom(null, async (get, set, args: ToggleFavoriteFxArgs) => {
-  const { itemId } = args
-  const previousItems = get($items)
+// main.ts — inside toggleFavoriteFx
+const previousItems = get($items)                    // 1. capture, before touching anything
 
-  // 1. Apply optimistically
-  set($items, (items) =>
-    items.map((item) =>
-      item.id === itemId ? { ...item, isFavorite: !item.isFavorite } : item
-    )
-  )
+set($items, (items) => items.map((item) =>           // 2. apply immediately
+  item.id === itemId ? { ...item, isFavorite: !item.isFavorite } : item))
 
-  try {
-    // 2. Send to server
-    await toggleFavoriteApi({ itemId })
-  } catch (error) {
-    // 3. Rollback on failure
-    set($items, previousItems)
-    // 4. Notify user
-    set($toastMessage, 'Failed to update. Please try again.')
-  }
-})
+try {
+  await toggleFavoriteApi({ itemId })                // 3. only then tell the server
+} catch {
+  set($items, previousItems)                         // 4. rollback
+  set($toastMessage, 'Failed to update. Please try again.')
+}
 ```
 
 ### Rollback Strategy
@@ -340,5 +303,5 @@ export const toggleFavoriteFx = atom(null, async (get, set, args: ToggleFavorite
 1. **Capture previous state** before applying the optimistic change
 2. **Apply the change** immediately to the atom
 3. **Send the request** to the server
-4. **On failure:** Restore the captured state and show a non-intrusive notification (toast)
+4. **On failure:** Restore the captured state and notify non-intrusively
 5. **On success:** No action needed (state already reflects the correct value)

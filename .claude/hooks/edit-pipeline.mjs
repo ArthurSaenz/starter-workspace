@@ -205,8 +205,7 @@ try {
       if (!run.timedOut && !run.missing && !run.spawnFailed && run.status !== 2) {
         lintReport = parseEslintJson(run.stdout);
         // Fixable AND absent from stage 2 => eslint fixed it, prettier put it back.
-        // Measured: 0 conflicts across every real candidate today. Insurance against config drift,
-        // not a live detector — the failure it catches is silent and repeats on every edit.
+        // Why this stays despite never having fired — see README Design notes.
         conflictRules = [
           ...new Set(
             lintReport.messages

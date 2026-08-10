@@ -98,6 +98,36 @@ const BLOCKED = [
   ['nohup gh', 'nohup gh run rerun 1'],
   ['xargs gh via pipe', 'echo x | xargs gh run rerun'],
   ['sudo + env + path', 'sudo env GH_TOKEN=x /opt/homebrew/bin/gh run rerun 1'],
+
+  // --- one row per SHELL_WRAPPERS member beyond bash/sh/zsh ---
+  // Each member is load-bearing alone: deleting `dash` from the set left the whole suite green.
+  ['dash -c', 'dash -c "gh run rerun 1"'],
+  ['ksh -c', 'ksh -c "gh run rerun 1"'],
+  ['fish -c', 'fish -c "gh run rerun 1"'],
+  ['csh -c', 'csh -c "gh run rerun 1"'],
+  ['tcsh -c', 'tcsh -c "gh run rerun 1"'],
+
+  // --- prefixes with NO wrapper present ---
+  // The `+ wrapper` rows above cannot test the prefix: with the prefix deleted, the wrapper scan
+  // still denies, so the row passes either way. `stdbuf` was covered only in that useless shape.
+  ['doas, no wrapper', 'doas gh run rerun 1'],
+  ['builtin, no wrapper', 'builtin gh run rerun 1'],
+  ['stdbuf with a value flag, no wrapper', 'stdbuf -oL gh run rerun 1'],
+
+  // --- every dispatch-switch head that routes to checkInfraKit ---
+  // `pnpm exec infra-kit …` is headed by `pnpm`, so the `infra-kit` case — and GUARDED_TOOLS'
+  // `infra-kit` entry — were never reached. A bare `deliver` needs the tool beside it, which is
+  // exactly what these heads supply.
+  ['bare infra-kit as argv[0]', 'infra-kit release deliver'],
+
+  // GUARDED_TOOLS is read ONLY by the re-anchor, which runs when a value-taking prefix consumed
+  // tokens and may have eaten the tool itself. `script --command "ik …"` above covers `ik`;
+  // `infra-kit` reached that path untested, since every other row puts it at argv[0] or after `pnpm`.
+  ['flock -c payload naming infra-kit', 'flock -c "infra-kit release deliver" /tmp/l'],
+  ['npm head', 'npm release deliver'],
+  ['npx head', 'npx release deliver'],
+  ['pnpx head', 'pnpx release deliver'],
+  ['yarn head', 'yarn release deliver'],
 ];
 
 // The raw scan reads the WHOLE command, so a wrapper anywhere re-arms the phrase everywhere. These
@@ -321,6 +351,9 @@ test('block-deploy fails closed when prefix stripping consumes the whole command
     // with no operand run nothing, and the quote-blind splitter manufactures exactly that shape
     // from `rg "fatal|timeout" x` — see SPLIT_ARTEFACTS_AND_WRAPPERS.
     'echo x | xargs', 'env | grep DOPPLER', 'env | sort', 'env', 'time', 'sudo',
+    // The rest of BARE_PREFIX_FAILS_CLOSED. Each was removable from the set with a green suite:
+    // `env`/`time`/`sudo`/`xargs` above were the only members this test ever pinned.
+    'doas', 'command', 'builtin', 'exec', 'eval', 'nohup', 'nice', 'stdbuf',
   ]) {
     assert.ok(decision(command).denied, `stripped-to-empty must deny, never silently pass: ${command}`);
   }

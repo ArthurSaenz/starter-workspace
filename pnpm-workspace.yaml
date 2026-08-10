@@ -32,7 +32,7 @@ catalog:
   '@tanstack/router-plugin': ^1.167.12
   '@tanstack/router-vite-plugin': 1.166.27
   '@types/aws-lambda': ^8.10.162
-  '@types/node': ^26.1.2
+  '@types/node': ^26.2.0
   '@types/react': 19.2.18
   '@types/react-dom': 19.2.4
   '@vitejs/plugin-react': 6.0.5
@@ -41,7 +41,7 @@ catalog:
   date-fns: ^4.1.0
 
   jotai: 2.20.2
-  lucide-react: ^1.28.0
+  lucide-react: ^1.30.0
   playwright: ^1.62.1
   react: 19.2.8
   react-dom: 19.2.8
@@ -55,7 +55,7 @@ catalog:
   typescript: ^6.0.3
   typescript-plugin-css-modules: ^5.2.0
 
-  vite: 8.2.0
+  vite: 8.2.1
   vite-plugin-dts: ^5.0.3
   vite-tsconfig-paths: ^6.1.1
   zod: 3.25.76
@@ -89,7 +89,6 @@ allowBuilds:
   '@parcel/watcher': true
   esbuild: true
   msw: true
-  unrs-resolver: set this to true or false
 
 minimumReleaseAgeExclude:
   - '@slip-stream-kit/*'
