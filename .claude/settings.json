@@ -51,7 +51,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/quality-gate.mjs",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/quality-gates.mjs",
             "timeout": 600
           }
         ]

@@ -76,9 +76,9 @@ The only thing that makes "cannot" literally true. Needs repo-admin on travelist
 
 ## Follow-up 2: `hooklib.mjs` is a shared failure domain (not done)
 
-Four hooks import it statically, three of which block (`protect-files.mjs`, `quality-gate.mjs`,
+Four hooks import it statically, three of which block (`protect-files.mjs`, `quality-gates.mjs`,
 `edit-pipeline.mjs`). By the mechanism in limit 5, a parse error in those 84 lines takes all four
-down at once, silently, across two hook events. Sharpest instance: `quality-gate.mjs` says "failing
+down at once, silently, across two hook events. Sharpest instance: `quality-gates.mjs` says "failing
 closed", yet its ability to fail closed is itself hostage to that import. Same bug class the
 launcher closes for the deploy lane, one layer up.
 

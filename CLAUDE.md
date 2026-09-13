@@ -50,7 +50,7 @@ do not change how a person deploys.
 ## .claude test suite
 
 Everything under `.claude/**/__tests__/` — hooks and skill scripts alike — is covered by
-`pnpm run test:claude`, deliberately **not** part of `pnpm run qa`: the quality-gate hook runs `qa`
+`pnpm run test:claude`, deliberately **not** part of `pnpm run qa`: the quality-gates hook runs `qa`
 on every task completion, so folding its own suite in made each completion pay ~65s to re-verify the
 hooks. CI runs it as a separate step. If you change a hook or a skill script, run
 `pnpm run test:claude` yourself — nothing else will.
