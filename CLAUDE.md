@@ -24,10 +24,10 @@ describes the hook; if it and the hook ever diverge, the hook wins and this text
 **Allowed:**
 
 - read workflow state freely — `gh run list` / `view` / `watch`, `gh workflow view`, `gh api` GETs
-- **deploy to non-prod** — expected, not merely tolerated. MCP `mcp__plugin_infra-kit_infra-kit__gh-release-deploy-all`
-  / `mcp__plugin_infra-kit_infra-kit__gh-release-deploy-selected`, or CLI `ik release deploy-all` /
-  `ik release deploy-selected`. Both enforce the same rules: `prod` is refused, every other
-  environment is fair game.
+- **deploy to non-prod** — expected, not merely tolerated. `ik release deploy-all --json --agent` /
+  `ik release deploy-selected --json --agent`: both preview the plan and exit; re-run the same argv
+  with `--yes` to execute. Both enforce the same rules: `prod` is refused, every other environment
+  is fair game.
 
 **Refused by the hook:**
 
