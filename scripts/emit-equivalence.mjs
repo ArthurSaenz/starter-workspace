@@ -41,7 +41,12 @@ const countKinds = (files) => {
   return counts
 }
 
-const buildTsconfig = (repoRoot, pkg, outDir, nodeNext) => {
+const NODENEXT = { module: 'NodeNext', moduleResolution: 'NodeNext' }
+// What every consumer had before plan step 2.4; `--baseline=bundler` pins side A to it so the gate
+// still measures something in a repo whose committed config is already NodeNext.
+const BUNDLER = { module: 'ES2022', moduleResolution: 'Bundler' }
+
+const buildTsconfig = (repoRoot, pkg, outDir, resolution) => {
   const base = buildBaseTsconfig(repoRoot, pkg)
 
   return {
@@ -50,7 +55,7 @@ const buildTsconfig = (repoRoot, pkg, outDir, nodeNext) => {
       ...base.compilerOptions,
       // Emit is the measurement, so everything that changes emit is pinned identically on both
       // sides; only `module`/`moduleResolution` are allowed to differ.
-      ...(nodeNext ? { module: 'NodeNext', moduleResolution: 'NodeNext' } : {}),
+      ...resolution,
       composite: false,
       incremental: false,
       noEmit: false,
@@ -62,12 +67,12 @@ const buildTsconfig = (repoRoot, pkg, outDir, nodeNext) => {
   }
 }
 
-const compile = (repoRoot, workDir, pkg, side, nodeNext) => {
+const compile = (repoRoot, workDir, pkg, side, resolution) => {
   const outDir = join(workDir, side)
   const configPath = join(workDir, `${side}.tsconfig.json`)
 
   mkdirSync(outDir, { recursive: true })
-  writeFileSync(configPath, `${JSON.stringify(buildTsconfig(repoRoot, pkg, outDir, nodeNext), null, 2)}\n`)
+  writeFileSync(configPath, `${JSON.stringify(buildTsconfig(repoRoot, pkg, outDir, resolution), null, 2)}\n`)
 
   const errors = parseErrors(repoRoot, runTsc(repoRoot, configPath))
 
@@ -86,7 +91,7 @@ const unifiedDiff = (a, b) => {
   }
 }
 
-const comparePackage = (repoRoot, tempRoot, pkg) => {
+const comparePackage = (repoRoot, tempRoot, pkg, baseline) => {
   // A `noEmit` package (hulyo `packages/mongo-cli`: no `build` script, run as `node src/check.ts`)
   // has no emit to compare, and forcing emit on it is not even a valid config — its
   // `allowImportingTsExtensions` is legal only while it never emits. Excluded from the tally rather
@@ -101,11 +106,11 @@ const comparePackage = (repoRoot, tempRoot, pkg) => {
   const workDir = join(tempRoot, pkg.dir.replace(/\//g, '__'))
   mkdirSync(workDir, { recursive: true })
 
-  const before = compile(repoRoot, workDir, pkg, 'a', false)
+  const before = compile(repoRoot, workDir, pkg, 'a', baseline)
 
   if (before.errors.length > 0) return { dir: pkg.dir, status: 'BASELINE-FAILED', before, after: null, differing: [] }
 
-  const after = compile(repoRoot, workDir, pkg, 'b', true)
+  const after = compile(repoRoot, workDir, pkg, 'b', NODENEXT)
 
   if (after.errors.length > 0) return { dir: pkg.dir, status: 'NODENEXT-FAILED', before, after, differing: [] }
 
@@ -176,13 +181,15 @@ const printDifference = (result) => {
 }
 
 const parseArgs = (argv) => {
-  const flags = { mode: 'config', repo: null, packages: [] }
+  const flags = { mode: 'config', repo: null, packages: [], baseline: 'committed' }
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
 
     if (arg === '--mode') flags.mode = argv[++i]
     else if (arg.startsWith('--mode=')) flags.mode = arg.slice('--mode='.length)
+    else if (arg === '--baseline') flags.baseline = argv[++i]
+    else if (arg.startsWith('--baseline=')) flags.baseline = arg.slice('--baseline='.length)
     else if (arg === '--repo') flags.repo = argv[++i]
     else if (arg.startsWith('--repo=')) flags.repo = arg.slice('--repo='.length)
     else if (arg === '--package') flags.packages.push(argv[++i])
@@ -191,24 +198,29 @@ const parseArgs = (argv) => {
   }
 
   if (!['config', 'codemod'].includes(flags.mode)) throw new Error(`Unknown --mode: ${flags.mode}`)
+  if (!['committed', 'bundler'].includes(flags.baseline)) throw new Error(`Unknown --baseline: ${flags.baseline}`)
   if (!flags.repo) throw new Error('Missing --repo <name> (resolved under the vendor.json workspaceDir).')
 
   return flags
 }
 
-// The baseline side inherits `module`/`moduleResolution` from whatever the repo has committed. Once a
-// repo is synced past plan step 2.4 that is already NodeNext, and the comparison compares NodeNext
-// with itself — a pass that proves nothing. Say so rather than reporting a vacuous IDENTICAL.
-const reportBaseline = (repoRoot, pkg) => {
+// By default the baseline side inherits `module`/`moduleResolution` from whatever the repo has
+// committed. Once a repo is synced past plan step 2.4 that is already NodeNext, and the comparison
+// compares NodeNext with itself — a pass that proves nothing. Say so, and point at `--baseline=bundler`,
+// rather than reporting a vacuous IDENTICAL.
+const reportBaseline = (repoRoot, pkg, baseline) => {
   const vendorConfig = buildBaseTsconfig(repoRoot, pkg).extends
-  const { module, moduleResolution } = readTsconfig(vendorConfig).compilerOptions ?? {}
+  const committed = readTsconfig(vendorConfig).compilerOptions ?? {}
+  const { module, moduleResolution } = baseline === BUNDLER ? BUNDLER : committed
 
-  console.log(`baseline: ${relative(repoRoot, vendorConfig)} — module=${module}, moduleResolution=${moduleResolution}`)
+  console.log(
+    `baseline: ${baseline === BUNDLER ? 'forced' : relative(repoRoot, vendorConfig)} — module=${module}, moduleResolution=${moduleResolution}`,
+  )
 
   if (String(moduleResolution).toLowerCase() === 'nodenext') {
     process.stderr.write(
       'WARNING: the committed vendor config already resolves as NodeNext, so both sides of this ' +
-        'comparison are NodeNext and an IDENTICAL verdict is vacuous.\n',
+        'comparison are NodeNext and an IDENTICAL verdict is vacuous. Pass --baseline=bundler.\n',
     )
   }
 }
@@ -227,8 +239,9 @@ const main = () => {
   noteForkedTsconfigs(repoRoot, setG, 'building')
 
   const packages = selectPackages(setG, flags.packages)
+  const baseline = flags.baseline === 'bundler' ? BUNDLER : {}
 
-  reportBaseline(repoRoot, packages[0])
+  reportBaseline(repoRoot, packages[0], baseline)
   console.log('')
 
   const tempRoot = mkdtempSync(join(tmpdir(), 'emit-equivalence-'))
@@ -236,7 +249,7 @@ const main = () => {
 
   for (const [index, pkg] of packages.entries()) {
     process.stderr.write(`[${index + 1}/${packages.length}] ${pkg.dir}\n`)
-    results.push(comparePackage(repoRoot, tempRoot, pkg))
+    results.push(comparePackage(repoRoot, tempRoot, pkg, baseline))
   }
 
   printTable(results)

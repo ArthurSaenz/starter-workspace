@@ -223,6 +223,14 @@ export const buildBaseTsconfig = (repoRoot, pkg) => {
 
   if (Array.isArray(inherited.rootDirs)) inherited.rootDirs = absolutizeGlobs(inherited.rootDirs, pkg.packageDir)
 
+  // `paths` targets resolve against `baseUrl`, or the tsconfig's directory when it is unset — the
+  // temp dir here. Left relative, every alias would point at nothing and surface as phantom TS2307s.
+  if (inherited.paths && typeof inherited.paths === 'object') {
+    inherited.paths = Object.fromEntries(
+      Object.entries(inherited.paths).map(([alias, targets]) => [alias, absolutizeGlobs(targets, pkg.packageDir)]),
+    )
+  }
+
   return {
     extends: vendorConfig,
     compilerOptions: {
