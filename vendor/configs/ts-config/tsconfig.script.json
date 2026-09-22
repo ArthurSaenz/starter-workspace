@@ -10,7 +10,6 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true,
-    "isolatedModules": false,
     "esModuleInterop": true,
     "strict": true,
     "noImplicitAny": true,
