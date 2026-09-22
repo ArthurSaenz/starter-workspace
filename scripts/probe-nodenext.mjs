@@ -5,9 +5,12 @@ import { join } from 'node:path'
 import {
   buildBaseTsconfig,
   deriveSetG,
+  mapWithProgress,
   noteForkedTsconfigs,
   parseErrors,
+  printTable as renderTable,
   resolveRepoRoot,
+  runMain,
   runTsc,
   selectPackages,
 } from './lib/set-g.mjs'
@@ -54,13 +57,8 @@ const printTable = (results) => {
 
   const header = ['package', 'total', ...codes]
   const rows = results.map((r) => [r.dir, String(r.total), ...codes.map((code) => String(r.byCode[code] ?? 0))])
-  const widths = header.map((cell, i) => Math.max(cell.length, ...rows.map((row) => row[i].length)))
-  const line = (cells) =>
-    cells.map((cell, i) => (i === 0 ? cell.padEnd(widths[i]) : cell.padStart(widths[i]))).join('  ')
 
-  console.log(line(header))
-  console.log(widths.map((width) => '-'.repeat(width)).join('  '))
-  for (const row of rows) console.log(line(row))
+  renderTable(header, rows)
 
   for (const result of results.filter((r) => r.total > 0)) {
     console.log(`\n${result.dir} — ${result.total} error(s):`)
@@ -128,12 +126,7 @@ const main = () => {
   process.stderr.write("reminder: dependencies' dist/ must be current — `pnpm exec turbo run build --force`\n")
 
   const tempRoot = mkdtempSync(join(tmpdir(), 'probe-nodenext-'))
-  const results = []
-
-  for (const [index, pkg] of packages.entries()) {
-    process.stderr.write(`[${index + 1}/${packages.length}] ${pkg.dir}\n`)
-    results.push(probePackage(repoRoot, tempRoot, pkg))
-  }
+  const results = mapWithProgress(packages, (pkg) => probePackage(repoRoot, tempRoot, pkg))
 
   if (flags.json) console.log(JSON.stringify({ packages: results }, null, 2))
   else printTable(results)
@@ -141,9 +134,4 @@ const main = () => {
   return results.some((result) => result.total > 0) ? 1 : 0
 }
 
-try {
-  process.exitCode = main()
-} catch (error) {
-  console.error(`💥 ${error.message}`)
-  process.exitCode = 1
-}
+runMain(main)

@@ -125,7 +125,7 @@ const nearestPackageDir = (repoRoot, filePath) => {
   return null
 }
 
-export const extendsTarget = (tsconfig) => {
+const extendsTarget = (tsconfig) => {
   const raw = tsconfig.extends
   const candidates = Array.isArray(raw) ? raw : [raw]
 
@@ -195,8 +195,7 @@ export const selectPackages = (setG, requested) => {
   return setG.filter((pkg) => requested.includes(pkg.dir))
 }
 
-export const absolutizeGlobs = (globs, packageDir) =>
-  globs.map((glob) => (isAbsolute(glob) ? glob : join(packageDir, glob)))
+const absolutizeGlobs = (globs, packageDir) => globs.map((glob) => (isAbsolute(glob) ? glob : join(packageDir, glob)))
 
 // The part of a generated tsconfig that is the same whatever the caller is measuring: the package's
 // own options with every path made absolute, minus the emit destination, which each caller chooses.
@@ -288,4 +287,29 @@ export const parseErrors = (repoRoot, stdout) => {
   }
 
   return errors
+}
+
+export const mapWithProgress = (packages, fn) =>
+  packages.map((pkg, index) => {
+    process.stderr.write(`[${index + 1}/${packages.length}] ${pkg.dir}\n`)
+    return fn(pkg)
+  })
+
+export const printTable = (header, rows) => {
+  const widths = header.map((text, i) => Math.max(text.length, ...rows.map((row) => row[i].length)))
+  const line = (cells) =>
+    cells.map((text, i) => (i === 0 ? text.padEnd(widths[i]) : text.padStart(widths[i]))).join('  ')
+
+  console.log(line(header))
+  console.log(widths.map((width) => '-'.repeat(width)).join('  '))
+  for (const row of rows) console.log(line(row))
+}
+
+export const runMain = (main) => {
+  try {
+    process.exitCode = main()
+  } catch (error) {
+    console.error(`💥 ${error.message}`)
+    process.exitCode = 1
+  }
 }

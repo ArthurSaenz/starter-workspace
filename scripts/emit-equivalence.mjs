@@ -6,10 +6,13 @@ import { join, relative } from 'node:path'
 import {
   buildBaseTsconfig,
   deriveSetG,
+  mapWithProgress,
   noteForkedTsconfigs,
   parseErrors,
   readTsconfig,
+  printTable as renderTable,
   resolveRepoRoot,
+  runMain,
   runTsc,
   selectPackages,
 } from './lib/set-g.mjs'
@@ -147,13 +150,8 @@ const cell = (result, kind) => {
 const printTable = (results) => {
   const header = ['package', ...EMIT_KINDS, 'verdict']
   const rows = results.map((r) => [r.dir, ...EMIT_KINDS.map((kind) => cell(r, kind)), r.status])
-  const widths = header.map((text, i) => Math.max(text.length, ...rows.map((row) => row[i].length)))
-  const line = (cells) =>
-    cells.map((text, i) => (i === 0 ? text.padEnd(widths[i]) : text.padStart(widths[i]))).join('  ')
 
-  console.log(line(header))
-  console.log(widths.map((width) => '-'.repeat(width)).join('  '))
-  for (const row of rows) console.log(line(row))
+  renderTable(header, rows)
 }
 
 const printFailure = (result) => {
@@ -245,12 +243,7 @@ const main = () => {
   console.log('')
 
   const tempRoot = mkdtempSync(join(tmpdir(), 'emit-equivalence-'))
-  const results = []
-
-  for (const [index, pkg] of packages.entries()) {
-    process.stderr.write(`[${index + 1}/${packages.length}] ${pkg.dir}\n`)
-    results.push(comparePackage(repoRoot, tempRoot, pkg, baseline))
-  }
+  const results = mapWithProgress(packages, (pkg) => comparePackage(repoRoot, tempRoot, pkg, baseline))
 
   printTable(results)
 
@@ -268,9 +261,4 @@ const main = () => {
   return identical === comparable.length ? 0 : 1
 }
 
-try {
-  process.exitCode = main()
-} catch (error) {
-  console.error(`💥 ${error.message}`)
-  process.exitCode = 1
-}
+runMain(main)
