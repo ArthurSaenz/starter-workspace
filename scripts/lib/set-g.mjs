@@ -6,10 +6,9 @@ import { dirname, isAbsolute, join, relative } from 'node:path'
 // where the consumer repos are checked out.
 const VENDOR_CONFIG_PATH = join(process.env.HOME, '.infra-kit', 'vendor.json')
 
-// The `extends` values that define Set G. A tsconfig naming either one is in the migration set;
-// `tsconfig.script.json` is included before it exists so that introducing it cannot silently shrink
-// Set G. See .omc/plans/backend-import-extensions.md §1.
-const SET_G_EXTENDS = ['@wl/ts-config/tsconfig.service.json', '@wl/ts-config/tsconfig.script.json']
+// The `extends` value that defines Set G: every backend, CLI included, builds with `tsc -b` off the
+// one service config. See .omc/plans/backend-import-extensions.md §1.
+const SET_G_EXTENDS = ['@wl/ts-config/tsconfig.service.json']
 
 const WALK_SKIP_DIRS = new Set(['node_modules', 'dist', 'out', '.git', '.turbo'])
 
