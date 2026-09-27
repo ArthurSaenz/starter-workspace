@@ -1,9 +1,40 @@
 {
-  "environments": ["dev", "arthur"],
   "envManagement": {
     "provider": "doppler",
     "config": {
       "name": "infra-kit"
     }
+  },
+  "vendorSource": {
+    "copy": [
+      { "path": ".claude" },
+      { "path": ".cursor/mcp.json" },
+      { "path": ".mcp.json" },
+      { "path": ".cursor/rules" },
+      { "path": "vendor/packages/web-toolkit" },
+      { "path": ".vscode/extensions.json" },
+      { "path": ".vscode/global.code-snippets" },
+      { "path": ".vscode/settings.json" },
+      { "path": ".prettierrc.mjs" },
+      { "path": ".prettierignore" },
+      { "path": ".node-version" },
+      { "path": ".gitignore" },
+      { "path": ".editorconfig" },
+      { "path": "vitest.config.ts" },
+      { "path": "skills-lock.json" },
+      { "path": ".agents" },
+      { "path": "turbo.json" },
+      { "path": "vendor/configs" },
+      { "path": "vendor/packages/docs-ui" },
+      { "path": "devops/scripts/lib" },
+      { "path": ".github/workflows/_cache-nodemodules-jobs.yml" },
+      { "path": ".github/workflows/_code-quality-jobs.yml" },
+      { "path": ".github/workflows/_deploy-media-jobs.yml" },
+      { "path": ".github/workflows/_notify-success-jobs.yml" },
+      { "path": ".github/workflows/_playwright-jobs.yml" },
+      { "path": ".github/workflows/_terraform-apply-infrastructure-jobs.yml" },
+      { "path": ".github/workflows/code-quality.yml" }
+    ],
+    "exclude": ["serverless-config"]
   }
 }
