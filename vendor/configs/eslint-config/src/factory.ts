@@ -5,6 +5,7 @@ import { antfuBaseOptions, overrides, sonarjsRecommended } from './configs/base.
 import { boundaries } from './configs/boundaries.js'
 import { wlComponentsRecommended } from './configs/components.js'
 import { jsdoc, markdown } from './configs/docs.js'
+import { e2eBoundaries } from './configs/e2e-boundaries.js'
 import { frameworks } from './configs/frameworks/index.js'
 import { ignores } from './configs/ignores.js'
 import { tempDisabledRules } from './configs/temp-disabled.js'
@@ -35,7 +36,8 @@ export const createConfig = async (userOptions: ConfigOptions = {}): Promise<Typ
     { ...antfuBaseOptions, ...fw.antfuFlags },
     sonarjsRecommended,
     overrides,
-    ...(o.boundaries === false ? [] : [boundaries(o.boundaries)]),
+    // e2e after the app layer: for files of a Playwright package its elements replace features/services/shared.
+    ...(o.boundaries === false ? [] : [boundaries(o.boundaries), e2eBoundaries(o.boundaries)]),
     ...fw.extraConfigs,
     ...(o.components ? wlComponentsRecommended : []),
     ...(o.jsdoc ? [jsdoc] : []),

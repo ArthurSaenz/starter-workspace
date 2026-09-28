@@ -86,6 +86,7 @@ src/
   configs/
     base.ts         # antfu base options + sonarjs + the project rule overrides (incl. Phase-1)
     boundaries.ts   # Phase-2 relationship-aware boundaries (severity-parameterized)
+    e2e-boundaries.ts # import direction inside Playwright packages (same toggle)
     components.ts   # @wl component conventions
     docs.ts         # JSDoc + markdown layers
     ignores.ts      # built-in + user ignores
@@ -151,6 +152,33 @@ resolves relative TS imports via the bundled node resolver (extended with TS ext
 consumer that imports via a path alias (e.g. `#root` ⇒ `src`) must add a matching resolver
 (e.g. `eslint-import-resolver-typescript` in its `settings['import/resolver']`); otherwise
 aliased targets resolve as `unknown` and are silently not enforced.
+
+## E2E import direction (Playwright packages)
+
+A package whose `package.json` declares `@playwright/test` (the same signal `@wl/package-structure`
+uses) gets its own element set in place of `feature`/`service`/`shared`, so `pages`, `lib` and
+`config` there never collide with the app-code meaning of those folder names:
+
+```
+tests/<domain> | visual/<domain> | setup → fixtures → pages → components → mocks → lib → config
+```
+
+- A shared layer imports its own layer or any layer below it.
+- A domain folder under `src/tests` / `src/visual` is private: it imports every shared layer and
+  its own files, never a sibling domain. Anything two domains share moves down into a shared layer.
+- `boundaries/no-unknown-files` flags a file outside every layer and domain, including a loose
+  `src/*.ts` — env and constants live in `src/config/`.
+
+```ts
+// src/lib/wait.ts
+import { HomePage } from '#root/pages/home.page'            // ❌ lib → pages (upward)
+// src/tests/checkout/pay.spec.ts
+import { test } from './fixtures/checkout.fixture'           // ✅ own domain
+import { HomePage } from '#root/pages/home.page'             // ✅ domain → shared layer
+import { cart } from '../cart/fixtures/cart.fixture'         // ❌ sibling domain
+```
+
+It follows the `boundaries` toggle and severity. Source: `src/configs/e2e-boundaries.ts`.
 
 ## JSDoc layer (size-gated)
 

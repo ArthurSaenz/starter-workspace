@@ -27,13 +27,13 @@ const ourMarkdown = (flat: Flat) => {
 const wlRule = (flat: Flat) => flat.find((c) => c?.rules?.['@wl/props-destructuring-newline'])
 
 describe('options: group toggles drop exactly their contribution', () => {
-  it('boundaries:false removes the Phase-2 boundaries item only', async () => {
+  it('boundaries:false removes the app and e2e boundaries items only', async () => {
     const base = await config()
     const off = await config({ boundaries: false })
 
     expect(ourBoundaries(base)).toBeDefined()
     expect(ourBoundaries(off)).toBeUndefined()
-    expect(off.length).toBe(base.length - 1)
+    expect(off.length).toBe(base.length - 2)
   })
 
   it("boundaries:'error' flips only the severity, keeping the item count", async () => {
