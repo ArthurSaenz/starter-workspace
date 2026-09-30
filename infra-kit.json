@@ -33,6 +33,6 @@
       { "path": ".github/workflows/_playwright-jobs.yml" },
       { "path": ".github/workflows/_terraform-apply-infrastructure-jobs.yml" }
     ],
-    "exclude": ["serverless-config", "invoke-lambda.mjs"]
+    "exclude": ["serverless-config"]
   }
 }
