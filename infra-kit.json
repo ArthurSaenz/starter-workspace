@@ -28,13 +28,11 @@
       { "path": "vendor/packages/docs-ui" },
       { "path": "devops/scripts/lib" },
       { "path": ".github/workflows/_cache-nodemodules-jobs.yml" },
-      { "path": ".github/workflows/_code-quality-jobs.yml" },
       { "path": ".github/workflows/_deploy-media-jobs.yml" },
       { "path": ".github/workflows/_notify-success-jobs.yml" },
       { "path": ".github/workflows/_playwright-jobs.yml" },
-      { "path": ".github/workflows/_terraform-apply-infrastructure-jobs.yml" },
-      { "path": ".github/workflows/code-quality.yml" }
+      { "path": ".github/workflows/_terraform-apply-infrastructure-jobs.yml" }
     ],
-    "exclude": ["serverless-config"]
+    "exclude": ["serverless-config", "invoke-lambda.mjs"]
   }
 }
