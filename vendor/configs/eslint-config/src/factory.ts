@@ -8,6 +8,7 @@ import { jsdoc, markdown } from './configs/docs.js'
 import { e2eBoundaries } from './configs/e2e-boundaries.js'
 import { frameworks } from './configs/frameworks/index.js'
 import { ignores } from './configs/ignores.js'
+import { shadcnConfig } from './configs/shadcn.js'
 import { tempDisabledRules } from './configs/temp-disabled.js'
 import { isKnownMode, resolveOptions } from './options.js'
 import type { ConfigOptions } from './types.js'
@@ -42,6 +43,7 @@ export const createConfig = async (userOptions: ConfigOptions = {}): Promise<Typ
     ...(o.components ? wlComponentsRecommended : []),
     ...(o.jsdoc ? [jsdoc] : []),
     ...(o.markdown ? [markdown] : []),
+    ...(o.shadcn ? [shadcnConfig] : []),
     // Appended after all rule layers so its `'off'` wins, but before consumer rules so they can override.
     tempDisabledRules(o),
     ignores(o.ignores),

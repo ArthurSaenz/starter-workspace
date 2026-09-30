@@ -25,6 +25,7 @@ const ourMarkdown = (flat: Flat) => {
   )
 }
 const wlRule = (flat: Flat) => flat.find((c) => c?.rules?.['@wl/props-destructuring-newline'])
+const ourShadcn = (flat: Flat) => flat.find((c) => c?.name === 'wl/shadcn')
 
 describe('options: group toggles drop exactly their contribution', () => {
   it('boundaries:false removes the app and e2e boundaries items only', async () => {
@@ -70,5 +71,14 @@ describe('options: group toggles drop exactly their contribution', () => {
     expect(wlRule(base)).toBeDefined()
     expect(wlRule(off)).toBeUndefined()
     expect(off.length).toBeLessThan(base.length)
+  })
+
+  it('shadcn:false removes the @shadcn/lint item only', async () => {
+    const base = await config()
+    const off = await config({ shadcn: false })
+
+    expect(ourShadcn(base)).toBeDefined()
+    expect(ourShadcn(off)).toBeUndefined()
+    expect(off.length).toBe(base.length - 1)
   })
 })
