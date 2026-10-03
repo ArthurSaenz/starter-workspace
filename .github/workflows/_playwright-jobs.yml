@@ -15,6 +15,10 @@ on:
       environment:
         required: true
         type: string
+      grep:
+        required: false
+        type: string
+        default: ''
 
 jobs:
   test:
@@ -24,6 +28,9 @@ jobs:
       E2E_ENVIRONMENT: ${{ inputs.environment }}
       E2E__BASIC_AUTH_USERNAME: ${{ secrets.E2E__BASIC_AUTH_USERNAME }}
       E2E__BASIC_AUTH_PASSWORD: ${{ secrets.E2E__BASIC_AUTH_PASSWORD }}
+      E2E_BACKOFFICE_LOGIN_EMAIL: ${{ secrets.E2E_BACKOFFICE_LOGIN_EMAIL }}
+      E2E_BACKOFFICE_LOGIN_PASSWORD: ${{ secrets.E2E_BACKOFFICE_LOGIN_PASSWORD }}
+      E2E_GREP: ${{ inputs.grep }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
