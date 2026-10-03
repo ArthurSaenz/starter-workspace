@@ -53,6 +53,8 @@ vite.config.ts.timestamp-*.mjs
 **/blob-report/
 **/playwright/.cache/
 **/.playwright-mcp/
+# Saved storage state is a live session cookie.
+.auth/
 
 # Testing - Vitest / Coverage
 .coverage
