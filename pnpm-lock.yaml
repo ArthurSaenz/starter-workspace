@@ -241,8 +241,8 @@ importers:
   .:
     devDependencies:
       '@slip-stream-kit/config':
-        specifier: ^0.15.0
-        version: 0.15.0(vite@8.3.0(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(stylus@0.62.0(supports-color@7.2.0))(yaml@2.9.1))
+        specifier: ^0.17.0
+        version: 0.17.0(vite@8.3.0(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(stylus@0.62.0(supports-color@7.2.0))(yaml@2.9.1))
       '@types/react':
         specifier: 'catalog:'
         version: 19.3.0
@@ -271,8 +271,8 @@ importers:
         specifier: ^0.2.0
         version: 0.2.0(@typescript-eslint/parser@8.69.0(eslint@10.11.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@6.0.3))(eslint@10.11.0(jiti@2.7.0)(supports-color@7.2.0))
       '@slip-stream-kit/eslint-plugin':
-        specifier: ^0.15.0
-        version: 0.15.0(eslint@10.11.0(jiti@2.7.0)(supports-color@7.2.0))
+        specifier: ^0.17.0
+        version: 0.17.0(eslint@10.11.0(jiti@2.7.0)(supports-color@7.2.0))
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.4
@@ -2301,8 +2301,8 @@ packages:
     resolution: {integrity: sha512-TeheYy0ILzBEI/CO55CP6zJCSdSWeRtGnHy8U8dWSUH4I68iqTsy7HkMktR4xakThc9jotkPQUXT4ITdbV7cHA==}
     engines: {node: '>=18'}
 
-  '@slip-stream-kit/config@0.15.0':
-    resolution: {integrity: sha512-GsodlMQEQSSJVirNgHUN6fDGZrnsHNxa4WYuoYj5MoegTjTwk1VvUYDeizf0+SyDhPifMVPzxxF+VgLG8nSpWw==}
+  '@slip-stream-kit/config@0.17.0':
+    resolution: {integrity: sha512-XqyX99aw1S6Cs9hwQSf3hnnY9tNWbLXfz3yOS0ji0xezqEoqTdYFEmHZfI149HPKYIZztwoQWeIAJd+ai3I5Og==}
     engines: {node: '>=24.x'}
     peerDependencies:
       vite: '>=8'
@@ -2310,8 +2310,8 @@ packages:
       vite:
         optional: true
 
-  '@slip-stream-kit/eslint-plugin@0.15.0':
-    resolution: {integrity: sha512-bX8HRGWrl4T6RGMQBYP3xD8vCdiH/lHmpKvquqh0k0cD8wbQQMy2oy3ao4zzh+deRkV9ass3uuWc47v4E6etTg==}
+  '@slip-stream-kit/eslint-plugin@0.17.0':
+    resolution: {integrity: sha512-N1AhjX4mEJqfsT4iN9X8H5ZnDkMG1YrqQwy4fPGduL//oT/AqB7zTX0vQtWSbOIiEJ6YwE7JIIsyKwwRN03ECg==}
     engines: {node: '>=24.x'}
     peerDependencies:
       eslint: '>=9'
@@ -7807,13 +7807,13 @@ snapshots:
 
   '@sindresorhus/base62@1.0.0': {}
 
-  '@slip-stream-kit/config@0.15.0(vite@8.3.0(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(stylus@0.62.0(supports-color@7.2.0))(yaml@2.9.1))':
+  '@slip-stream-kit/config@0.17.0(vite@8.3.0(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(stylus@0.62.0(supports-color@7.2.0))(yaml@2.9.1))':
     dependencies:
       zod: 4.6.5
     optionalDependencies:
       vite: 8.3.0(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(stylus@0.62.0(supports-color@7.2.0))(yaml@2.9.1)
 
-  '@slip-stream-kit/eslint-plugin@0.15.0(eslint@10.11.0(jiti@2.7.0)(supports-color@7.2.0))':
+  '@slip-stream-kit/eslint-plugin@0.17.0(eslint@10.11.0(jiti@2.7.0)(supports-color@7.2.0))':
     dependencies:
       eslint: 10.11.0(jiti@2.7.0)(supports-color@7.2.0)
 
