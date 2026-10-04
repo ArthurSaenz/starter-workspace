@@ -39,11 +39,10 @@
     "infra-kit-check": "pnpm exec turbo run infra-kit-check --continue --output-logs=errors-only && pnpm run infra-kit-check-root"
   },
   "devDependencies": {
-    "@slip-stream-kit/config": "^0.14.0",
+    "@slip-stream-kit/config": "^0.15.0",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@wl/prettier-config": "workspace:*",
-    "shadcn": "^4.21.0",
     "turbo": "2.10.13",
     "typescript": "catalog:"
   },
