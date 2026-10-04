@@ -43,9 +43,9 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^9.5.1",
-    "@eslint-react/eslint-plugin": "^5.22.1",
+    "@eslint-react/eslint-plugin": "^5.23.3",
     "@shadcn/lint": "^0.2.0",
-    "@slip-stream-kit/eslint-plugin": "^0.14.0",
+    "@slip-stream-kit/eslint-plugin": "^0.17.0",
     "@types/node": "catalog:",
     "@wl/vitest-config": "workspace:*",
     "eslint": "^10.11.0",
