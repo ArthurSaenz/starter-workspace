@@ -7,6 +7,7 @@ node_modules
 build
 out
 **/storybook-static
+**/.mf
 
 # Turbo
 **/.turbo
@@ -62,6 +63,8 @@ coverage
 *.lcov
 .nyc_output
 **/.vitest/
+# Vitest browser-mode failure screenshots. Un-ignore a package's dir if it adopts `toMatchScreenshot` baselines.
+**/__screenshots__/
 
 # Logs
 *.log

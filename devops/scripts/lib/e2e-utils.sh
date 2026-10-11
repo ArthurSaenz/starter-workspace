@@ -66,11 +66,15 @@ run_e2e_tests() {
     export INFRA_KIT_E2E=cloud
     # No `--` separator: pnpm forwards args after the script name, and a literal `--` would reach
     # playwright and end its option parsing.
-    local grep_args=()
+    local extra_args=()
     if [ -n "$E2E_GREP" ]; then
-        grep_args=(--grep "$E2E_GREP")
+        extra_args=(--grep "$E2E_GREP")
     fi
-    pnpm --filter=e2e-${project} e2e-test "${grep_args[@]}"
+    # E2E_VISUAL=run adds the `visual` project to the run; =update records only its baselines, on this runner's OS.
+    if [ "$E2E_VISUAL" = "update" ]; then
+        extra_args+=(--project=visual --update-snapshots)
+    fi
+    pnpm --filter=e2e-${project} e2e-test "${extra_args[@]}"
 
     echo -e "${GREEN}E2E tests completed for ${project}!${NC}"
 }
