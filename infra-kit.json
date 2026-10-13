@@ -26,6 +26,8 @@
       { "path": "turbo.json" },
       { "path": "vendor/configs" },
       { "path": "vendor/packages/docs-ui" },
+      { "path": "vendor/packages/auth-be" },
+      { "path": "vendor/packages/auth-fe" },
       { "path": "devops/scripts/lib" },
       { "path": ".github/workflows/_cache-nodemodules-jobs.yml" },
       { "path": ".github/workflows/_deploy-media-jobs.yml" },
