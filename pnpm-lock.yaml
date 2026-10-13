@@ -167,9 +167,6 @@ catalogs:
     '@tailwindcss/vite':
       specifier: ^4.3.3
       version: 4.3.3
-    '@types/jsonwebtoken':
-      specifier: ^9.0.10
-      version: 9.0.10
     '@types/node':
       specifier: ^26.6.5
       version: 26.6.5
@@ -200,9 +197,6 @@ catalogs:
     jotai:
       specifier: 3.0.1
       version: 3.0.1
-    jsonwebtoken:
-      specifier: ^9.0.3
-      version: 9.0.3
     lucide-react:
       specifier: ^1.55.0
       version: 1.55.0
@@ -399,11 +393,11 @@ importers:
   vendor/packages/auth-be:
     dependencies:
       jsonwebtoken:
-        specifier: 'catalog:'
+        specifier: ^9.0.3
         version: 9.0.3
     devDependencies:
       '@types/jsonwebtoken':
-        specifier: 'catalog:'
+        specifier: ^9.0.10
         version: 9.0.10
       '@types/node':
         specifier: 'catalog:'

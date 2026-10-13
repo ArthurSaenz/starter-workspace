@@ -27,10 +27,10 @@
     "infra-kit-check": "pnpm exec infra-kit audit"
   },
   "dependencies": {
-    "jsonwebtoken": "catalog:"
+    "jsonwebtoken": "^9.0.3"
   },
   "devDependencies": {
-    "@types/jsonwebtoken": "catalog:",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "catalog:",
     "@wl/eslint-config": "workspace:*",
     "@wl/ts-config": "workspace:*",
