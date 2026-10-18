@@ -128,24 +128,6 @@ const COPY_CONFIG = [
     vendored: true,
   },
   {
-    name: 'VsCode extensions',
-    source: '.vscode/extensions.json',
-    target: '.vscode/extensions.json',
-    type: 'file',
-  },
-  {
-    name: 'VsCode snippets',
-    source: '.vscode/global.code-snippets',
-    target: '.vscode/global.code-snippets',
-    type: 'file',
-  },
-  {
-    name: 'VsCode settings',
-    source: '.vscode/settings.json',
-    target: '.vscode/settings.json',
-    type: 'file',
-  },
-  {
     name: 'Prettier config',
     source: '.prettierrc.mjs',
     target: '.prettierrc.mjs',
