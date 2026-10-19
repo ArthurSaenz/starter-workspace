@@ -58,6 +58,7 @@
     "tailwind-merge": "catalog:"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "catalog:",
     "@types/react": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "@wl/eslint-config": "workspace:*",
@@ -65,6 +66,7 @@
     "@wl/vitest-config": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "vitest-browser-react": "catalog:"

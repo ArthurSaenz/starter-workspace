@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
+import { userEvent } from 'vitest/browser'
 
 import type { NumberRangeFilterConfig } from '../config/filter-config'
 import { NumberRangeFilter } from '../filters/number-range-filter'
@@ -43,6 +44,22 @@ describe('numberRangeFilter', () => {
     await screen.getByRole('spinbutton', { name: 'Maximum' }).fill('400')
 
     expect(onChange).toHaveBeenCalledWith({ min: 100, max: 400 })
+  })
+
+  it('commits the slider position once a handle is moved', async () => {
+    const onChange = vi.fn()
+    const config = buildConfig({ onChange, step: 10 })
+
+    const screen = await render(<NumberRangeFilter config={config} />)
+
+    await screen.getByRole('slider').first().click()
+    await userEvent.keyboard('{ArrowRight}')
+
+    await expect
+      .poll(() => {
+        return onChange.mock.calls.at(-1)?.[0]
+      })
+      .toEqual({ min: 110, max: 500 })
   })
 
   it('clamps a min entry above bounds.max down to bounds.max', async () => {

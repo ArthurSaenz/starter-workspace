@@ -3,6 +3,12 @@ run-name: '07 ⚙️ Code quality'
 
 on:
   workflow_dispatch:
+    inputs:
+      visual:
+        description: 'Vitest screenshot baselines: `check` compares, `update` re-records the Linux set and uploads it'
+        type: choice
+        options: [check, update]
+        default: check
 
 jobs:
   validate-cache:
@@ -18,6 +24,7 @@ jobs:
     with:
       branch: ${{ github.ref }}
       cache_version: 1
+      visual: ${{ inputs.visual }}
     secrets: inherit
 
   notify-success:

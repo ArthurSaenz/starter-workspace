@@ -9,6 +9,10 @@ on:
       cache_version:
         required: true
         type: string
+      visual:
+        required: false
+        type: string
+        default: check
 
 jobs:
   code-quality:
@@ -34,6 +38,18 @@ jobs:
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install chromium --with-deps
+
+      # Baselines are per platform; recording them here keeps the Linux set identical to what qa compares.
+      - name: Record screenshot baselines
+        if: ${{ inputs.visual == 'update' }}
+        run: pnpm --filter @wl/data-table exec vitest run src/__tests__/visual.test.tsx --update
+
+      - name: Upload screenshot baselines
+        if: ${{ inputs.visual == 'update' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-screenshot-baselines
+          path: '**/__screenshots__/**/*-linux.png'
 
       - name: Run QA
         run: pnpm run qa
