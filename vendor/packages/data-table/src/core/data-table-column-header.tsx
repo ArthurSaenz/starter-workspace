@@ -1,4 +1,4 @@
-import type { Column, Table } from '@tanstack/react-table'
+import type { RowData } from '@tanstack/react-table'
 import { ArrowDown, ArrowUp, ChevronsUpDown, ListRestart } from 'lucide-react'
 import type { HTMLAttributes } from 'react'
 
@@ -11,10 +11,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../primitives/dropdown-menu'
+import type { DataTableColumn, DataTableInstance } from './table-features'
 
-export interface DataTableColumnHeaderProps<TData, TValue> extends HTMLAttributes<HTMLDivElement> {
-  column: Column<TData, TValue>
-  table?: Table<TData>
+export interface DataTableColumnHeaderProps<TData extends RowData, TValue> extends HTMLAttributes<HTMLDivElement> {
+  column: DataTableColumn<TData, TValue>
+  table?: DataTableInstance<TData>
   title: string
 }
 
@@ -28,7 +29,9 @@ export interface DataTableColumnHeaderProps<TData, TValue> extends HTMLAttribute
  * data arrived in — meaningful for tables whose incoming order carries information, such as the
  * async-operations monitor, where the server already returns the newest-started operation first.
  */
-export const DataTableColumnHeader = <TData, TValue>(props: DataTableColumnHeaderProps<TData, TValue>) => {
+export const DataTableColumnHeader = <TData extends RowData, TValue>(
+  props: DataTableColumnHeaderProps<TData, TValue>,
+) => {
   const { column, table, title, className, ...rest } = props
 
   if (!column.getCanSort()) {
@@ -40,7 +43,7 @@ export const DataTableColumnHeader = <TData, TValue>(props: DataTableColumnHeade
   }
 
   const sortDirection = column.getIsSorted()
-  const hasAnySort = table ? table.getState().sorting.length > 0 : Boolean(sortDirection)
+  const hasAnySort = table ? table.store.state.sorting.length > 0 : Boolean(sortDirection)
   const ariaSort = sortDirection ? ARIA_SORT_BY_DIRECTION[sortDirection] : 'none'
 
   const handleSortAscClick = () => {

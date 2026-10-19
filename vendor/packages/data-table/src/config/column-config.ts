@@ -1,11 +1,12 @@
-import type { Column, Table } from '@tanstack/react-table'
+import type { RowData } from '@tanstack/react-table'
 import type { ReactNode } from 'react'
 
+import type { DataTableColumn, DataTableInstance } from '../core/table-features'
 import type { CellConfig, CellRenderContext } from './cell-config'
 
-export interface ColumnHeaderRenderContext<TData> {
-  column: Column<TData, unknown>
-  table: Table<TData>
+export interface ColumnHeaderRenderContext<TData extends RowData> {
+  column: DataTableColumn<TData>
+  table: DataTableInstance<TData>
   label: string
 }
 
@@ -21,7 +22,7 @@ export interface ColumnHeaderRenderContext<TData> {
  * `header` replaces the built-in sortable header for this column (the visibility menu still uses
  * `label`) — the escape hatch for headers with tooltips, sr-only text, or consumer-owned sort UI.
  */
-export interface TableColumnConfig<TData> {
+export interface TableColumnConfig<TData extends RowData> {
   id: string
   label: string
   cell: CellConfig<TData>

@@ -15,7 +15,7 @@ export interface ControllableStateOptions<TState> {
  * One piece of table state that a consumer may or may not own.
  *
  * The returned setter is a TanStack `OnChangeFn`, so it accepts either a value or an updater
- * function and is handed straight to `useReactTable`. Its identity never changes, which keeps
+ * function and is handed straight to `useTable`. Its identity never changes, which keeps
  * the table options stable across renders. `onChange` is always called with a resolved value —
  * a consumer storing sorting in Jotai should not have to unwrap an updater.
  */

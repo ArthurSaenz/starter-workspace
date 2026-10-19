@@ -4,16 +4,17 @@ import type {
   ColumnDef,
   DisplayColumnDef,
   HeaderContext,
-  Row,
+  RowData,
 } from '@tanstack/react-table'
 
 import type { CellKind, CellRenderContext, TableColumnConfig } from '../config'
 import type { CellRegistry, CellRenderer } from './cell-renderer-types'
 import { DataTableColumnHeader } from './data-table-column-header'
+import type { DataTableFeatures, DataTableRow } from './table-features'
 
-type ColumnHeaderContext<TData> = HeaderContext<TData, unknown>
+type ColumnHeaderContext<TData extends RowData> = HeaderContext<DataTableFeatures, TData, unknown>
 
-type ColumnCellContext<TData> = CellContext<TData, unknown>
+type ColumnCellContext<TData extends RowData> = CellContext<DataTableFeatures, TData, unknown>
 
 /**
  * Live lookups that let a memoized column def read the newest config.
@@ -25,18 +26,21 @@ type ColumnCellContext<TData> = CellContext<TData, unknown>
  * without them the defs fall back to the snapshot they were built from, which is what a direct
  * caller (and the unit tests) wants.
  */
-export interface BuildColumnDefsHelpers<TData> {
+export interface BuildColumnDefsHelpers<TData extends RowData> {
   getColumnConfig?: (columnId: string) => TableColumnConfig<TData> | undefined
   getCellRenderer?: (kind: CellKind) => CellRenderer<TData> | undefined
 }
 
-export interface BuildColumnDefsResult<TData> {
-  columnDefs: ColumnDef<TData>[]
+export interface BuildColumnDefsResult<TData extends RowData> {
+  columnDefs: ColumnDef<DataTableFeatures, TData>[]
   /** id → header label, consumed by the columns-visibility menu. */
   labels: Map<string, string>
 }
 
-const buildCellRenderContext = <TData,>(row: Row<TData>, columnId: string): CellRenderContext<TData> => {
+const buildCellRenderContext = <TData extends RowData>(
+  row: DataTableRow<TData>,
+  columnId: string,
+): CellRenderContext<TData> => {
   return {
     row: row.original,
     rowIndex: row.index,
@@ -59,14 +63,14 @@ const buildCellRenderContext = <TData,>(row: Row<TData>, columnId: string): Cell
  * during render takes the whole table down over one misconfigured column, while the failure is a
  * config typo that the operator can see and the developer can read straight off the screen.
  */
-export const buildColumnDefs = <TData,>(
+export const buildColumnDefs = <TData extends RowData>(
   columns: TableColumnConfig<TData>[],
   registry: CellRegistry<TData>,
   helpers: BuildColumnDefsHelpers<TData> = {},
 ): BuildColumnDefsResult<TData> => {
   const labels = new Map<string, string>()
 
-  const columnDefs = columns.map((snapshot): ColumnDef<TData> => {
+  const columnDefs = columns.map((snapshot): ColumnDef<DataTableFeatures, TData> => {
     const columnId = snapshot.id
 
     labels.set(columnId, snapshot.label)
@@ -75,7 +79,7 @@ export const buildColumnDefs = <TData,>(
       return helpers.getColumnConfig?.(columnId) ?? snapshot
     }
 
-    const base: DisplayColumnDef<TData, unknown> = {
+    const base: DisplayColumnDef<DataTableFeatures, TData, unknown> = {
       id: columnId,
       size: snapshot.size,
       enableSorting: snapshot.sortable ?? false,
@@ -109,7 +113,7 @@ export const buildColumnDefs = <TData,>(
       return base
     }
 
-    const sortable: AccessorFnColumnDef<TData, unknown> = {
+    const sortable: AccessorFnColumnDef<DataTableFeatures, TData, unknown> = {
       ...base,
       accessorFn: (row: TData) => {
         return resolveConfig().sortingValue?.(row) ?? ''
@@ -127,7 +131,7 @@ export const buildColumnDefs = <TData,>(
  * narrower than the `CellConfig` union a runtime lookup can produce. The lookup is sound — the
  * key comes from the very config being rendered — but only the caller knows that, hence the cast.
  */
-export const resolveCellRenderer = <TData,>(
+export const resolveCellRenderer = <TData extends RowData>(
   registry: CellRegistry<TData>,
   kind: CellKind,
 ): CellRenderer<TData> | undefined => {

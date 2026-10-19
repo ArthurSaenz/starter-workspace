@@ -1,4 +1,4 @@
-import type { Table } from '@tanstack/react-table'
+import type { RowData } from '@tanstack/react-table'
 import { Settings2 } from 'lucide-react'
 
 import { Button } from '../primitives/button'
@@ -11,9 +11,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../primitives/dropdown-menu'
+import type { DataTableInstance } from './table-features'
 
-export interface DataTableViewOptionsProps<TData> {
-  table: Table<TData>
+export interface DataTableViewOptionsProps<TData extends RowData> {
+  table: DataTableInstance<TData>
   /**
    * id → header label. The package keeps its own map instead of augmenting TanStack's
    * `ColumnMeta`: the backoffice already declares that module augmentation, and a second one
@@ -22,7 +23,7 @@ export interface DataTableViewOptionsProps<TData> {
   labels: Map<string, string>
 }
 
-export const DataTableViewOptions = <TData,>(props: DataTableViewOptionsProps<TData>) => {
+export const DataTableViewOptions = <TData extends RowData>(props: DataTableViewOptionsProps<TData>) => {
   const { table, labels } = props
 
   return (

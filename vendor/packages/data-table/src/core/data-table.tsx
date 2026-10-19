@@ -1,4 +1,4 @@
-import type { Row, Table as TanstackTable } from '@tanstack/react-table'
+import type { RowData } from '@tanstack/react-table'
 import { flexRender } from '@tanstack/react-table'
 import type { ComponentType, MouseEvent, ReactNode } from 'react'
 import { Fragment, useMemo } from 'react'
@@ -17,16 +17,17 @@ import { DataTableToolbar } from './data-table-toolbar'
 import { DataTableViewOptions } from './data-table-view-options'
 import { MINIMAL_CELL_REGISTRY } from './minimal-cell-registry'
 import { resolveRowClassName } from './row-class-name'
+import type { DataTableInstance, DataTableRow } from './table-features'
 import { useDataTable } from './use-data-table'
 
-export interface DataTableProps<TData> {
+export interface DataTableProps<TData extends RowData> {
   config: TableConfig<TData>
   cellRegistry?: CellRegistry<TData>
   filterRegistry?: FilterRegistry
   components?: DataTableComponents<TData>
 }
 
-export const DataTable = <TData,>(props: DataTableProps<TData>) => {
+export const DataTable = <TData extends RowData>(props: DataTableProps<TData>) => {
   const { config, cellRegistry, filterRegistry, components } = props
 
   const registry = cellRegistry ?? (MINIMAL_CELL_REGISTRY as CellRegistry<TData>)
@@ -101,7 +102,6 @@ export const DataTable = <TData,>(props: DataTableProps<TData>) => {
       return (
         <Fragment key={row.id}>
           <TableRow
-            data-state={row.getIsSelected() ? 'selected' : undefined}
             className={cn(resolvedRowClassName, isExpanded && expandable && 'border-b-0')}
             onClick={
               onRowClick
@@ -243,8 +243,8 @@ export interface DataTableFilterBarProps {
   registry?: FilterRegistry
 }
 
-export interface DataTablePaginationProps<TData> {
-  table: TanstackTable<TData>
+export interface DataTablePaginationProps<TData extends RowData> {
+  table: DataTableInstance<TData>
   config: PaginationConfig
 }
 
@@ -252,12 +252,15 @@ export interface DataTablePaginationProps<TData> {
  * The two sub-trees the shell does not own. They are injected rather than imported so the core
  * has no edge to the filters and pagination modules, which are built independently.
  */
-export interface DataTableComponents<TData> {
+export interface DataTableComponents<TData extends RowData> {
   FilterBar?: ComponentType<DataTableFilterBarProps>
   Pagination?: ComponentType<DataTablePaginationProps<TData>>
 }
 
-const buildRowContext = <TData,>(row: Row<TData>, columnId: string): CellRenderContext<TData> => {
+const buildRowContext = <TData extends RowData>(
+  row: DataTableRow<TData>,
+  columnId: string,
+): CellRenderContext<TData> => {
   return {
     row: row.original,
     rowIndex: row.index,
@@ -286,9 +289,9 @@ const isInteractiveTarget = (event: MouseEvent<HTMLTableRowElement>): boolean =>
 const INTERACTIVE_TARGET_SELECTOR =
   'a, button, input, select, textarea, label, [role="checkbox"], [role="switch"], [role="combobox"], [role="menuitem"]'
 
-const resolveCellClassName = <TData,>(
+const resolveCellClassName = <TData extends RowData>(
   column: TableColumnConfig<TData> | undefined,
-  row: Row<TData>,
+  row: DataTableRow<TData>,
   columnId: string,
 ): string | undefined => {
   const { cellClassName } = column ?? {}

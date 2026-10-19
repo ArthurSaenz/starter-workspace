@@ -1,22 +1,18 @@
-import type { ExpandedState, Row, SortingState, Table, VisibilityState } from '@tanstack/react-table'
-import {
-  getCoreRowModel,
-  getExpandedRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
-} from '@tanstack/react-table'
+import type { ColumnVisibilityState, ExpandedState, RowData, SortingState } from '@tanstack/react-table'
+import { useTable } from '@tanstack/react-table'
 import { useMemo } from 'react'
 
 import type { CellKind, TableColumnConfig, TableConfig } from '../config'
 import type { BuildColumnDefsHelpers } from './build-column-defs'
 import { buildColumnDefs, resolveCellRenderer } from './build-column-defs'
 import type { CellRegistry } from './cell-renderer-types'
+import type { DataTableInstance, DataTableRow } from './table-features'
+import { DATA_TABLE_FEATURES } from './table-features'
 import { useControllableState } from './use-controllable-state'
 import { useLatestRef } from './use-latest-ref'
 
-export interface UseDataTableResult<TData> {
-  table: Table<TData>
+export interface UseDataTableResult<TData extends RowData> {
+  table: DataTableInstance<TData>
   /** id → header label, for the columns-visibility menu. */
   labels: Map<string, string>
 }
@@ -28,7 +24,7 @@ export interface UseDataTableResult<TData> {
  * callbacks. Cells keep their DOM (and their focus) across such a rebuild, and still read the
  * newest getters; see the note above the column-def memo for how.
  */
-export const useDataTable = <TData>(
+export const useDataTable = <TData extends RowData>(
   config: TableConfig<TData>,
   cellRegistry: CellRegistry<TData>,
 ): UseDataTableResult<TData> => {
@@ -86,7 +82,7 @@ export const useDataTable = <TData>(
     initial: config.sorting?.initial ?? EMPTY_SORTING,
   })
 
-  const [columnVisibility, onColumnVisibilityChange] = useControllableState<VisibilityState>({
+  const [columnVisibility, onColumnVisibilityChange] = useControllableState<ColumnVisibilityState>({
     value: config.columnVisibility?.value,
     onChange: config.columnVisibility?.onChange,
     initial: buildInitialVisibility(config.columnVisibility?.initialHidden),
@@ -103,28 +99,12 @@ export const useDataTable = <TData>(
   const isClientPagination = pagination?.mode === 'client'
   const serverPagination = pagination?.mode === 'server' ? pagination : undefined
 
-  const coreRowModel = useMemo(() => {
-    return getCoreRowModel<TData>()
-  }, [])
-
-  const sortedRowModel = useMemo(() => {
-    return getSortedRowModel<TData>()
-  }, [])
-
-  const expandedRowModel = useMemo(() => {
-    return isExpandable ? getExpandedRowModel<TData>() : undefined
-  }, [isExpandable])
-
-  const paginationRowModel = useMemo(() => {
-    return isClientPagination ? getPaginationRowModel<TData>() : undefined
-  }, [isClientPagination])
-
   const getRowCanExpand = useMemo(() => {
     if (!isExpandable) {
       return undefined
     }
 
-    return (row: Row<TData>) => {
+    return (row: DataTableRow<TData>) => {
       return canExpandRef.current?.(row.original) ?? true
     }
   }, [isExpandable, canExpandRef])
@@ -137,20 +117,20 @@ export const useDataTable = <TData>(
 
   const clientPageSize = isClientPagination ? (pagination.initialPageSize ?? DEFAULT_CLIENT_PAGE_SIZE) : undefined
 
-  const table = useReactTable<TData>({
+  const table = useTable<typeof DATA_TABLE_FEATURES, TData>({
+    features: DATA_TABLE_FEATURES,
     data: config.data,
     columns: columnDefs,
-    getCoreRowModel: coreRowModel,
-    getSortedRowModel: sortedRowModel,
-    ...(expandedRowModel ? { getExpandedRowModel: expandedRowModel } : {}),
-    ...(paginationRowModel ? { getPaginationRowModel: paginationRowModel } : {}),
+    // Without a client pager the registered paginated model must not slice `data`: a table with no
+    // pagination shows every row, and a server-paged one already holds just the current page.
+    manualPagination: !isClientPagination,
     ...(clientPageSize === undefined
       ? {}
       : { initialState: { pagination: { pageIndex: 0, pageSize: clientPageSize } } }),
     // The server owns the slice: the table is told how many pages exist and which one it is
     // looking at, and never slices `data` itself.
     ...(serverPagination
-      ? { manualPagination: true, pageCount: resolvePageCount(serverPagination.totalCount, serverPagination.pageSize) }
+      ? { pageCount: resolvePageCount(serverPagination.totalCount, serverPagination.pageSize) }
       : {}),
     getRowId,
     getRowCanExpand,
@@ -180,7 +160,7 @@ const resolvePageCount = (totalCount: number, pageSize: number): number => {
   return Math.max(1, Math.ceil(totalCount / Math.max(1, pageSize)))
 }
 
-const buildInitialVisibility = (initialHidden: string[] | undefined): VisibilityState => {
+const buildInitialVisibility = (initialHidden: string[] | undefined): ColumnVisibilityState => {
   if (!initialHidden?.length) {
     return EMPTY_VISIBILITY
   }
@@ -195,5 +175,5 @@ const buildInitialVisibility = (initialHidden: string[] | undefined): Visibility
 const DEFAULT_CLIENT_PAGE_SIZE = 10
 
 const EMPTY_SORTING: SortingState = []
-const EMPTY_VISIBILITY: VisibilityState = {}
+const EMPTY_VISIBILITY: ColumnVisibilityState = {}
 const EMPTY_EXPANDED: ExpandedState = {}

@@ -2,24 +2,25 @@
 // `mode: 'serverManual'` / `currentPage` in the app map to `mode: 'server'` / `page` here
 // (see PaginationConfig) — everything else (DOM, labels, the en-dash row-range string) is
 // kept byte-identical.
-import type { Table } from '@tanstack/react-table'
+import type { RowData } from '@tanstack/react-table'
 import type { FocusEvent, KeyboardEvent } from 'react'
 import { useRef } from 'react'
 
 import type { PaginationConfig, ServerPaginationConfig } from '../config/pagination-config'
+import type { DataTableInstance } from '../core/table-features'
 import { Button } from '../primitives/button'
 import { cn } from '../primitives/cn'
 import { Input } from '../primitives/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../primitives/select'
 import { ADMIN_PAGE_SIZE_OPTIONS } from './page-size-presets'
 
-export interface DataTablePaginationProps<TData> {
+export interface DataTablePaginationProps<TData extends RowData> {
   config: PaginationConfig
-  table?: Table<TData>
+  table?: DataTableInstance<TData>
   className?: string
 }
 
-export const DataTablePagination = <TData,>(props: DataTablePaginationProps<TData>) => {
+export const DataTablePagination = <TData extends RowData>(props: DataTablePaginationProps<TData>) => {
   const { config, table, className } = props
 
   if (config.mode === 'server') {
@@ -33,22 +34,22 @@ export const DataTablePagination = <TData,>(props: DataTablePaginationProps<TDat
   return <ClientPagination table={table} pageSizeOptions={config.pageSizeOptions} className={className} />
 }
 
-interface ClientPaginationProps<TData> {
-  table: Table<TData>
+interface ClientPaginationProps<TData extends RowData> {
+  table: DataTableInstance<TData>
   pageSizeOptions?: readonly number[]
   className?: string
 }
 
-const ClientPagination = <TData,>(props: ClientPaginationProps<TData>) => {
+const ClientPagination = <TData extends RowData>(props: ClientPaginationProps<TData>) => {
   const { table, pageSizeOptions = ADMIN_PAGE_SIZE_OPTIONS, className } = props
 
-  const currentPage = table.getState().pagination.pageIndex + 1
+  const currentPage = table.store.state.pagination.pageIndex + 1
   const totalPages = table.getPageCount()
 
   return (
     <div className={cn('flex flex-wrap items-center justify-center gap-4', className)}>
       <PageSizeSelect
-        pageSize={table.getState().pagination.pageSize}
+        pageSize={table.store.state.pagination.pageSize}
         options={pageSizeOptions}
         onPageSizeChange={(value) => {
           table.setPageSize(value)

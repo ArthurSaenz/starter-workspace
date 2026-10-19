@@ -1,4 +1,4 @@
-import type { OnChangeFn, SortingState, VisibilityState } from '@tanstack/react-table'
+import type { ColumnVisibilityState, OnChangeFn, RowData, SortingState } from '@tanstack/react-table'
 import type { ReactNode } from 'react'
 
 import type { CellRenderContext } from './cell-config'
@@ -21,8 +21,8 @@ export interface TableSortingConfig {
 /** `initialHidden` lists column ids hidden on first render; `value`/`onChange` control it. */
 export interface TableColumnVisibilityConfig {
   initialHidden?: string[]
-  value?: VisibilityState
-  onChange?: OnChangeFn<VisibilityState>
+  value?: ColumnVisibilityState
+  onChange?: OnChangeFn<ColumnVisibilityState>
 }
 
 export interface TableFullscreenConfig {
@@ -67,7 +67,7 @@ export interface TableMessagesConfig {
  * that land on a control inside the row — a checkbox, button, link or input — are left to that
  * control, so a `checkbox-select` cell and the row handler never both fire for one click.
  */
-export interface TableConfig<TData> {
+export interface TableConfig<TData extends RowData> {
   data: TData[]
   getRowId: (row: TData) => string
   columns: TableColumnConfig<TData>[]

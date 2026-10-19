@@ -2,7 +2,7 @@
 
 Declarative data tables for React. Describe your table as one config object — columns, filters, pagination, row styling — and get a complete table with sorting, a column-visibility menu, a filter bar, and fullscreen mode. No JSX needed for common tables.
 
-Built on [TanStack Table v8](https://tanstack.com/table/v8). Works with any state management (or none).
+Built on [TanStack Table v9](https://tanstack.com/table/latest). Works with any state management (or none).
 
 ## Features
 

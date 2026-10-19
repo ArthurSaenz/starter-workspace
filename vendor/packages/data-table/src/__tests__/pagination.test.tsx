@@ -1,11 +1,13 @@
 import type { ColumnDef } from '@tanstack/react-table'
-import { getCoreRowModel, getPaginationRowModel, useReactTable } from '@tanstack/react-table'
+import { useTable } from '@tanstack/react-table'
 import type { ReactNode } from 'react'
 import { Component } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
 
+import type { DataTableFeatures } from '../core/table-features'
+import { DATA_TABLE_FEATURES } from '../core/table-features'
 import { DataTablePagination } from '../pagination/data-table-pagination'
 
 describe('dataTablePagination server mode', () => {
@@ -223,14 +225,13 @@ const CLIENT_TEST_DATA: ClientRow[] = Array.from({ length: 25 }, (_, index) => {
   return { id: index + 1 }
 })
 
-const CLIENT_TEST_COLUMNS: ColumnDef<ClientRow>[] = [{ accessorKey: 'id', header: 'ID' }]
+const CLIENT_TEST_COLUMNS: ColumnDef<DataTableFeatures, ClientRow>[] = [{ accessorKey: 'id', header: 'ID' }]
 
 const ClientPaginationHost = () => {
-  const table = useReactTable({
+  const table = useTable({
+    features: DATA_TABLE_FEATURES,
     data: CLIENT_TEST_DATA,
     columns: CLIENT_TEST_COLUMNS,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     initialState: { pagination: { pageIndex: 0, pageSize: 10 } },
   })
 

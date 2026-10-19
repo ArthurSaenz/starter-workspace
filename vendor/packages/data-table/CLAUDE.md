@@ -44,6 +44,10 @@ kind doesn't cover — see the readme's "Registry extension" section and
 vendored, not a mirror of any app's copy.
 
 A dependency uses `catalog:` only if every vendor target's catalog has it; the rest are literal
-versions, or `pnpm install` breaks in the targets that lack the entry. `@tanstack/react-table` stays
-pinned to `"^8.21.3"` even where a catalog has it — Hulyo's carries `^9.1.2`, a breaking major for
-this package's v8 API usage.
+versions, or `pnpm install` breaks in the targets that lack the entry. `@tanstack/react-table` is a
+literal `"^9.3.1"` for that reason (not every target's catalog carries it).
+
+TanStack v9 only exposes the APIs of registered features. `src/core/table-features.ts` registers every
+feature and row model the table uses, once; a new TanStack call (row selection, filtering, pinning…)
+needs its feature added there, or it is missing at runtime and in the types. The screenshot baselines in
+`src/__tests__/__screenshots__/` were recorded on v8 and pass unchanged on v9.
