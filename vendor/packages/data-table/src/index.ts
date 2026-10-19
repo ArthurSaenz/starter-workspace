@@ -51,3 +51,14 @@ export type { AdminPageSize, CatalogPageSize } from './pagination/page-size-pres
 // Shared z-index scale, for consumers that need to stack their own UI above/below the table's
 // fullscreen overlay or portaled popovers.
 export { DATA_TABLE_FULLSCREEN_Z_INDEX, DATA_TABLE_POPOVER_Z_INDEX } from './primitives/z-index'
+
+// TanStack state types that consumers hold when they control table state, re-exported so apps
+// depend on `@wl/data-table` alone and never import `@tanstack/react-table` directly.
+export type {
+  ColumnVisibilityState,
+  ExpandedState,
+  OnChangeFn,
+  PaginationState,
+  RowSelectionState,
+  SortingState,
+} from '@tanstack/react-table'
