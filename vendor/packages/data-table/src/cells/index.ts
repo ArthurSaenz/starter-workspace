@@ -1,0 +1,15 @@
+// Internal barrel — re-exports the full cell registry and its per-kind renderers for use inside
+// this package. The package's public surface lives in src/index.ts.
+export * from './actions-cell'
+export * from './badge-cell'
+export * from './cell-registry'
+export * from './checkbox-select-cell'
+export * from './computed-cell'
+export * from './currency-select-cell'
+export * from './custom-cell'
+export * from './expander-cell'
+export * from './number-input-cell'
+export * from './price-input-cell'
+export * from './switch-cell'
+export * from './text-cell'
+export * from './textarea-cell'
