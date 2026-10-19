@@ -49,5 +49,7 @@ literal `"^9.3.1"` for that reason (not every target's catalog carries it).
 
 TanStack v9 only exposes the APIs of registered features. `src/core/table-features.ts` registers every
 feature and row model the table uses, once; a new TanStack call (row selection, filtering, pinning…)
-needs its feature added there, or it is missing at runtime and in the types. The screenshot baselines in
+needs its feature added there, or it is missing at runtime and in the types. Sortable columns use
+`sortFn_v8Auto`, not v9's `'auto'`, which samples different rows and reorders client-sorted tables;
+`src/__tests__/core-sorting.test.tsx` pins the v8 orders. The screenshot baselines in
 `src/__tests__/__screenshots__/` were recorded on v8 and pass unchanged on v9.

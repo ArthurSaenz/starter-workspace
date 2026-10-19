@@ -10,6 +10,7 @@ import type {
 import type { CellKind, CellRenderContext, TableColumnConfig } from '../config'
 import type { CellRegistry, CellRenderer } from './cell-renderer-types'
 import { DataTableColumnHeader } from './data-table-column-header'
+import { sortFn_v8Auto } from './table-features'
 import type { DataTableFeatures, DataTableRow } from './table-features'
 
 type ColumnHeaderContext<TData extends RowData> = HeaderContext<DataTableFeatures, TData, unknown>
@@ -118,6 +119,7 @@ export const buildColumnDefs = <TData extends RowData>(
       accessorFn: (row: TData) => {
         return resolveConfig().sortingValue?.(row) ?? ''
       },
+      sortFn: sortFn_v8Auto,
     }
 
     return sortable
