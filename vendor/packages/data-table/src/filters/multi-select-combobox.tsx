@@ -114,7 +114,7 @@ export const MultiSelectCombobox = (props: MultiSelectComboboxProps) => {
   }
 
   const trimmedQuery = query.trim()
-  const filteredOptions = (searchOptions ?? filterOptions)(options, query).slice(0, MAX_VISIBLE_OPTIONS)
+  const filteredOptions = (searchOptions ?? filterOptions)(options, query)
   const labelByValue = buildLabelByValue(options)
   const optionValues = new Set(
     options.map((option) => {
@@ -292,6 +292,21 @@ const SelectedChips = (props: SelectedChipsProps) => {
 
   return (
     <div className="pt-1">
+      {/* Toggle sits above the chips so collapsing an expanded wall never needs a scroll back down. */}
+      {shouldCollapse ? (
+        <button
+          type="button"
+          className="mb-1 text-sm text-violet-700 underline underline-offset-2 hover:text-violet-800"
+          onClick={() => {
+            setIsExpanded((prev) => {
+              return !prev
+            })
+          }}
+        >
+          {isExpanded ? T.showLess : T.showMore}
+        </button>
+      ) : null}
+
       <div className={cn('flex flex-wrap gap-1', isCollapsed && 'max-h-[5.5rem] overflow-hidden')}>
         {value.map((v) => {
           const chipLabel = labelByValue.get(v) ?? v
@@ -328,20 +343,6 @@ const SelectedChips = (props: SelectedChipsProps) => {
           )
         })}
       </div>
-
-      {shouldCollapse ? (
-        <button
-          type="button"
-          className="mt-1 text-sm text-violet-700 underline underline-offset-2 hover:text-violet-800"
-          onClick={() => {
-            setIsExpanded((prev) => {
-              return !prev
-            })
-          }}
-        >
-          {isExpanded ? T.showLess : T.showMore}
-        </button>
-      ) : null}
     </div>
   )
 }
@@ -688,5 +689,4 @@ const T = {
   showLess: 'Show less',
 } as const
 
-const MAX_VISIBLE_OPTIONS = 100
 const COLLAPSED_CHIP_THRESHOLD = 50
