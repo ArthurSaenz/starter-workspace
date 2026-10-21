@@ -63,6 +63,7 @@ export const overrides: TypedFlatConfigItem = {
     'sonarjs/no-commented-code': 'off',
 
     'unicorn/no-new-array': 'off',
+    'unicorn/no-for-each': 'error',
 
     // prettier lowercases hex literals; let it win over unicorn/number-literal-case.
     'unicorn/number-literal-case': 'off',

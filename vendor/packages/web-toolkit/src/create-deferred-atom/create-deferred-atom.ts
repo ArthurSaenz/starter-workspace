@@ -44,9 +44,9 @@ export const createDeferredAtom = <Value, Args>(): DeferredAtom<Value, Args> => 
 
     set($data, null)
 
-    current.forEach((resolve) => {
-      return resolve(value)
-    })
+    for (const resolve of current) {
+      resolve(value)
+    }
   })
 
   const dismissFx: WritableAtom<null, [], void> = atom(null, (_get, set) => {

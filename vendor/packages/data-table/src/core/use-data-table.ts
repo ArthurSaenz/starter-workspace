@@ -31,9 +31,9 @@ export const useDataTable = <TData extends RowData>(
   const columnsById = useMemo(() => {
     const map = new Map<string, TableColumnConfig<TData>>()
 
-    config.columns.forEach((column) => {
+    for (const column of config.columns) {
       map.set(column.id, column)
-    })
+    }
 
     return map
   }, [config.columns])

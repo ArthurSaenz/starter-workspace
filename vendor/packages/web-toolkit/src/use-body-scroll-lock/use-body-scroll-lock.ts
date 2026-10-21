@@ -9,15 +9,15 @@ import { useEffect } from 'react'
 const SCROLLABLE_SELECTOR = '[data-noscroll-scrollable]'
 
 const markScrollableElements = () => {
-  document.querySelectorAll<HTMLElement>(SCROLLABLE_SELECTOR).forEach((el) => {
+  for (const el of document.querySelectorAll<HTMLElement>(SCROLLABLE_SELECTOR)) {
     markScrollable(el)
-  })
+  }
 }
 
 const unmarkScrollableElements = () => {
-  document.querySelectorAll<HTMLElement>(SCROLLABLE_SELECTOR).forEach((el) => {
+  for (const el of document.querySelectorAll<HTMLElement>(SCROLLABLE_SELECTOR)) {
     unmarkScrollable(el)
-  })
+  }
 }
 
 export const disablePageScroll = () => {

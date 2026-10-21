@@ -119,10 +119,10 @@ export const parseData = <T>(key: string, string: string): T | null => {
 export const flush = (force = false): false | void => {
   if (!supportsLS()) return false
 
-  Object.keys(localStorage).forEach((key) => {
+  for (const key of Object.keys(localStorage)) {
     const string = localStorage.getItem(key)
 
-    if (!string) return // continue iteration
+    if (!string) continue
 
     let item
 
@@ -131,13 +131,13 @@ export const flush = (force = false): false | void => {
       // eslint-disable-next-line unused-imports/no-unused-vars
     } catch (error) {
       // Some packages write strings to localStorage that are not converted by JSON.stringify(), so we need to ignore it
-      return
+      continue
     }
     // flush only if ttl was set and is/is not expired
     if (isObject(item) && APX in item && (Date.now() > item.ttl || force)) {
       localStorage.removeItem(key)
     }
-  })
+  }
 }
 
 export const remove = (key: string): undefined | false => {

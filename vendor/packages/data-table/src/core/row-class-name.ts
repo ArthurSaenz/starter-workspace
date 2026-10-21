@@ -46,11 +46,11 @@ export const resolveRowClassName = <TData>(
     layers.push(rowIndex % 2 === 0 ? pair.even : pair.odd)
   }
 
-  rules?.forEach((rule) => {
+  for (const rule of rules ?? []) {
     if (rule.when(row)) {
       layers.push(rule.className)
     }
-  })
+  }
 
   layers.push(fn?.(row, rowIndex))
 

@@ -187,7 +187,7 @@ const readBodyRowIds = (container: HTMLElement): string[] => {
 }
 
 describe('client sorting keeps the v8 order', () => {
-  CASES.forEach(({ name, values, asc, desc }) => {
+  for (const { name, values, asc, desc } of CASES) {
     it(`${name} — asc`, async () => {
       const screen = await render(<DataTable config={buildConfig(values, false)} />)
 
@@ -207,5 +207,5 @@ describe('client sorting keeps the v8 order', () => {
         })
         .toEqual(desc)
     })
-  })
+  }
 })
