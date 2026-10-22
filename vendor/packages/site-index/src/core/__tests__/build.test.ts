@@ -26,6 +26,27 @@ describe('buildSiteIndex', () => {
     expect(files['robots.txt']).toContain('Sitemap:')
   })
 
+  it('groups bare paths by config prefix, keeping a group the producer set', () => {
+    const { files } = buildSiteIndex(
+      { ...config, llms: { ...config.llms, groupPrefixes: { flights: ['/budget/Flights_to_'], legal: ['/terms'] } } },
+      [
+        manifest('wp', [
+          { path: '/budget/Flights_to_Rome', title: 'Rome' },
+          { path: '/budget/Flights_to_Paris', title: 'Paris', group: 'shows' },
+          { path: '/terms', title: 'Terms' },
+          { path: '/misc', title: 'Misc' },
+        ]),
+      ],
+      { crawlable: true },
+    )
+    const llms = files['llms.txt']
+
+    expect(llms.indexOf('[Rome]')).toBeGreaterThan(llms.indexOf('## Flights'))
+    expect(llms.indexOf('[Paris]')).toBeGreaterThan(llms.indexOf('## Shows'))
+    expect(llms.indexOf('[Terms]')).toBeGreaterThan(llms.indexOf('## Optional'))
+    expect(llms.indexOf('[Misc]')).toBeLessThan(llms.indexOf('## Flights'))
+  })
+
   it('fails on a disallowed path', () => {
     expect(() => {
       return buildSiteIndex(config, [manifest('client', [{ path: '/api/health' }])], { crawlable: true })

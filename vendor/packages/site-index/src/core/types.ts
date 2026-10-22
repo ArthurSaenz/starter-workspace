@@ -51,6 +51,11 @@ export interface SiteIndexConfig {
     defaultSectionTitle?: string
     /** Groups rendered under `## Optional` — the llmstxt.org section a client may skip for a short context. */
     optionalGroups?: string[]
+    /**
+     * Group for an entry that names none, by raw path prefix (`/budget/Flights_to_` matches
+     * `/budget/Flights_to_Rome`); the first matching group wins. Lets producers ship bare paths.
+     */
+    groupPrefixes?: Record<string, string[]>
   }
   defaults?: {
     changefreq?: Changefreq

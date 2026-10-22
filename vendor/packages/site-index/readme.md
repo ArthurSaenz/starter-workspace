@@ -31,7 +31,7 @@ CloudFront (origin_path /public) ──▶ /sitemap.xml /robots.txt /llms.txt
 ```
 
 - `path` is site-relative; the host comes from `config.origin`. A trailing slash is significant.
-- `group` picks the llms.txt section; `llms: false` keeps a URL in the sitemap only.
+- `group` picks the llms.txt section (or leave it out and let `config.llms.groupPrefixes` assign one by path prefix); `llms: false` keeps a URL in the sitemap only.
 - Validation is strict: an unknown field, a wrong type or a bad path fails with the source, the entry
   index, its path and the expected value. `createManifest` runs it at build time, the aggregator on
   every S3 object.

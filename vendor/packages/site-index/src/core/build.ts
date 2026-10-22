@@ -3,7 +3,7 @@ import type { DuplicateEntry } from './manifest.js'
 import { SiteIndexError, findDisallowedEntries, mergeManifests } from './manifest.js'
 import { renderRobots } from './robots.js'
 import { renderSitemap } from './sitemap.js'
-import type { SiteIndexConfig, SiteIndexFiles, SiteIndexManifest } from './types.js'
+import type { SiteIndexConfig, SiteIndexEntry, SiteIndexFiles, SiteIndexManifest } from './types.js'
 
 export interface BuildSiteIndexOptions {
   crawlable: boolean
@@ -42,6 +42,24 @@ const assertUniqueProducers = (manifests: SiteIndexManifest[]) => {
   if (repeated.length > 0) throw new SiteIndexError('Two manifests claim the same producer', repeated)
 }
 
+const assignGroups = (entries: SiteIndexEntry[], config: SiteIndexConfig): SiteIndexEntry[] => {
+  const prefixes = Object.entries(config.llms.groupPrefixes ?? {})
+
+  if (prefixes.length === 0) return entries
+
+  return entries.map((entry) => {
+    if (entry.group) return entry
+
+    const match = prefixes.find(([, groupPrefixes]) => {
+      return groupPrefixes.some((prefix) => {
+        return entry.path.startsWith(prefix)
+      })
+    })
+
+    return match ? { ...entry, group: match[0] } : entry
+  })
+}
+
 export const buildSiteIndex = (
   config: SiteIndexConfig,
   manifests: SiteIndexManifest[],
@@ -50,7 +68,9 @@ export const buildSiteIndex = (
   assertUniqueProducers(manifests)
 
   const sorted = sortByProducer(manifests)
-  const { entries, duplicates } = mergeManifests(sorted)
+  const merged = mergeManifests(sorted)
+  const { duplicates } = merged
+  const entries = assignGroups(merged.entries, config)
   const disallowed = findDisallowedEntries(entries, config)
 
   if (disallowed.length > 0) throw new SiteIndexError('Manifests list disallowed paths', disallowed)
