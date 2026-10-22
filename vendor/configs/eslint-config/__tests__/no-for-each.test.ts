@@ -49,4 +49,10 @@ describe('unicorn/no-for-each', () => {
 
     expect(fixed).toContain('for (const item of items)')
   })
+
+  it('does not apply to JSON, whose language the rule does not support', async () => {
+    const messages = await lintCase({ source: '{ "items": [1, 2] }\n', fileName: 'src/data.json' })
+
+    expect(messages).toEqual([])
+  })
 })

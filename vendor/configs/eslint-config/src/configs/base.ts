@@ -2,6 +2,7 @@ import type { TypedFlatConfigItem } from '@antfu/eslint-config'
 import type { Linter } from 'eslint'
 import sonarjs from 'eslint-plugin-sonarjs'
 
+import { GLOB_SRC_ALL, GLOB_SVELTE } from '../globs.js'
 import type { ConfigRules } from '../types.js'
 
 /** Base antfu options shared by every mode. Framework flags (react/svelte) are merged in the factory. */
@@ -63,7 +64,6 @@ export const overrides: TypedFlatConfigItem = {
     'sonarjs/no-commented-code': 'off',
 
     'unicorn/no-new-array': 'off',
-    'unicorn/no-for-each': 'error',
 
     // prettier lowercases hex literals; let it win over unicorn/number-literal-case.
     'unicorn/number-literal-case': 'off',
@@ -88,4 +88,15 @@ export const overrides: TypedFlatConfigItem = {
       },
     ],
   } as ConfigRules,
+}
+
+/**
+ * Rules turned ON, scoped to code: a rule that is on must support every language its block matches, and the
+ * unscoped `overrides` block also matches the JSON/YAML files antfu lints (`rules do not support the language`).
+ */
+export const sourceOverrides: TypedFlatConfigItem = {
+  files: [GLOB_SRC_ALL, GLOB_SVELTE],
+  rules: {
+    'unicorn/no-for-each': 'error',
+  },
 }
