@@ -12,11 +12,12 @@ CloudFront (origin_path /public) ──▶ /sitemap.xml /robots.txt /llms.txt
 
 ## Entry points
 
-| Import                | Runtime         | What                                                                                                         |
-| --------------------- | --------------- | ------------------------------------------------------------------------------------------------------------ |
-| `@wl/site-index`      | any, no deps    | `defineSiteIndexConfig`, `createManifest`, `parseManifest`, `buildSiteIndex`, the three renderers.           |
-| `@wl/site-index/node` | Node build step | `writeManifest(dir, manifest)`, `readManifests(dir)`, `writeSiteIndexFiles(dir, files)` for a local preview. |
-| `@wl/site-index/aws`  | Lambda          | `createSiteIndexHandler(options)`; needs `@aws-sdk/client-s3` and `@aws-sdk/client-cloudfront`.              |
+| Import                  | Runtime                 | What                                                                                                         |
+| ----------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `@wl/site-index`        | any, no deps            | `defineSiteIndexConfig`, `createManifest`, `parseManifest`, `buildSiteIndex`, the three renderers.           |
+| `@wl/site-index/node`   | Node build step         | `writeManifest(dir, manifest)`, `readManifests(dir)`, `writeSiteIndexFiles(dir, files)` for a local preview. |
+| `@wl/site-index/deploy` | infra-kit deploy script | `publishSiteIndexManifest(toolkit, options)`: upload a manifest, invoke the aggregator. Served from `src/`.  |
+| `@wl/site-index/aws`    | Lambda                  | `createSiteIndexHandler(options)`; needs `@aws-sdk/client-s3` and `@aws-sdk/client-cloudfront`.              |
 
 ## Manifest contract
 
@@ -48,10 +49,17 @@ an intended drop.
 ```ts
 // producer build step
 import { createManifest } from '@wl/site-index'
+// the producer's deploy.ts, in postDeploy
+import { publishSiteIndexManifest } from '@wl/site-index/deploy'
 import { writeManifest } from '@wl/site-index/node'
 
-await writeManifest('dist/site-index', createManifest('client', urls))
-// deploy: aws s3 cp dist/site-index/client.json s3://<bucket>/manifests/client.json, then invoke the aggregator
+await writeManifest('out/site-index', createManifest('client', urls))
+
+await publishSiteIndexManifest(toolkit, {
+  manifestPath: join(appDir, 'out/site-index/client.json'),
+  bucketParameter: '/<brand>/s3/site-index/bucket_name',
+  aggregatorFunctionName: `<service>-${stage}-siteIndexAggregate`,
+})
 ```
 
 ```ts

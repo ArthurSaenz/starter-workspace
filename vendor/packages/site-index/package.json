@@ -15,6 +15,10 @@
     "./aws": {
       "types": "./dist/aws/index.d.ts",
       "import": "./dist/aws/index.js"
+    },
+    "./deploy": {
+      "types": "./src/deploy/index.ts",
+      "import": "./src/deploy/index.ts"
     }
   },
   "private": true,
