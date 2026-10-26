@@ -72,7 +72,7 @@ const createFakeBucket = (initial: Record<string, unknown>, pageSize = 1000): Fa
   })
 
   const cloudFrontSend = vi.fn(async (command: unknown) => {
-    if (!(command instanceof CreateInvalidationCommand)) throw new Error('unexpected CloudFront command')
+    if (!(command instanceof CreateInvalidationCommand)) throw new TypeError('unexpected CloudFront command')
 
     invalidations.push(command.input.InvalidationBatch?.Paths?.Items ?? [])
 
