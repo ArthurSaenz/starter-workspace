@@ -41,6 +41,9 @@ export const overrides: TypedFlatConfigItem = {
       { blankLine: 'always', prev: '*', next: 'return' },
       { blankLine: 'always', prev: ['const', 'let'], next: '*' },
       { blankLine: 'any', prev: ['const', 'let'], next: ['const', 'let'] },
+      // Later entries win, so these carve multi-line declarations out of the `any` above.
+      { blankLine: 'always', prev: ['singleline-const', 'singleline-let'], next: ['multiline-const', 'multiline-let'] },
+      { blankLine: 'always', prev: ['multiline-const', 'multiline-let'], next: '*' },
     ],
     'style/jsx-one-expression-per-line': 'off',
     'style/brace-style': 'off',

@@ -29,6 +29,7 @@ export const createFakes = (seed: TestUser[] = []) => {
       return [user.id, user]
     }),
   )
+
   const tokens: (NewMagicToken & { spent: boolean })[] = []
   const sessions: (NewSession & StoredSession & { id: string })[] = []
   const sent: MagicLinkEmail[] = []

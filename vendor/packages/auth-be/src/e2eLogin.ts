@@ -59,6 +59,7 @@ export const createE2eLogin = <TUser extends AuthUser, TCtx extends AuthContext>
   }
 
   const createError = config.createError ?? defaultCreateAuthError
+
   const allowedEmails = config.allowedEmails
     .map((email) => {
       return email.trim().toLowerCase()
@@ -85,6 +86,7 @@ export const createE2eLogin = <TUser extends AuthUser, TCtx extends AuthContext>
       }
 
       const account = await config.resolveAccount(email, ctx)
+
       // A test account always carries at least the base role, whatever the host's own fallback.
       const pair = await config.issueSession(
         { ...account, roles: account.roles?.length ? account.roles : ['user'] },

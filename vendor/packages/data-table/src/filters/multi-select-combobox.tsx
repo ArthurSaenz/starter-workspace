@@ -116,13 +116,16 @@ export const MultiSelectCombobox = (props: MultiSelectComboboxProps) => {
   const trimmedQuery = query.trim()
   const filteredOptions = (searchOptions ?? filterOptions)(options, query)
   const labelByValue = buildLabelByValue(options)
+
   const optionValues = new Set(
     options.map((option) => {
       return option.value
     }),
   )
+
   const selectedValues = new Set(value)
   const createError = resolveCreateError(allowCreate, trimmedQuery, validateCreate)
+
   const canCreate = canCreateValue({
     allowCreate,
     trimmedQuery,
@@ -130,6 +133,7 @@ export const MultiSelectCombobox = (props: MultiSelectComboboxProps) => {
     optionValues,
     selectedValues,
   })
+
   const isAllSelected = areAllOptionsSelected(value, options)
   const shouldShowSelectAll = Boolean(showSelectAll) && options.length > 0 && trimmedQuery.length === 0
 

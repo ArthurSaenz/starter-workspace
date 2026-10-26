@@ -32,14 +32,17 @@ const renderSection = (title: string, entries: SiteIndexEntry[], config: SiteInd
 export const renderLlmsTxt = (entries: SiteIndexEntry[], config: SiteIndexConfig): string => {
   const { llms } = config
   const optionalGroups = new Set(llms.optionalGroups)
+
   const knownGroups = new Set(
     llms.sections.map((section) => {
       return section.group
     }),
   )
+
   const listed = entries.filter((entry) => {
     return entry.llms !== false
   })
+
   const inGroup = (group: string) => {
     return listed.filter((entry) => {
       return entry.group === group

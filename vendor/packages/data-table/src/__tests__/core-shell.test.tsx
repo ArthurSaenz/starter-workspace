@@ -101,6 +101,7 @@ describe('data table shell', () => {
     const screen = await render(<DataTable config={buildConfig()} />)
 
     const { container } = screen
+
     const readAriaSort = () => {
       return container.querySelector('[aria-sort]')?.getAttribute('aria-sort')
     }

@@ -1,4 +1,5 @@
 const noop = () => {}
+
 const fakeLs = {
   setItem: noop,
   getItem: noop,
@@ -8,6 +9,7 @@ const fakeLs = {
 const _localStorage = typeof window === 'undefined' ? fakeLs : window.localStorage
 
 const namespace = 'v1'
+
 /**
  * Returns the namespaced localStorage key for a given cache name.
  *
@@ -18,6 +20,7 @@ const namespace = 'v1'
 const getKey = (name: string) => {
   return `${namespace}.${name}`
 }
+
 /**
  * Returns the namespaced localStorage key for the updatedAt timestamp of a given cache name.
  *

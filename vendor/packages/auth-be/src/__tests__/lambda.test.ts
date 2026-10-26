@@ -10,11 +10,13 @@ const CORS = { 'Access-Control-Allow-Origin': 'https://app.test', 'Access-Contro
 const setup = (uninvitedRequest: 'silent' | 'reject' = 'silent') => {
   const fakes = createFakes([invitedUser()])
   const auth = createMagicLinkAuth({ ...fakes.config, uninvitedRequest })
+
   const routes = createAuthRoutes(auth, {
     corsHeaders: () => {
       return CORS
     },
   })
+
   const wrap = (route: (typeof routes)[keyof typeof routes]) => {
     return toLambdaHandler(route, {
       corsHeaders: () => {
@@ -35,6 +37,7 @@ const signedIn = async () => {
   const verified = await ctx.wrap(ctx.routes.verifyMagicLink)({
     queryStringParameters: { token: tokenFromEmail(ctx.fakes.sent[0]!) },
   })
+
   const [accessCookie, refreshCookie] = verified.multiValueHeaders!['Set-Cookie']!
   const cookie = `${accessCookie!.split(';')[0]}; ${refreshCookie!.split(';')[0]}`
 
@@ -127,6 +130,7 @@ describe('auth routes', () => {
     const { routes, auth } = setup()
     const onError = vi.fn()
     const boom = { handle: vi.fn().mockRejectedValue(new Error('boom')) }
+
     const base = {
       corsHeaders: () => {
         return CORS
@@ -150,12 +154,14 @@ describe('auth routes', () => {
   it('passes the host context to the engine', async () => {
     const { fakes, auth } = setup()
     const ctx = { logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }
+
     const routes = createAuthRoutes(auth, {
       corsHeaders: () => {
         return CORS
       },
       requestMagicLinkMessage: 'Check your inbox.',
     })
+
     const handler = toLambdaHandler(routes.requestMagicLink, {
       corsHeaders: () => {
         return CORS

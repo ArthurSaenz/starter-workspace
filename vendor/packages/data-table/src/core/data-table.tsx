@@ -65,6 +65,7 @@ export const DataTable = <TData extends RowData>(props: DataTableProps<TData>) =
   const headerActions = config.headerActions ?? defaultHeaderActions
 
   const FilterBarComponent: ComponentType<DataTableFilterBarProps> = components?.FilterBar ?? FilterBar
+
   const PaginationComponent: ComponentType<DataTablePaginationProps<TData>> =
     components?.Pagination ?? DataTablePagination
 

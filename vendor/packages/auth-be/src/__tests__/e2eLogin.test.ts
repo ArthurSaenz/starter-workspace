@@ -11,6 +11,7 @@ const SECRET = 's'.repeat(32)
 const setup = (secret = SECRET, user = invitedUser({ roles: [] })) => {
   const fakes = createFakes([user])
   const auth = createMagicLinkAuth(fakes.config)
+
   const resolveAccount = vi.fn(async () => {
     return user
   })

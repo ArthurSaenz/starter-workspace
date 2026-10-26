@@ -73,6 +73,7 @@ describe('cell kinds: badge', () => {
 describe('cell kinds: number-input', () => {
   it('fires onChange with the raw string and the row', async () => {
     const onChange = vi.fn()
+
     const column: TableColumnConfig<Row> = {
       id: 'price',
       label: 'Price',
@@ -123,6 +124,7 @@ describe('cell kinds: number-input', () => {
 describe('cell kinds: price-input', () => {
   it('stacks every field and fires the currency select onChange', async () => {
     const onCurrencyChange = vi.fn()
+
     const column: TableColumnConfig<Row> = {
       id: 'buying',
       label: 'Buying',
@@ -201,6 +203,7 @@ describe('cell kinds: price-input', () => {
 describe('cell kinds: currency-select', () => {
   it('renders the controlled value and fires onChange', async () => {
     const onChange = vi.fn()
+
     const column: TableColumnConfig<Row> = {
       id: 'currency',
       label: 'Currency',
@@ -231,6 +234,7 @@ describe('cell kinds: currency-select', () => {
 describe('cell kinds: textarea', () => {
   it('fires onChange and renders the slot', async () => {
     const onChange = vi.fn()
+
     const column: TableColumnConfig<Row> = {
       id: 'comment',
       label: 'Comment',
@@ -259,6 +263,7 @@ describe('cell kinds: textarea', () => {
 describe('cell kinds: switch', () => {
   it('emits {row, checked} and defaults to the green/red toggle classes', async () => {
     const onToggle = vi.fn()
+
     const column: TableColumnConfig<Row> = {
       id: 'active',
       label: 'Active',
@@ -350,6 +355,7 @@ describe('cell kinds: actions', () => {
 
   it('passes the render context to edit/save onClick', async () => {
     const onClick = vi.fn()
+
     const column: TableColumnConfig<Row> = {
       id: 'actions',
       label: 'Actions',
@@ -400,6 +406,7 @@ describe('cell kinds: actions', () => {
 describe('cell kinds: checkbox-select', () => {
   it('reflects isSelected and calls onToggle(row) on click', async () => {
     const onToggle = vi.fn()
+
     const column: TableColumnConfig<Row> = {
       id: 'select',
       label: 'Select',

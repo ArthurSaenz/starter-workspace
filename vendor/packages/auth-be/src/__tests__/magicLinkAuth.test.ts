@@ -96,6 +96,7 @@ describe('requestMagicLink', () => {
 
   it('uses a host validator in place of the built-in one', async () => {
     const fakes = createFakes([invitedUser()])
+
     const requestMagicLink = vi.fn(() => {
       throw new Error('nope')
     })
@@ -286,6 +287,7 @@ describe('verifyMagicLink', () => {
 
   it('maps errors through the host factory', async () => {
     const fakes = createFakes([invitedUser()])
+
     const createError = vi.fn((init: { code: string }) => {
       return new Error(`host:${init.code}`)
     })

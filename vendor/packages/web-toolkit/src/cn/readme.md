@@ -28,6 +28,7 @@ console.log(className) // "text-white bg-blue-500"
 
 ```typescript
 const isActive = true
+
 const className = cn('bg-red-500', {
   'text-white': isActive,
   'text-gray-500': !isActive,

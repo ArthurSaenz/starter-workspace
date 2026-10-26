@@ -27,14 +27,17 @@ const createFakeBucket = (initial: Record<string, unknown>, pageSize = 1000): Fa
       return [key, typeof value === 'string' ? value : JSON.stringify(value)]
     }),
   )
+
   const invalidations: string[][] = []
 
   const s3Send = vi.fn(async (command: unknown) => {
     if (command instanceof ListObjectsV2Command) {
       const { Prefix = '', ContinuationToken } = command.input
+
       const keys = [...objects.keys()].filter((key) => {
         return key.startsWith(Prefix)
       })
+
       const start = ContinuationToken ? Number(ContinuationToken) : 0
       const page = keys.slice(start, start + pageSize)
       const next = start + pageSize
@@ -163,6 +166,7 @@ describe('createSiteIndexHandler', () => {
       [STATE_KEY]: { urlCount: 114 },
       'public/sitemap.xml': 'old',
     })
+
     const handler = createHandler(bucket)
 
     await expect(handler()).rejects.toThrow(/fell from 114 to 5/)
@@ -177,6 +181,7 @@ describe('createSiteIndexHandler', () => {
       'manifests/client.json': manifest('client', [{ path: '/' }]),
       'manifests/seo.json': manifest('seo', [{ path: '/' }]),
     })
+
     const warn = vi.fn()
 
     await createSiteIndexHandler({ config, bucket: BUCKET, crawlable: true, s3: bucket.s3, warn })()

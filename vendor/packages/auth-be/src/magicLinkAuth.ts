@@ -168,12 +168,14 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
   const inviteTtlMin = config.magicLink.inviteTtlMin ?? DEFAULT_INVITE_TOKEN_TTL_MIN
   const cookies = resolveCookieOptions(config.cookies)
   const maxTokenAgeMs = Math.max(signInTtlMin, inviteTtlMin) * 60 * 1000
+
   // Per key, so an explicit `undefined` override keeps the default instead of disabling the limit.
   const limits = Object.fromEntries(
     Object.entries(DEFAULT_RATE_LIMITS).map(([key, fallback]) => {
       return [key, config.rateLimits?.[key as keyof RateLimitConfig] ?? fallback]
     }),
   ) as unknown as RateLimitConfig
+
   const createError = config.createError ?? defaultCreateAuthError
   const notInvitedMessage = config.notInvitedMessage ?? 'This email is not invited.'
 
@@ -182,6 +184,7 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
     ((user: TUser) => {
       return user.invited === true
     })
+
   const rolesOf =
     config.rolesOf ??
     ((user: TUser) => {
@@ -274,12 +277,14 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
   const issueSession = async (user: TUser, meta?: RequestMeta, ctx?: TCtx): Promise<TokenPair> => {
     const userId = String(user.id)
     const jti = crypto.randomUUID()
+
     const access = signAccessToken(
       { sub: userId, roles: rolesOf(user), authMethod: 'magic' },
       config.jwt.accessSecret,
       identity,
       accessTtlSec,
     )
+
     const refresh = signRefreshToken({ sub: userId, jti }, config.jwt.refreshSecret, identity, refreshTtlSec)
 
     await sessions.create(
@@ -308,12 +313,14 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
   const rotateSession = async (session: StoredSession, user: TUser, ctx?: TCtx): Promise<TokenPair> => {
     const userId = String(user.id)
     const jti = crypto.randomUUID()
+
     const access = signAccessToken(
       { sub: userId, roles: rolesOf(user), authMethod: 'magic' },
       config.jwt.accessSecret,
       identity,
       accessTtlSec,
     )
+
     const refresh = signRefreshToken({ sub: userId, jti }, config.jwt.refreshSecret, identity, refreshTtlSec)
 
     const rotated = await sessions.rotate(

@@ -43,6 +43,7 @@ describe('publishSiteIndexManifest', () => {
 
   it('fails the deploy on a missing bucket parameter unless best-effort', async () => {
     const missing = new Error('ParameterNotFound')
+
     const ssm = vi.fn(async () => {
       throw missing
     })

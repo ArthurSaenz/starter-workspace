@@ -120,9 +120,11 @@ describe('zero-JSX config (AC2)', () => {
     const screen = await render(<DataTable config={CONFIG} cellRegistry={createCellRegistry<DestinationRow>()} />)
 
     const { container } = screen
+
     const readAriaSort = () => {
       return container.querySelector('[aria-sort]')?.getAttribute('aria-sort')
     }
+
     const readDestinations = () => {
       return [...container.querySelectorAll('tbody tr')].map((row) => {
         return row.querySelectorAll('td')[0]?.textContent ?? ''

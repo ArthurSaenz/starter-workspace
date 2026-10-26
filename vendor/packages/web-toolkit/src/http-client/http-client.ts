@@ -87,6 +87,7 @@ export class HttpClient<R extends string = string> {
 
       const isNeedParse =
         response.status !== 206 && contentTypeIs(response.headers, 'application/json') && options.method !== 'HEAD'
+
       const answer = isNeedParse ? await response.json() : await response.text()
 
       const responder = {

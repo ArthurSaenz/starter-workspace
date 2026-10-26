@@ -8,9 +8,11 @@ export const RequireAuthContainer = <TUser,>(props: RequireAuthContainerProps<TU
   const { onUnauthenticated, onLoggedOut, fallback, isAllowed, renderDenied, children } = props
 
   const store = useAuthStore<TUser>()
+
   const status = useAuth((state: AuthState<TUser>) => {
     return state.status
   })
+
   const user = useAuth((state: AuthState<TUser>) => {
     return state.user
   })

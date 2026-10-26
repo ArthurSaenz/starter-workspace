@@ -137,6 +137,7 @@ export const parseManifest = (raw: unknown, source: string): SiteIndexManifest =
   if (!isRecord(raw)) throw new SiteIndexError(`Manifest ${source} is not a JSON object`)
 
   const { producer, version, generatedAt, urls } = raw
+
   const issues = Object.keys(raw)
     .filter((key) => {
       return !MANIFEST_FIELDS.includes(key)

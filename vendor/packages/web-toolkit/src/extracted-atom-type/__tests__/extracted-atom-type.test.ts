@@ -59,6 +59,7 @@ describe('atom utility types', () => {
       type CounterActionArgs = { type: 'increment' } | { type: 'decrement' } | { type: 'set'; value: number }
 
       const _countAtom = atom(0)
+
       const _counterAtom = atom(null, (get, set, action: CounterActionArgs) => {
         const current = get(_countAtom)
 
@@ -81,6 +82,7 @@ describe('atom utility types', () => {
       }
 
       const _userAtom = atom({ name: 'John', age: 30 })
+
       const _setUserAtom = atom(null, (_get, set, args: SetUserArgs) => {
         const { name, age } = args
 
@@ -92,6 +94,7 @@ describe('atom utility types', () => {
 
     it('should extract args from atom with primitive payload', () => {
       const _message = atom('')
+
       const _messageAtom = atom(null, (_get, set, message: string) => {
         set(_message, message)
       })

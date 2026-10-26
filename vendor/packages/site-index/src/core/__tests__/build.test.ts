@@ -39,6 +39,7 @@ describe('buildSiteIndex', () => {
       ],
       { crawlable: true },
     )
+
     const llms = files['llms.txt']
 
     expect(llms.indexOf('[Rome]')).toBeGreaterThan(llms.indexOf('## Flights'))

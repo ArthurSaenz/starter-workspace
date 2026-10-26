@@ -59,9 +59,11 @@ export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthC
   options: AuthRoutesOptions,
 ) => {
   const { corsHeaders } = options
+
   const json = (statusCode: number, body: unknown): LambdaResult => {
     return { statusCode, headers: corsHeaders(), body: JSON.stringify(body) }
   }
+
   const withCookies = (body: unknown, cookies: string[]): LambdaResult => {
     return { ...json(200, body), multiValueHeaders: { 'Set-Cookie': cookies } }
   }
@@ -71,6 +73,7 @@ export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthC
       message: options.requestMagicLinkMessage ?? 'If that email exists, a sign-in link has been sent.',
     })
   }
+
   const noContent = (): LambdaResult => {
     return {
       statusCode: 204,

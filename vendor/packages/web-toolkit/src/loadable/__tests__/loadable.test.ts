@@ -33,9 +33,11 @@ describe('loadable', () => {
   it('returns loading, then hasData once the promise resolves', async () => {
     const store = createStore()
     const deferred = createDeferred<string>()
+
     const $value = atom(() => {
       return deferred.promise
     })
+
     const $snapshot = loadable($value)
 
     store.sub($snapshot, () => {})
@@ -52,9 +54,11 @@ describe('loadable', () => {
     const store = createStore()
     const deferred = createDeferred<string>()
     const error = new Error('boom')
+
     const $value = atom(() => {
       return deferred.promise
     })
+
     const $snapshot = loadable($value)
 
     store.sub($snapshot, () => {})
@@ -70,6 +74,7 @@ describe('loadable', () => {
   it('returns hasError when a sync read throws', () => {
     const store = createStore()
     const error = new Error('sync boom')
+
     const $value = atom(() => {
       throw error
     })
@@ -81,6 +86,7 @@ describe('loadable', () => {
     const store = createStore()
     const $trigger = atom(0)
     const deferreds: ReturnType<typeof createDeferred<number>>[] = []
+
     const $value = atom((get) => {
       get($trigger)
 
@@ -90,6 +96,7 @@ describe('loadable', () => {
 
       return deferred.promise
     })
+
     const $snapshot = loadable($value)
 
     store.sub($snapshot, () => {})
@@ -121,6 +128,7 @@ describe('loadable', () => {
     const $value = atom(async () => {
       return 'text'
     })
+
     const $snapshot = loadable($value)
     const store = createStore()
     const snapshot = store.get($snapshot)

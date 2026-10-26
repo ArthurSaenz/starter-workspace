@@ -154,6 +154,7 @@ describe('createAuthClient', () => {
 
   it('uses an injected refresh instead of its own endpoint', async () => {
     const fetchMock = vi.fn()
+
     const refresh = vi.fn(async () => {
       return true
     })

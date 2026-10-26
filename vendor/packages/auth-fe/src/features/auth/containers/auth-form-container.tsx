@@ -9,6 +9,7 @@ export const AuthFormContainer = (props: AuthFormContainerProps) => {
   const { redirect, onAuthenticated, render } = props
 
   const store = useAuthStore<unknown>()
+
   const state = useAuth((current: AuthState<unknown>) => {
     return current
   })

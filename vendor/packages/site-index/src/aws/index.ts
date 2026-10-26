@@ -108,6 +108,7 @@ export const createSiteIndexHandler = (options: SiteIndexHandlerOptions) => {
     )
 
     const { files, stats } = buildSiteIndex(config, manifests, { crawlable })
+
     const refusal = event?.force
       ? null
       : getShrinkRefusal(await readPreviousUrlCount(s3, bucket), stats.urlCount, maxDropRatio)
@@ -146,6 +147,7 @@ export const createSiteIndexHandler = (options: SiteIndexHandlerOptions) => {
       const paths = (Object.keys(files) as SiteIndexFileName[]).map((name) => {
         return `/${name}`
       })
+
       const invalidation = await cloudFront.send(
         new CreateInvalidationCommand({
           DistributionId: distributionId,

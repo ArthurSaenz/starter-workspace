@@ -29,6 +29,7 @@ const sortByProducer = (manifests: SiteIndexManifest[]): SiteIndexManifest[] => 
 
 const assertUniqueProducers = (manifests: SiteIndexManifest[]) => {
   const seen = new Set<string>()
+
   const repeated = manifests.flatMap((manifest) => {
     if (!seen.has(manifest.producer)) {
       seen.add(manifest.producer)
