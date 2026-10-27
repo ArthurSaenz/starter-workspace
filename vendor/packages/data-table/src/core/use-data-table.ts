@@ -134,6 +134,10 @@ export const useDataTable = <TData extends RowData>(
       : {}),
     getRowId,
     getRowCanExpand,
+    // TanStack v9 recomputes the core row model on every `data` identity change and then resets
+    // expansion unless told otherwise (v8 only did so for grouped rows). Rows are keyed by
+    // `getRowId`, so an edited or refetched row keeps its id and must keep its panel (HULY-2770).
+    autoResetExpanded: false,
     onSortingChange,
     onColumnVisibilityChange,
     onExpandedChange,
