@@ -1,7 +1,7 @@
 export { createE2eLogin, parseAllowedEmails, safeSecretEqual } from './e2eLogin.js'
 export type { E2eLoginConfig, E2eLoginInput } from './e2eLogin.js'
 export { buildMagicLinkUrl, formatExpiry, renderMagicLinkEmail } from './email.js'
-export type { MagicLinkEmailText } from './email.js'
+export type { MagicLinkEmailInput, MagicLinkEmailKind, MagicLinkEmailText, RenderMagicLinkEmail } from './email.js'
 export { AuthError, defaultCreateAuthError } from './errors.js'
 export type { AuthErrorCode, AuthErrorInit, CreateAuthError } from './errors.js'
 export {

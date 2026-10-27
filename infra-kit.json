@@ -25,6 +25,7 @@
       { "path": "vendor/packages/docs-ui" },
       { "path": "vendor/packages/auth-be", "module": "auth" },
       { "path": "vendor/packages/auth-fe", "module": "auth" },
+      { "path": "vendor/packages/auth-emails", "module": "auth" },
       { "path": "vendor/packages/data-table", "module": "data-table" },
       { "path": "vendor/packages/site-index", "module": "site-index" },
       { "path": "devops/scripts/lib", "module": "devops-scripts" },

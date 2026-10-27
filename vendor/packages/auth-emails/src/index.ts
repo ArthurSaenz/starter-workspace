@@ -1,0 +1,5 @@
+export { createAuthEmailRenderer, DEFAULT_AUTH_EMAIL_COPY } from './createAuthEmailRenderer.js'
+export type { AuthEmailRendererOptions } from './createAuthEmailRenderer.js'
+export { MagicLinkEmail } from './MagicLinkEmail.js'
+export type { MagicLinkEmailProps } from './MagicLinkEmail.js'
+export type { AuthEmailBrand, AuthEmailCopy } from './types.js'

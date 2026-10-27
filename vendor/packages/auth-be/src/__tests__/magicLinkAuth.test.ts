@@ -3,6 +3,7 @@
 import jwt from 'jsonwebtoken'
 import { describe, expect, it, vi } from 'vitest'
 
+import type { RenderMagicLinkEmail } from '../email.js'
 import { AuthError } from '../errors.js'
 import { createMagicLinkAuth } from '../magicLinkAuth.js'
 import { hashToken, signRefreshToken } from '../tokens.js'
@@ -18,6 +19,19 @@ const signIn = async (fakes: ReturnType<typeof createFakes>, email = 'ada@exampl
   await auth.requestMagicLink({ email, redirectUrl: '/trips' })
 
   return { auth, result: await auth.verifyMagicLink({ rawToken: tokenFromEmail(fakes.sent.at(-1)!) }) }
+}
+
+const withRenderEmail = (
+  fakes: ReturnType<typeof createFakes>,
+  renderEmail: RenderMagicLinkEmail<object> | undefined,
+): ReturnType<typeof createFakes>['config'] => {
+  const config: ReturnType<typeof createFakes>['config'] = { ...fakes.config }
+
+  delete config.email
+
+  if (renderEmail) config.renderEmail = renderEmail
+
+  return config
 }
 
 const expectAuthError = async (promise: Promise<unknown>, code: string, status: number) => {
@@ -45,6 +59,62 @@ describe('createMagicLinkAuth config guards', () => {
     expect(() => {
       return createMagicLinkAuth({ ...config, magicLink: { baseUrl: '' } })
     }).toThrow(/baseUrl/)
+  })
+
+  it('refuses neither of email and renderEmail', () => {
+    const config = withRenderEmail(createFakes(), undefined)
+
+    expect(() => {
+      return createMagicLinkAuth(config)
+    }).toThrow(/exactly one of email or renderEmail/)
+  })
+
+  it('refuses both email and renderEmail', () => {
+    const { config } = createFakes()
+
+    expect(() => {
+      return createMagicLinkAuth({ ...config, renderEmail: vi.fn() })
+    }).toThrow(/exactly one of email or renderEmail/)
+  })
+})
+
+describe('renderEmail', () => {
+  const rendered = { to: 'x', subject: 'Custom', text: 'custom text', html: '<b>custom</b>' }
+
+  it.each([
+    ['sign-in', 15],
+    ['invite', 72 * 60],
+  ] as const)('renders a %s email through the host renderer with the matching TTL', async (kind, expMin) => {
+    const fakes = createFakes([invitedUser()])
+
+    const renderEmail = vi.fn(async () => {
+      return rendered
+    })
+
+    const ctx = { logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }
+    const auth = createMagicLinkAuth(withRenderEmail(fakes, renderEmail))
+
+    if (kind === 'invite') await auth.sendInviteLink('ada@example.com', ctx)
+    else await auth.requestMagicLink({ email: 'ada@example.com' }, ctx)
+
+    expect(renderEmail).toHaveBeenCalledWith(
+      { to: 'ada@example.com', link: expect.stringContaining('https://app.test/auth/verify?token='), expMin, kind },
+      ctx,
+    )
+    expect(fakes.sent).toEqual([rendered])
+  })
+
+  it('invalidates the token when the host renderer throws', async () => {
+    const fakes = createFakes([invitedUser()])
+
+    const renderEmail = vi.fn(() => {
+      throw new Error('template broke')
+    })
+
+    await createMagicLinkAuth(withRenderEmail(fakes, renderEmail)).requestMagicLink({ email: 'ada@example.com' })
+
+    expect(fakes.tokens[0]!.spent).toBe(true)
+    expect(fakes.sent).toHaveLength(0)
   })
 })
 

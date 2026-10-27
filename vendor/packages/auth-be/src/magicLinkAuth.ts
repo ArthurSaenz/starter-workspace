@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 
-import type { MagicLinkEmailText } from './email.js'
+import type { MagicLinkEmailKind, MagicLinkEmailText, RenderMagicLinkEmail } from './email.js'
 import { buildMagicLinkUrl, renderMagicLinkEmail } from './email.js'
 import type { AuthErrorCode, CreateAuthError } from './errors.js'
 import { defaultCreateAuthError } from './errors.js'
@@ -95,7 +95,9 @@ export interface MagicLinkAuthConfig<TUser extends AuthUser, TMe, TCtx extends A
   jwt: JwtIdentity & { accessSecret: string; refreshSecret: string; accessTtlSec?: number; refreshTtlSec?: number }
   /** `baseUrl` is the SPA origin; the emailed link is `${baseUrl}${verifyPath}?token=…`. */
   magicLink: { baseUrl: string; verifyPath?: string; ttlMin?: number; inviteTtlMin?: number }
-  email: MagicLinkEmailText
+  /** Exactly one of `email` (the built-in plain template's copy) and `renderEmail` is required. */
+  email?: MagicLinkEmailText
+  renderEmail?: RenderMagicLinkEmail<TCtx>
   /** The DTO `GET /auth/me` answers with. */
   toMe: (user: TUser) => TMe
   cookies?: CookieOptions
@@ -159,6 +161,18 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
   if (!config.magicLink.baseUrl) {
     throw new Error('auth: magicLink.baseUrl is required')
   }
+
+  const { email: emailText, renderEmail: hostRenderEmail } = config
+
+  if (!emailText === !hostRenderEmail) {
+    throw new Error('auth: pass exactly one of email or renderEmail')
+  }
+
+  const renderEmail: RenderMagicLinkEmail<TCtx> =
+    hostRenderEmail ??
+    (({ to, link, expMin }) => {
+      return renderMagicLinkEmail(to, link, expMin, emailText!)
+    })
 
   const { users, magicTokens, sessions, rateLimiter, mailer } = config
   const identity: JwtIdentity = { issuer: config.jwt.issuer, audience: config.jwt.audience }
@@ -227,9 +241,11 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
     email: string,
     redirectUrl: string,
     meta: RequestMeta,
-    ttlMin: number,
+    kind: MagicLinkEmailKind,
     ctx?: TCtx,
   ): Promise<void> => {
+    const ttlMin = kind === 'invite' ? inviteTtlMin : signInTtlMin
+
     await magicTokens.invalidateByEmail(email, ctx)
 
     const rawToken = generateRawToken()
@@ -248,7 +264,8 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
     const link = buildMagicLinkUrl(config.magicLink.baseUrl, rawToken, redirectUrl, config.magicLink.verifyPath)
 
     try {
-      await mailer.send(renderMagicLinkEmail(email, link, ttlMin, config.email), ctx)
+      // Rendering sits inside the try: a template that throws leaves the same undelivered token.
+      await mailer.send(await renderEmail({ to: email, link, expMin: ttlMin, kind }, ctx), ctx)
     } catch (error) {
       // A token nobody received must not stay redeemable.
       ctx?.logger?.error('Magic link send failed; invalidating the undelivered token', {
@@ -402,7 +419,7 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
         return
       }
 
-      await mintAndSendMagicLink(email, redirectUrl, input, signInTtlMin, ctx)
+      await mintAndSendMagicLink(email, redirectUrl, input, 'sign-in', ctx)
     },
 
     /**
@@ -410,13 +427,7 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
      * caller has just authorised this address. Uses the longer invite TTL.
      */
     async sendInviteLink(email: string, ctx?: TCtx): Promise<void> {
-      await mintAndSendMagicLink(
-        (email || '').trim().toLowerCase(),
-        sanitizeRedirectUrl(undefined),
-        {},
-        inviteTtlMin,
-        ctx,
-      )
+      await mintAndSendMagicLink((email || '').trim().toLowerCase(), sanitizeRedirectUrl(undefined), {}, 'invite', ctx)
     },
 
     async verifyMagicLink(input: VerifyMagicLinkInput, ctx?: TCtx): Promise<VerifyMagicLinkResult> {

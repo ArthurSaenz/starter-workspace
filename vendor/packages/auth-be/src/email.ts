@@ -1,4 +1,4 @@
-import type { MagicLinkEmail } from './ports.js'
+import type { AuthContext, MagicLinkEmail } from './ports.js'
 
 export interface MagicLinkEmailText {
   subject: string
@@ -7,6 +7,22 @@ export interface MagicLinkEmailText {
   expiryPrefix?: string
   warning?: string
 }
+
+/** `invite` is an admin's `sendInviteLink`; `sign-in` is the user's own request. */
+export type MagicLinkEmailKind = 'sign-in' | 'invite'
+
+export interface MagicLinkEmailInput {
+  to: string
+  link: string
+  expMin: number
+  kind: MagicLinkEmailKind
+}
+
+/** Host-owned rendering (e.g. React Email templates) in place of the built-in plain HTML. */
+export type RenderMagicLinkEmail<TCtx extends AuthContext = AuthContext> = (
+  input: MagicLinkEmailInput,
+  ctx?: TCtx,
+) => MagicLinkEmail | Promise<MagicLinkEmail>
 
 export const buildMagicLinkUrl = (
   baseUrl: string,
