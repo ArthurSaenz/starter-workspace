@@ -36,6 +36,6 @@
       { "path": "devops/scripts/rotate-grafana-tokens.sh", "module": "grafana-rotation" },
       { "path": ".github/workflows/_rotate-grafana-tokens-jobs.yml", "module": "grafana-rotation" }
     ],
-    "exclude": ["serverless-config"]
+    "exclude": ["serverless-config", "special-pages"]
   }
 }
