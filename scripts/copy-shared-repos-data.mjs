@@ -226,12 +226,6 @@ const COPY_CONFIG = [
   //   type: 'file',
   // },
   // {
-  //   name: 'GH Workflow: Playwright Jobs',
-  //   source: '.github/workflows/_playwright-jobs.yml',
-  //   target: '.github/workflows/_playwright-jobs.yml',
-  //   type: 'file',
-  // },
-  // {
   //   name: 'GH Workflow: Terraform Apply Infrastructure',
   //   source: '.github/workflows/_terraform-apply-infrastructure-jobs.yml',
   //   target: '.github/workflows/_terraform-apply-infrastructure-jobs.yml',

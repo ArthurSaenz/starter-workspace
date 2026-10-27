@@ -32,7 +32,6 @@
       { "path": ".github/workflows/_cache-nodemodules-jobs.yml" },
       { "path": ".github/workflows/_deploy-media-jobs.yml", "module": "deploy-media" },
       { "path": ".github/workflows/_notify-success-jobs.yml" },
-      { "path": ".github/workflows/_playwright-jobs.yml" },
       { "path": ".github/workflows/_terraform-apply-infrastructure-jobs.yml", "module": "terraform" }
     ],
     "exclude": ["serverless-config"]
