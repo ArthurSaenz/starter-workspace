@@ -25,7 +25,7 @@
     "test-ui": "pnpm exec vitest --ui --silent passed-only",
     "test-report": "pnpm exec vitest run --coverage --silent passed-only",
     "email-dev": "pnpm exec email dev --dir previews --port 3030",
-    "infra-kit-check": "pnpm exec infra-kit audit"
+    "infra-kit-check": "infra-kit audit"
   },
   "peerDependencies": {
     "react": "catalog:",

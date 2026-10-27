@@ -36,7 +36,7 @@
     "test-watch": "pnpm exec vitest --watch --silent passed-only",
     "test-ui": "pnpm exec vitest --ui --silent passed-only",
     "test-report": "pnpm exec vitest run --coverage --silent passed-only",
-    "infra-kit-check": "pnpm exec infra-kit audit"
+    "infra-kit-check": "infra-kit audit"
   },
   "peerDependencies": {
     "@aws-sdk/client-cloudfront": "^3.1077.0",

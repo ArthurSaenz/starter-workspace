@@ -35,9 +35,5 @@
       { "path": ".github/workflows/_terraform-apply-infrastructure-jobs.yml", "module": "terraform" }
     ],
     "exclude": ["serverless-config"]
-  },
-  "audit": {
-    "requiredScripts": [],
-    "requiredFiles": []
   }
 }

@@ -31,7 +31,7 @@
     "test-report": "pnpm exec vitest run --coverage --silent passed-only",
     "qa": "pnpm run prettier-check && pnpm run eslint-check && pnpm run ts-check && pnpm run test && echo ✅ Success",
     "fix": "pnpm run prettier-fix && pnpm run eslint-fix && pnpm run qa",
-    "infra-kit-check": "pnpm exec infra-kit audit"
+    "infra-kit-check": "infra-kit audit"
   },
   "peerDependencies": {
     "react": "catalog:",
