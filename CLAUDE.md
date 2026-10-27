@@ -60,7 +60,7 @@ forget. New project skills that ship scripts get picked up by putting their test
 `.claude/skills/<name>/__tests__/`.
 
 <!-- infra-kit:begin -->
-<!-- infra-kit:version 0.21.0 -->
+<!-- infra-kit:version 0.35.0 -->
 
 # infra-kit
 

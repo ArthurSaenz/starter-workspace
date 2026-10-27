@@ -1,5 +1,5 @@
 <!-- infra-kit:package:begin -->
-<!-- infra-kit:package:version 0.23.0 lib -->
+<!-- infra-kit:package:version 0.35.0 lib -->
 
 # @wl/data-table
 
