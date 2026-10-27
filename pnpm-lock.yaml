@@ -247,8 +247,8 @@ importers:
   .:
     devDependencies:
       '@slip-stream-kit/config':
-        specifier: ^0.34.0
-        version: 0.34.0(vite@8.3.0(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(stylus@0.62.0(supports-color@7.2.0))(yaml@2.9.1))
+        specifier: ^0.35.0
+        version: 0.35.0(vite@8.3.0(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(stylus@0.62.0(supports-color@7.2.0))(yaml@2.9.1))
       '@types/react':
         specifier: 'catalog:'
         version: 19.3.0
@@ -2972,8 +2972,8 @@ packages:
     resolution: {integrity: sha512-TeheYy0ILzBEI/CO55CP6zJCSdSWeRtGnHy8U8dWSUH4I68iqTsy7HkMktR4xakThc9jotkPQUXT4ITdbV7cHA==}
     engines: {node: '>=18'}
 
-  '@slip-stream-kit/config@0.34.0':
-    resolution: {integrity: sha512-LupyBv+7AcUuzU5s7po5SU474azra8JsOWf6JKwCdh9JMvruXPyY8fkTm0iTyj7yM1OU9ZnAeurk8qkiOgqufw==}
+  '@slip-stream-kit/config@0.35.0':
+    resolution: {integrity: sha512-aJFSz8OnlQfMyyxpBfNZ0q8P6KgjAgmTOsUmcsQVHy/xX+D2jmIG2P9WSRn+lwTP/by43d9Kc2C1N5ejAFKplg==}
     engines: {node: '>=24.x'}
     peerDependencies:
       vite: '>=8'
@@ -9403,7 +9403,7 @@ snapshots:
 
   '@sindresorhus/base62@1.0.0': {}
 
-  '@slip-stream-kit/config@0.34.0(vite@8.3.0(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(stylus@0.62.0(supports-color@7.2.0))(yaml@2.9.1))':
+  '@slip-stream-kit/config@0.35.0(vite@8.3.0(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(stylus@0.62.0(supports-color@7.2.0))(yaml@2.9.1))':
     dependencies:
       zod: 4.6.7
     optionalDependencies:

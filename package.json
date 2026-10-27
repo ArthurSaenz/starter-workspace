@@ -35,11 +35,11 @@
     "test-report": "pnpm exec turbo run test-report --continue",
     "test-unit": "pnpm exec turbo test-unit --continue",
     "test-ui": "vitest --ui --silent passed-only",
-    "infra-kit-check-root": "pnpm exec infra-kit audit --root",
+    "infra-kit-check-root": "infra-kit audit --root",
     "infra-kit-check": "pnpm exec turbo run infra-kit-check --continue --output-logs=errors-only && pnpm run infra-kit-check-root"
   },
   "devDependencies": {
-    "@slip-stream-kit/config": "^0.34.0",
+    "@slip-stream-kit/config": "^0.35.0",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@wl/prettier-config": "workspace:*",
