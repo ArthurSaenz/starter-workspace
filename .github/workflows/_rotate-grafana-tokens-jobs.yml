@@ -1,0 +1,60 @@
+name: _rotate-grafana-tokens-jobs
+
+on:
+  workflow_call:
+    inputs:
+      # The Grafana workspace region (the infrastructure stack's var.region_name), not
+      # ROOT_AWS_REGION — the workspace can live elsewhere than the root account default.
+      aws-region:
+        required: true
+        type: string
+
+jobs:
+  rotate:
+    runs-on: ubuntu-24.04-arm
+    # Grafana is prod-only, and DOPPLER_GRAFANA_ROTATION_TOKEN belongs here as an environment
+    # secret so it inherits the prod environment's protection. That token can overwrite prod
+    # secrets — it is more dangerous than the Grafana tokens it manages.
+    environment: prod
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up AWS CLI
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.TERRAFORM_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.TERRAFORM_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.aws-region }}
+          # Required, not hardening: these are root-account keys and the workspace is in prod.
+          # Without the assume, every aws call runs in the wrong account and reports the
+          # workspace as not found.
+          role-to-assume: ${{ secrets.GRAFANA_ROTATION_ROLE_ARN }}
+          role-skip-session-tagging: true
+
+      - name: Rotate tokens
+        env:
+          WORKSPACE_ID: ${{ secrets.GRAFANA_WORKSPACE_ID }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_GRAFANA_ROTATION_TOKEN }}
+          # Which Doppler config each token is written to. `ik env-load -c <config>` is what
+          # decides which identity a session gets, so these must stay different.
+          AGENT_CONFIG: prod
+          OBSERVABILITY_CONFIG: prod_observability
+        # The Doppler project is the one `ik env-load` reads, so the tokens land where sessions look.
+        run: |
+          DOPPLER_PROJECT=$(jq -er '.envManagement.config.name' infra-kit.json)
+          export DOPPLER_PROJECT
+          sh ./devops/scripts/rotate-grafana-tokens.sh
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_MESSAGE: >-
+            Grafana token rotation failed for ${{ github.repository }}. The tokens in Doppler stay
+            valid for roughly 23 more days, so this is not urgent yet. Re-run
+            "06 🔑 Rotate Grafana tokens" to recover. Do not mint a token by hand — nothing would
+            replace it when it expires.
+          SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
+          SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
