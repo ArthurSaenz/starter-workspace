@@ -73,57 +73,48 @@ export class HttpClient<R extends string = string> {
 
     const url = `${this.baseUrl}${uri}`
 
-    try {
-      const response = await fetchWrap({
-        url,
-        options: requestOptions,
-        config,
-        fetchInstance: this.fetchInstance,
-      }).catch((error) => {
-        const options = { cause: error as Error }
+    const response = await fetchWrap({
+      url,
+      options: requestOptions,
+      config,
+      fetchInstance: this.fetchInstance,
+    }).catch((error) => {
+      const options = { cause: error as Error }
 
-        throw new Error(`Network error: ${error.message}`, options)
-      })
+      throw new Error(`Network error: ${error.message}`, options)
+    })
 
-      const isNeedParse =
-        response.status !== 206 && contentTypeIs(response.headers, 'application/json') && options.method !== 'HEAD'
+    const isNeedParse =
+      response.status !== 206 && contentTypeIs(response.headers, 'application/json') && options.method !== 'HEAD'
 
-      const answer = isNeedParse ? await response.json() : await response.text()
+    const answer = isNeedParse ? await response.json() : await response.text()
 
-      const responder = {
-        ok: response.ok,
-        body: answer,
-        status: response.status,
-        headers: Object.fromEntries(response.headers.entries()),
-      }
-
-      if (response.ok || response.status === 304) {
-        return responder
-      }
-
-      if (response.status === 570) {
-        throw new ServerError<R>({
-          type: responder.body?.type || 'SERVER_ERROR',
-          message: responder.body?.message || 'Server error message',
-          extraData: answer.extraData || {},
-          metaData: {
-            res: responder,
-            req: { ...requestOptions, body: options.body },
-          },
-        })
-      }
-
-      // console.log('API Layer', url, responder)
-
-      throw new Error(`API Layer: ${responder.status} - ${url}`, { cause: responder })
-    } catch (error) {
-      if (import.meta.env.DEBUG_API_REQUEST) {
-        console.error(error)
-      }
-
-      // throw new Error(`API Layer ${url}`, { cause: error as Error })
-      throw error
+    const responder = {
+      ok: response.ok,
+      body: answer,
+      status: response.status,
+      headers: Object.fromEntries(response.headers.entries()),
     }
+
+    if (response.ok || response.status === 304) {
+      return responder
+    }
+
+    if (response.status === 570) {
+      throw new ServerError<R>({
+        type: responder.body?.type || 'SERVER_ERROR',
+        message: responder.body?.message || 'Server error message',
+        extraData: answer.extraData || {},
+        metaData: {
+          res: responder,
+          req: { ...requestOptions, body: options.body },
+        },
+      })
+    }
+
+    // console.log('API Layer', url, responder)
+
+    throw new Error(`API Layer: ${responder.status} - ${url}`, { cause: responder })
   }
 }
 
