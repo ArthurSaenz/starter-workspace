@@ -171,7 +171,7 @@ const loadScript = (props: ScriptProps): void => {
 
     afterLoad()
   } else if (children) {
-    // eslint-disable-next-line sonarjs/no-nested-conditional
+    // eslint-disable-next-line sonarjs/no-nested-conditional -- flat enough to read inline
     element.textContent = typeof children === 'string' ? children : Array.isArray(children) ? children.join('') : ''
 
     afterLoad()

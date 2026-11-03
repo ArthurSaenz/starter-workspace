@@ -1,5 +1,4 @@
-// `expectAuthError` asserts; the rule does not follow helpers.
-/* eslint-disable sonarjs/no-hardcoded-ip, sonarjs/assertions-in-tests */
+/* eslint-disable sonarjs/no-hardcoded-ip, sonarjs/assertions-in-tests -- fixture client IPs; `expectAuthError` asserts, and the rule does not follow helpers */
 import jwt from 'jsonwebtoken'
 import { describe, expect, it, vi } from 'vitest'
 

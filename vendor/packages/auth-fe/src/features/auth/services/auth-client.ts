@@ -49,6 +49,7 @@ export const createAuthClient = <TUser>(options: AuthClientOptions): AuthClient<
   const doFetch =
     options.fetch ??
     ((input: RequestInfo | URL, init?: RequestInit) => {
+      // eslint-disable-next-line no-restricted-globals -- auth-fe is the transport itself; apps inject theirs via `options.fetch`
       return fetch(input, init)
     })
 

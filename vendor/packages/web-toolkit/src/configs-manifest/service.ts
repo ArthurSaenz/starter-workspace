@@ -132,7 +132,7 @@ const fetchRootManifest = async <T>(args: {
 
     if (response.status === 304 && cachedData) {
       if (isEnabledDebug) {
-        // eslint-disable-next-line no-console
+        // eslint-disable-next-line no-console -- debug mode only
         console.log('App manifest config (304, cached):', url, cachedData.data)
       }
 
@@ -144,7 +144,7 @@ const fetchRootManifest = async <T>(args: {
     }
 
     if (isEnabledDebug) {
-      // eslint-disable-next-line no-console
+      // eslint-disable-next-line no-console -- debug mode only
       console.log('App manifest config:', url, response.body)
     }
 
@@ -183,7 +183,7 @@ const getManifestConfigFile = ({ httpClient, isEnabledDebug }: { httpClient: Htt
       }
 
       if (isEnabledDebug) {
-        // eslint-disable-next-line no-console
+        // eslint-disable-next-line no-console -- debug mode only
         console.info('Manifest config file:', {
           cachedData,
           key,
@@ -213,7 +213,7 @@ const getManifestConfigFile = ({ httpClient, isEnabledDebug }: { httpClient: Htt
       }
 
       if (isEnabledDebug) {
-        // eslint-disable-next-line no-console
+        // eslint-disable-next-line no-console -- debug mode only
         console.info('Manifest config file:', key, response.headers)
       }
 
@@ -243,12 +243,12 @@ const attachDebugManifestCache = (args: { refetchConfigData: () => void }) => {
   window._app.manifestCache = {
     enable: () => {
       ls.remove(LS_DEBUG_MANIFEST_CACHE_STATUS)
-      // eslint-disable-next-line no-console
+      // eslint-disable-next-line no-console -- devtools helper output
       console.log('Refresh the page!')
     },
     disable: () => {
       ls.set(LS_DEBUG_MANIFEST_CACHE_STATUS, 'disabled')
-      // eslint-disable-next-line no-console
+      // eslint-disable-next-line no-console -- devtools helper output
       console.log('Refresh the page!')
     },
     refetchConfigData,

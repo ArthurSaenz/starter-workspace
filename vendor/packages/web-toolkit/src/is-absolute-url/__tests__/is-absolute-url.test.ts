@@ -1,4 +1,4 @@
-/* eslint-disable sonarjs/no-clear-text-protocols */
+/* eslint-disable sonarjs/no-clear-text-protocols -- http URLs are the test input */
 import { describe, expect, it } from 'vitest'
 
 import { isAbsoluteURL } from '../is-absolute-url'

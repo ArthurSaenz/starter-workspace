@@ -130,14 +130,14 @@ export const defineExperiments = <const T extends ExperimentsConfig>(config: T) 
       data: { ...ExperimentsNames },
       reset: () => {
         ls.remove(DEBUG_EXPERIMENTS_KEY)
-        // eslint-disable-next-line no-console
+        // eslint-disable-next-line no-console -- devtools helper output
         console.log('Refresh the page!')
       },
       setVariant: (exp: IdValue, variant: ExperimentNameValue) => {
         const data = ls.get(DEBUG_EXPERIMENTS_KEY)
 
         ls.set(DEBUG_EXPERIMENTS_KEY, { ...(data || {}), [exp]: variant })
-        // eslint-disable-next-line no-console
+        // eslint-disable-next-line no-console -- devtools helper output
         console.log('Refresh the page!')
       },
     }
@@ -178,7 +178,7 @@ export const defineExperiments = <const T extends ExperimentsConfig>(config: T) 
       if (isSSR) return
 
       if (isEnabledDebug) {
-        // eslint-disable-next-line react/web-api-no-leaked-timeout
+        // eslint-disable-next-line react/web-api-no-leaked-timeout -- one-shot debug log; nothing to clear on unmount
         setTimeout(() => {
           attachImplementedExperiments()
           setOptimizeAtom(getDevDebugExperimentsValues())
@@ -188,7 +188,7 @@ export const defineExperiments = <const T extends ExperimentsConfig>(config: T) 
         window.VWO.push([
           'isLoaded',
           () => {
-            // eslint-disable-next-line no-console
+            // eslint-disable-next-line no-console -- debug mode only
             console.info('VWO activate', window._vwo_exp_ids)
           },
         ])

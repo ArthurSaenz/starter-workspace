@@ -115,7 +115,7 @@ export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthC
   // redirect silently. The cookies ride along on the same-origin response.
   const verifyMagicLink: AuthRoute<TCtx> = {
     handle: async (event, ctx) => {
-      // eslint-disable-next-line dot-notation
+      // eslint-disable-next-line dot-notation -- `noPropertyAccessFromIndexSignature` requires brackets here
       const rawToken = (event.queryStringParameters?.['token'] || '').toString().trim()
       const result = await auth.verifyMagicLink({ rawToken, ...requestMeta(event) }, ctx)
 

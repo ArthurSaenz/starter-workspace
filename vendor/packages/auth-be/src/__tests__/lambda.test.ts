@@ -1,4 +1,4 @@
-/* eslint-disable sonarjs/no-hardcoded-ip */
+/* eslint-disable sonarjs/no-hardcoded-ip -- fixture client IPs */
 import { describe, expect, it, vi } from 'vitest'
 
 import { createAuthRoutes, extractSourceIp, toLambdaHandler } from '../lambda.js'

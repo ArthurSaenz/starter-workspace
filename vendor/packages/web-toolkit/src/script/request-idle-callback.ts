@@ -1,5 +1,5 @@
 export const requestIdleCallback =
-  // eslint-disable-next-line no-restricted-globals
+  // eslint-disable-next-line no-restricted-globals -- SSR guard: `typeof self` is false on the server
   (typeof self !== 'undefined' && self.requestIdleCallback && self.requestIdleCallback.bind(window)) ||
   function (callback: IdleRequestCallback): number {
     const start = Date.now()
@@ -15,7 +15,7 @@ export const requestIdleCallback =
   }
 
 export const cancelIdleCallback =
-  // eslint-disable-next-line no-restricted-globals
+  // eslint-disable-next-line no-restricted-globals -- SSR guard: `typeof self` is false on the server
   (typeof self !== 'undefined' && self.cancelIdleCallback && self.cancelIdleCallback.bind(window)) ||
   function (id: number) {
     return clearTimeout(id)
