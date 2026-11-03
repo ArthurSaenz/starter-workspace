@@ -1,0 +1,38 @@
+{
+  "src/features/auth/containers/auth-provider.tsx": {
+    "@wl/component-name-matches-file": {
+      "count": 1
+    }
+  },
+  "src/features/auth/services/auth-client.ts": {
+    "@wl/feature-files": {
+      "count": 1
+    }
+  },
+  "src/features/auth/services/auth-context.ts": {
+    "@wl/feature-files": {
+      "count": 1
+    },
+    "@wl/no-hooks-in-services": {
+      "count": 2
+    }
+  },
+  "src/features/auth/services/auth-store.ts": {
+    "@wl/feature-files": {
+      "count": 1
+    }
+  },
+  "src/features/auth/services/safe-redirect.ts": {
+    "@wl/feature-files": {
+      "count": 1
+    }
+  },
+  "src/features/auth/services/use-latest.ts": {
+    "@wl/feature-files": {
+      "count": 1
+    },
+    "@wl/no-hooks-in-services": {
+      "count": 1
+    }
+  }
+}
