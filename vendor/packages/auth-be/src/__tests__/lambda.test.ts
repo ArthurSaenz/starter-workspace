@@ -15,6 +15,7 @@ const setup = (uninvitedRequest: 'silent' | 'reject' = 'silent') => {
     corsHeaders: () => {
       return CORS
     },
+    clientIp: { trustedProxyHops: 0 },
   })
 
   const wrap = (route: (typeof routes)[keyof typeof routes]) => {
@@ -51,7 +52,11 @@ describe('auth routes', () => {
     const expected = { message: 'If that email exists, a sign-in link has been sent.' }
 
     for (const body of ['{"email":"ada@example.com"}', '{"email":"nobody@example.com"}', 'not json', null]) {
-      const result = await handler({ body, headers: { 'X-Forwarded-For': '1.2.3.4, 10.0.0.1' } })
+      const result = await handler({
+        body,
+        headers: { 'X-Forwarded-For': '6.6.6.6, 10.0.0.1' },
+        requestContext: { identity: { sourceIp: '1.2.3.4' } },
+      })
 
       expect(result.statusCode).toBe(200)
       expect(JSON.parse(result.body)).toEqual(expected)
@@ -160,6 +165,7 @@ describe('auth routes', () => {
         return CORS
       },
       requestMagicLinkMessage: 'Check your inbox.',
+      clientIp: { trustedProxyHops: 0 },
     })
 
     const handler = toLambdaHandler(routes.requestMagicLink, {
@@ -180,9 +186,117 @@ describe('auth routes', () => {
 })
 
 describe('extractSourceIp', () => {
-  it('prefers the first forwarded hop, then the API Gateway identity', () => {
-    expect(extractSourceIp({ headers: { 'x-forwarded-for': ' 5.6.7.8 ,1.1.1.1' } })).toBe('5.6.7.8')
-    expect(extractSourceIp({ requestContext: { identity: { sourceIp: '9.9.9.9' } } })).toBe('9.9.9.9')
-    expect(extractSourceIp({})).toBe('')
+  it.each<[{ xff?: string; sourceIp?: string; hops?: number }, string]>([
+    [{ xff: '6.6.6.6', sourceIp: '9.9.9.9', hops: 0 }, '9.9.9.9'],
+    [{ xff: '6.6.6.6, 1.2.3.4', hops: 1 }, '1.2.3.4'],
+    [{ xff: '1.2.3.4', sourceIp: '9.9.9.9', hops: 2 }, '9.9.9.9'],
+    [{}, ''],
+  ])('%o → %s', ({ xff, sourceIp, hops }, expected) => {
+    const event = {
+      ...(xff ? { headers: { 'X-Forwarded-For': xff } } : {}),
+      ...(sourceIp ? { requestContext: { identity: { sourceIp } } } : {}),
+    }
+
+    expect(extractSourceIp(event, hops)).toBe(expected)
+  })
+})
+
+describe('client IP', () => {
+  const XFF_WARNING = 'X-Forwarded-For names a client other than sourceIp; check clientIp.trustedProxyHops'
+
+  const event = (xff: string | undefined, sourceIp: string | undefined) => {
+    return {
+      body: '{"email":"ada@example.com"}',
+      ...(xff ? { headers: { 'X-Forwarded-For': xff } } : {}),
+      ...(sourceIp ? { requestContext: { identity: { sourceIp } } } : {}),
+    }
+  }
+
+  const loggerCtx = () => {
+    return { logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }
+  }
+
+  const xffWarnings = (ctx: ReturnType<typeof loggerCtx>) => {
+    return ctx.logger.warn.mock.calls.filter(([message]) => {
+      return message === XFF_WARNING
+    })
+  }
+
+  it('keys the per-IP limit on sourceIp whatever X-Forwarded-For claims', async () => {
+    const { routes, wrap, fakes } = setup()
+    const handler = wrap(routes.requestMagicLink)
+
+    await handler(event('6.6.6.6', '9.9.9.9'))
+    await handler(event('7.7.7.7, 8.8.8.8', '9.9.9.9'))
+
+    const ipKeys = fakes.rateLimiter.incrementAndCheck.mock.calls
+      .map(([key]) => {
+        return key
+      })
+      .filter((key) => {
+        return key.startsWith('magic:ip:')
+      })
+
+    expect(ipKeys).toEqual(['magic:ip:9.9.9.9', 'magic:ip:9.9.9.9'])
+  })
+
+  it.each([
+    ['a client other than sourceIp', '6.6.6.6', '9.9.9.9', 1],
+    ['a direct edge-optimized chain', '9.9.9.9, 130.176.0.1', '9.9.9.9', 0],
+    ['sourceIp itself', '9.9.9.9', '9.9.9.9', 0],
+    ['no header', undefined, '9.9.9.9', 0],
+  ])('with 0 hops, warns %s → %i warning(s)', async (_label, xff, sourceIp, warnings) => {
+    const { routes } = setup()
+    const ctx = loggerCtx()
+
+    await routes.requestMagicLink.handle(event(xff, sourceIp), ctx)
+
+    expect(xffWarnings(ctx)).toHaveLength(warnings)
+  })
+
+  it('warns once per routes instance, with no IP in the data', async () => {
+    const { routes } = setup()
+    const ctx = loggerCtx()
+
+    await routes.requestMagicLink.handle(event('6.6.6.6', '9.9.9.9'), ctx)
+    await routes.verifyMagicLink
+      .handle({ ...event('5.5.5.5', '9.9.9.9'), queryStringParameters: {} }, ctx)
+      .catch(() => {
+        return undefined
+      })
+
+    expect(xffWarnings(ctx)).toEqual([[XFF_WARNING, { data: { forwardedCount: 1 } }]])
+  })
+
+  it('keeps the warning for a later request when the first had no logger', async () => {
+    const { routes } = setup()
+    const ctx = loggerCtx()
+
+    await routes.requestMagicLink.handle(event('6.6.6.6', '9.9.9.9'), undefined)
+    await routes.requestMagicLink.handle(event('6.6.6.6', '9.9.9.9'), ctx)
+
+    expect(xffWarnings(ctx)).toHaveLength(1)
+  })
+
+  it('refuses a missing or invalid clientIp at construction', () => {
+    const { auth } = setup()
+
+    const corsHeaders = () => {
+      return CORS
+    }
+
+    expect(() => {
+      return createAuthRoutes(
+        auth,
+        // @ts-expect-error clientIp is required
+        { corsHeaders },
+      )
+    }).toThrow()
+    expect(() => {
+      return createAuthRoutes(auth, { corsHeaders, clientIp: { trustedProxyHops: -1 } })
+    }).toThrow()
+    expect(() => {
+      return createAuthRoutes(auth, { corsHeaders, clientIp: { trustedProxyHops: 1.5 } })
+    }).toThrow()
   })
 })

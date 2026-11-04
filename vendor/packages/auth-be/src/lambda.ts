@@ -32,20 +32,38 @@ export interface AuthRoutesOptions {
   corsHeaders: () => Record<string, string>
   /** The body every link request gets, whatever happened. */
   requestMagicLinkMessage?: string
+  /**
+   * The rate limits key on this IP. `trustedProxyHops` counts the proxies you run in front of API
+   * Gateway (e.g. 1 for CloudFront); 0 trusts only `sourceIp`. See the readme's topology table.
+   */
+  clientIp: { trustedProxyHops: number }
 }
 
-export const extractSourceIp = (event: LambdaEvent): string => {
-  const forwarded = readHeader(event.headers, 'x-forwarded-for')?.split(',')[0]
+const forwardedChain = (event: LambdaEvent): string[] => {
+  return (readHeader(event.headers, 'x-forwarded-for') ?? '')
+    .split(',')
+    .map((entry) => {
+      return entry.trim()
+    })
+    .filter(Boolean)
+}
 
-  return (forwarded || event.requestContext?.identity?.sourceIp || '').toString().trim()
+/**
+ * The client IP: `sourceIp` with 0 hops, else the X-Forwarded-For entry `trustedProxyHops` from the
+ * right. Entries further left are client-supplied and spoofable, so they are never read.
+ */
+export const extractSourceIp = (event: LambdaEvent, trustedProxyHops = 0): string => {
+  const sourceIp = (event.requestContext?.identity?.sourceIp || '').toString().trim()
+
+  if (trustedProxyHops === 0) return sourceIp
+
+  const chain = forwardedChain(event)
+
+  return (chain.length >= trustedProxyHops ? chain[chain.length - trustedProxyHops] : undefined) ?? sourceIp
 }
 
 export const extractUserAgent = (event: LambdaEvent): string => {
   return readHeader(event.headers, 'user-agent') || ''
-}
-
-const requestMeta = (event: LambdaEvent): RequestMeta => {
-  return { ipAddress: extractSourceIp(event), userAgent: extractUserAgent(event) }
 }
 
 /**
@@ -59,6 +77,37 @@ export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthC
   options: AuthRoutesOptions,
 ) => {
   const { corsHeaders } = options
+  // Read as optional: a JS caller gets no type check.
+  const trustedProxyHops = (options.clientIp as AuthRoutesOptions['clientIp'] | undefined)?.trustedProxyHops
+
+  if (typeof trustedProxyHops !== 'number' || !Number.isInteger(trustedProxyHops) || trustedProxyHops < 0) {
+    throw new Error('auth: clientIp.trustedProxyHops must be a non-negative integer')
+  }
+
+  let warnedAboutHops = false
+
+  const clientIp = (event: LambdaEvent, ctx?: TCtx): string => {
+    const ip = extractSourceIp(event, trustedProxyHops)
+
+    // The leftmost entry is the original client: it differs from `sourceIp` when a proxy of ours sits
+    // in front (AWS's own edge hops sit to its right). Only flagged once a logger actually took it.
+    if (trustedProxyHops === 0 && !warnedAboutHops && ctx?.logger) {
+      const chain = forwardedChain(event)
+
+      if (chain.length > 0 && chain[0] !== ip) {
+        ctx.logger.warn('X-Forwarded-For names a client other than sourceIp; check clientIp.trustedProxyHops', {
+          data: { forwardedCount: chain.length },
+        })
+        warnedAboutHops = true
+      }
+    }
+
+    return ip
+  }
+
+  const requestMeta = (event: LambdaEvent, ctx?: TCtx): RequestMeta => {
+    return { ipAddress: clientIp(event, ctx), userAgent: extractUserAgent(event) }
+  }
 
   const json = (statusCode: number, body: unknown): LambdaResult => {
     return { statusCode, headers: corsHeaders(), body: JSON.stringify(body) }
@@ -99,7 +148,7 @@ export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthC
         {
           email: body.email || '',
           ...(body.redirectUrl ? { redirectUrl: body.redirectUrl } : {}),
-          ...requestMeta(event),
+          ...requestMeta(event, ctx),
         },
         ctx,
       )
@@ -117,7 +166,7 @@ export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthC
     handle: async (event, ctx) => {
       // eslint-disable-next-line dot-notation -- `noPropertyAccessFromIndexSignature` requires brackets here
       const rawToken = (event.queryStringParameters?.['token'] || '').toString().trim()
-      const result = await auth.verifyMagicLink({ rawToken, ...requestMeta(event) }, ctx)
+      const result = await auth.verifyMagicLink({ rawToken, ...requestMeta(event, ctx) }, ctx)
 
       return withCookies({ ok: true, redirect: result.redirectUrl }, [result.accessCookie, result.refreshCookie])
     },
@@ -126,7 +175,7 @@ export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthC
   const refresh: AuthRoute<TCtx> = {
     handle: async (event, ctx) => {
       const pair = await auth.refreshSession(auth.extractRefreshToken(event.headers) || '', ctx, {
-        ipAddress: extractSourceIp(event),
+        ipAddress: clientIp(event, ctx),
       })
 
       return withCookies({ ok: true }, [pair.accessCookie, pair.refreshCookie])

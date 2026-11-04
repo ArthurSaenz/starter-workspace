@@ -21,14 +21,15 @@ honour the same cookie.
 
 ## Public API
 
-| Export                                                                                     | What it is                                                                                                                                                               |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `createMagicLinkAuth(config)`                                                              | The engine: `requestMagicLink`, `sendInviteLink`, `verifyMagicLink`, `refreshSession`, `logout`, `requireUser`, `authenticate`, `getMe`, `issueSession`, cookie helpers. |
-| `createAuthRoutes(auth, { corsHeaders, requestMagicLinkMessage? })`                        | The five endpoints as Lambda bodies (`requestMagicLink`, `verifyMagicLink`, `refresh`, `logout`, `me`), each `{ handle, fallbackResponse?, clearCookiesOn401? }`.        |
-| `toLambdaHandler(route, options)`                                                          | A complete handler for hosts without their own controller envelope (maps `AuthError`, honours fallback / clear-cookies).                                                 |
-| `verifySession(headers, { issuer, audience, accessSecret })`                               | For another service behind the same origin: the access-token payload or `null`. Fails closed.                                                                            |
-| `signAccessToken` / `verifyAccessToken` / `signRefreshToken` / `verifyRefreshToken`        | HS256 with issuer + audience pinning.                                                                                                                                    |
-| `sanitizeRedirectUrl`, `extractAccessToken`, `extractRefreshToken`, `buildClearCookies`, … | The pure helpers the engine is built from.                                                                                                                               |
+| Export                                                                                     | What it is                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createMagicLinkAuth(config)`                                                              | The engine: `requestMagicLink`, `sendInviteLink`, `verifyMagicLink`, `refreshSession`, `logout`, `requireUser`, `authenticate`, `getMe`, `issueSession`, cookie helpers.                                               |
+| `createAuthRoutes(auth, { corsHeaders, clientIp, requestMagicLinkMessage? })`              | The five endpoints as Lambda bodies (`requestMagicLink`, `verifyMagicLink`, `refresh`, `logout`, `me`), each `{ handle, fallbackResponse?, clearCookiesOn401? }`. `clientIp` is required: see [Client IP](#client-ip). |
+| `extractSourceIp(event, trustedProxyHops = 0)`                                             | The rate-limit client IP: `sourceIp`, or the X-Forwarded-For entry `trustedProxyHops` from the right.                                                                                                                  |
+| `toLambdaHandler(route, options)`                                                          | A complete handler for hosts without their own controller envelope (maps `AuthError`, honours fallback / clear-cookies).                                                                                               |
+| `verifySession(headers, { issuer, audience, accessSecret })`                               | For another service behind the same origin: the access-token payload or `null`. Fails closed.                                                                                                                          |
+| `signAccessToken` / `verifyAccessToken` / `signRefreshToken` / `verifyRefreshToken`        | HS256 with issuer + audience pinning.                                                                                                                                                                                  |
+| `sanitizeRedirectUrl`, `extractAccessToken`, `extractRefreshToken`, `buildClearCookies`, … | The pure helpers the engine is built from.                                                                                                                                                                             |
 
 ### `createMagicLinkAuth` config
 
@@ -70,8 +71,30 @@ const auth = createMagicLinkAuth<Customer, Me, Options>({
   email: { subject: 'Sign in', intro: 'Use the link below to sign in:', linkLabel: 'Sign in' },
   toMe: (u) => ({ id: u.id, email: u.email }),
 })
-const routes = createAuthRoutes(auth, { corsHeaders })
+const routes = createAuthRoutes(auth, { corsHeaders, clientIp: { trustedProxyHops: 0 } })
 
 // one Lambda per route
 export const handler = toLambdaHandler(routes.verifyMagicLink, { corsHeaders, clearCookies: auth.clearCookies })
 ```
+
+### Client IP
+
+The per-IP rate limits key on the client IP. Everything left of the hops you trust in
+`X-Forwarded-For` is client-supplied, so `clientIp.trustedProxyHops` must count exactly the proxies
+you run in front of API Gateway:
+
+| Topology                                              | `trustedProxyHops`                                                                    |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Regional API Gateway, called directly                 | `0`                                                                                   |
+| Edge-optimized API Gateway, called directly           | `0`: AWS's own edge hop is already folded into `sourceIp` (confirm in a dev stage)    |
+| CloudFront → API Gateway (regional or edge-optimized) | `N`, measured: log `X-Forwarded-For` and `sourceIp` in a dev stage and count our hops |
+
+Precondition for any `N > 0`: the `execute-api` endpoint must not be reachable directly, or a
+caller who bypasses CloudFront forges the whole chain. `0` stays spoof-proof either way, at the cost
+of keying every user behind one CloudFront edge on that edge's IP.
+
+With `0`, the routes log one warning per `createAuthRoutes` instance when the leftmost
+`X-Forwarded-For` entry differs from `sourceIp`
+(`X-Forwarded-For names a client other than sourceIp; check clientIp.trustedProxyHops`, data
+`{ forwardedCount }`): that is what a CloudFront in front looks like. A spoofed header triggers it
+too.
