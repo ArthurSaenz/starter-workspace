@@ -198,6 +198,54 @@ describe('authVerifyContainer', () => {
       expect(onVerified).toHaveBeenCalledWith('/fallback')
     })
   })
+
+  it('loads /me exactly once per verify', async () => {
+    const onVerified = vi.fn()
+    const client = fakeClient()
+
+    await renderVerify('good', client, onVerified)
+
+    await vi.waitFor(() => {
+      expect(onVerified).toHaveBeenCalledOnce()
+    })
+    expect(client.me).toHaveBeenCalledOnce()
+  })
+
+  it('errors without onVerified or a /me when logout lands during verify', async () => {
+    const onVerified = vi.fn()
+    const verified = Promise.withResolvers<{ ok: boolean; redirect?: string }>()
+
+    const client = fakeClient({
+      verifyMagicLink: vi.fn(() => {
+        return verified.promise
+      }),
+    })
+
+    const store = storeWith({}, client)
+
+    const screen = await render(
+      <AuthProvider store={store}>
+        <AuthVerifyContainer
+          token="good"
+          onVerified={onVerified}
+          render={(state) => {
+            return <div data-testid="verify">{state}</div>
+          }}
+        />
+      </AuthProvider>,
+    )
+
+    await vi.waitFor(() => {
+      expect(client.verifyMagicLink).toHaveBeenCalledOnce()
+    })
+    await store.logout()
+    verified.resolve({ ok: true, redirect: '/chat' })
+
+    await expect.element(screen.getByTestId('verify')).toHaveTextContent('error')
+    expect(onVerified).not.toHaveBeenCalled()
+    expect(client.me).not.toHaveBeenCalled()
+    expect(store.getState().status).toBe('unauthenticated')
+  })
 })
 
 describe('userMenuContainer', () => {

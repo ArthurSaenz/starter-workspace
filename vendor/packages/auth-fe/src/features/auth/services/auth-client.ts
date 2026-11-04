@@ -59,7 +59,8 @@ export const createAuthClient = <TUser>(options: AuthClientOptions): AuthClient<
     const response = await doFetch(url, {
       method: init.method,
       credentials,
-      headers: { 'content-type': 'application/json' },
+      // Off GETs to spare the preflight; kept on POSTs so a body-less one is never CORS-simple.
+      ...(init.method === 'GET' ? {} : { headers: { 'content-type': 'application/json' } }),
       ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
     })
 
@@ -100,7 +101,14 @@ export const createAuthClient = <TUser>(options: AuthClientOptions): AuthClient<
       }
     },
     me: async () => {
-      return (await readJson(await send(paths.me, { method: 'GET' }))) as TUser
+      const response = await send(paths.me, { method: 'GET' })
+      const body = await readJson(response)
+
+      if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+        throw new AuthHttpError(response.status, `${baseUrl}${paths.me}`, 'INVALID_RESPONSE')
+      }
+
+      return body as TUser
     },
     refresh: options.refresh ?? ownRefresh,
     logout: async () => {

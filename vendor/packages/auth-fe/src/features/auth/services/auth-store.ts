@@ -41,7 +41,12 @@ export const createAuthStore = <TUser>(
   // refresh token twice, which a backend with reuse detection answers by revoking every session.
   let inFlightFetchMe: Promise<TUser | null> | null = null
 
+  // Bumped by logout, so a /me sent before it can never publish over the cleared session.
+  let sessionEpoch = 0
+
   const loadUser = async (): Promise<TUser | null> => {
+    const epoch = sessionEpoch
+
     setState({ isSessionLoading: true })
 
     try {
@@ -57,14 +62,30 @@ export const createAuthStore = <TUser>(
         user = await client.me()
       }
 
+      if (epoch !== sessionEpoch) return null
+
       setState({ user, status: 'authenticated', isSessionLoading: false })
 
       return user
     } catch {
+      if (epoch !== sessionEpoch) return null
+
       setState({ user: null, status: 'unauthenticated', isSessionLoading: false })
 
       return null
     }
+  }
+
+  const fetchMe = (): Promise<TUser | null> => {
+    if (inFlightFetchMe) return inFlightFetchMe
+
+    const request = loadUser().finally(() => {
+      if (inFlightFetchMe === request) inFlightFetchMe = null
+    })
+
+    inFlightFetchMe = request
+
+    return request
   }
 
   return {
@@ -97,27 +118,31 @@ export const createAuthStore = <TUser>(
     resetSentEmail: () => {
       setState({ sentToEmail: null })
     },
-    fetchMe: () => {
-      inFlightFetchMe ??= loadUser().finally(() => {
-        inFlightFetchMe = null
-      })
-
-      return inFlightFetchMe
-    },
+    fetchMe,
     verify: async (token: string) => {
+      const epoch = sessionEpoch
       const result = await client.verifyMagicLink(token)
 
-      if (result.ok) setState({ status: 'authenticated' })
+      if (result.ok && epoch === sessionEpoch) {
+        // An in-flight /me used the pre-verify cookies, so wait it out and load again.
+        await inFlightFetchMe
+
+        if (epoch === sessionEpoch) await fetchMe()
+      }
 
       return result
     },
     logout: async () => {
+      sessionEpoch += 1
+      inFlightFetchMe = null
+
       try {
         await client.logout()
       } catch {
         // Ignore network failures: logout must always clear the local session.
       } finally {
-        setState({ user: null, status: 'unauthenticated' })
+        // A load started after this logout keeps its flag until it settles.
+        setState({ user: null, status: 'unauthenticated', ...(inFlightFetchMe ? {} : { isSessionLoading: false }) })
       }
     },
     refresh: () => {

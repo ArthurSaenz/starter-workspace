@@ -30,17 +30,7 @@ export const AuthVerifyContainer = (props: AuthVerifyContainerProps) => {
 
       if (cancelled) return
 
-      if (!result.ok) {
-        setState('error')
-
-        return
-      }
-
-      const me = await store.fetchMe()
-
-      if (cancelled) return
-
-      if (!me) {
+      if (!result.ok || !store.getState().user) {
         setState('error')
 
         return

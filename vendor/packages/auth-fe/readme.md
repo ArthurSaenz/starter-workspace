@@ -29,7 +29,9 @@ Root barrel (`src/index.ts`, re-exporting `src/features/auth/index.ts`):
   an `AuthHttpError` (`status`, `type` = the error body's `type`); `refresh` resolves a boolean and
   never rejects; `verifyMagicLink(token)` never rejects and resolves `{ ok, redirect?, errorCode? }` —
   GET `${paths.verifyMagicLink}?token=…`, `errorCode` is the body's `type` on a non-2xx (or on a 2xx
-  without `ok: true`). A JSON body is read only when the response says `application/json`.
+  without `ok: true`). A JSON body is read only when the response says `application/json`; a `me`
+  body that is not a JSON object rejects with `type: 'INVALID_RESPONSE'` (no refresh). GETs send no
+  `content-type`; POSTs always send `application/json`.
 
 - `createAuthStore<TUser>(client, options?)` → `AuthStore<TUser>` (`services/auth-store.ts`). A
   framework-agnostic external store: `getState()`, `subscribe(listener)`, and the actions
@@ -41,8 +43,11 @@ Root barrel (`src/index.ts`, re-exporting `src/features/auth/index.ts`):
   - `fetchMe()` — concurrent callers share one in-flight request; on a 401 it calls
     `client.refresh()` once and retries `/me` once; ends `authenticated` + `user`, or `unauthenticated`
     - `null`; `isSessionLoading` is true while it runs.
-  - `verify(token)` — sets `authenticated` on success; returns the client's result.
-  - `logout()` — always ends `unauthenticated` + `null`, even when the request fails.
+  - `verify(token)` — on success loads the user through `fetchMe` before resolving (a `/me` already
+    in flight is awaited, then repeated with the new cookies; a `logout` meanwhile skips the load), so
+    `authenticated` is never published without a user; returns the client's result.
+  - `logout()` — always ends `unauthenticated` + `null`, even when the request fails; a `/me` sent
+    before it never publishes.
   - `refresh()` — the client's refresh.
 
   `options.initialState` seeds any part of `AuthState` (tests, SSR hydration).
@@ -58,8 +63,8 @@ Root barrel (`src/index.ts`, re-exporting `src/features/auth/index.ts`):
     `{ status, loading, sentToEmail, error, onSubmit({ email }), onUseDifferentEmail }`; `onSubmit`
     sends `redirectUrl: safeRedirect(redirect)` and resolves `{ ok, email }` (toast it in the host).
   - `AuthVerifyContainer({ token?, redirect?, onVerified, render })` — no token → `error`; otherwise
-    `loading` → `verify` → `fetchMe` → `onVerified(safeRedirect(response.redirect ?? redirect))`, or
-    `error` when either step fails. `render(state)` with `'idle' | 'loading' | 'error'`.
+    `loading` → `verify` (which loads the user) → `onVerified(safeRedirect(response.redirect ?? redirect))`,
+    or `error` when the token fails or no user was loaded. `render(state)` with `'idle' | 'loading' | 'error'`.
   - `UserMenuContainer({ onLoggedOut, render })` — `null` unless authenticated with a user; `render`
     gets `{ user, onLogout }`, and `onLogout` logs out then awaits `onLoggedOut()`.
   - `RequireAuthContainer({ onUnauthenticated, onLoggedOut, fallback, isAllowed?, renderDenied?, children })`

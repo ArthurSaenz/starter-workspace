@@ -135,6 +135,55 @@ describe('createAuthClient', () => {
     expect(error).toMatchObject({ status: 401, type: 'UNAUTHENTICATED' })
   })
 
+  it.each([
+    ['an HTML page', new Response('<html></html>', { status: 200, headers: { 'content-type': 'text/html' } })],
+    ['JSON null', okResponse(null)],
+    ['a JSON array', okResponse([])],
+  ])('rejects me with INVALID_RESPONSE, not a 401, when it answers %s', async (_label, response) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        return response
+      }),
+    )
+
+    const error = await createAuthClient({ paths: PATHS })
+      .me()
+      .catch((caught: unknown) => {
+        return caught
+      })
+
+    expect(error).toBeInstanceOf(AuthHttpError)
+    expect(error).toMatchObject({ status: 200, type: 'INVALID_RESPONSE' })
+    expect(isUnauthorized(error)).toBe(false)
+  })
+
+  it('sends content-type on POSTs only', async () => {
+    const fetchMock = vi.fn(async (_input: string, _init?: RequestInit) => {
+      return okResponse({ ok: true })
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const client = createAuthClient({ paths: PATHS })
+
+    await client.me()
+    await client.verifyMagicLink('t')
+    await client.refresh()
+    await client.logout()
+
+    const contentTypes = fetchMock.mock.calls.map((call) => {
+      return [call[1]?.method, new Headers(call[1]?.headers).get('content-type')]
+    })
+
+    expect(contentTypes).toEqual([
+      ['GET', null],
+      ['GET', null],
+      ['POST', 'application/json'],
+      ['POST', 'application/json'],
+    ])
+  })
+
   it('refreshes through its own endpoint, resolving false on failure', async () => {
     const fetchMock = vi.fn(async (_input: string, _init?: RequestInit) => {
       return errorResponse(401, {})

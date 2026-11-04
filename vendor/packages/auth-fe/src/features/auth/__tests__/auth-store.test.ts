@@ -2,12 +2,49 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createAuthClient } from '../services/auth-client.js'
 import { DEFAULT_REQUEST_ERROR_TEXT, createAuthStore } from '../services/auth-store.js'
-import type { AuthStoreOptions } from '../types.js'
+import type { AuthClient, AuthState, AuthStore, AuthStoreOptions } from '../types.js'
 import { PATHS, USER, callsTo, errorResponse, okResponse } from './fixtures.js'
 import type { TestUser } from './fixtures.js'
 
 const newStore = (options?: AuthStoreOptions<TestUser>) => {
   return createAuthStore(createAuthClient<TestUser>({ paths: PATHS }), options)
+}
+
+const OTHER_USER: TestUser = { id: '2', email: 'y@b.com' }
+
+const unauthorized = () => {
+  return Object.assign(new Error('401'), { status: 401 })
+}
+
+const fakeClient = (overrides: Partial<AuthClient<TestUser>> = {}): AuthClient<TestUser> => {
+  return {
+    requestMagicLink: vi.fn(async () => {}),
+    verifyMagicLink: vi.fn(async () => {
+      return { ok: true }
+    }),
+    me: vi.fn(async () => {
+      return USER
+    }),
+    refresh: vi.fn(async () => {
+      return false
+    }),
+    logout: vi.fn(async () => {}),
+    ...overrides,
+  }
+}
+
+const recordStates = (store: AuthStore<TestUser>) => {
+  const seen: AuthState<TestUser>[] = []
+
+  store.subscribe(() => {
+    seen.push(store.getState())
+  })
+
+  return seen
+}
+
+const isAuthenticatedWithoutUser = (state: AuthState<TestUser>) => {
+  return state.status === 'authenticated' && state.user === null
 }
 
 describe('submitEmail', () => {
@@ -131,6 +168,97 @@ describe('verify', () => {
 
     expect(await store.verify('bad')).toEqual({ ok: false, errorCode: 'INVALID_OR_EXPIRED_TOKEN' })
     expect(store.getState().status).toBe('unknown')
+  })
+
+  it('never publishes authenticated without a user, and loads /me exactly once', async () => {
+    const client = fakeClient()
+    const store = createAuthStore(client)
+    const seen = recordStates(store)
+
+    await store.verify('t')
+
+    expect(seen.some(isAuthenticatedWithoutUser)).toBe(false)
+    expect(client.me).toHaveBeenCalledOnce()
+    expect(store.getState()).toMatchObject({ status: 'authenticated', user: USER })
+  })
+
+  it('authenticates against a mock that answers every URL with the verify body', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        return okResponse({ ok: true, redirect: '/x' })
+      }),
+    )
+
+    const store = newStore()
+
+    await store.verify('abc')
+
+    expect(store.getState().status).toBe('authenticated')
+  })
+
+  it('reloads the user when a pre-verify /me 401s after the token is verified', async () => {
+    const stale = Promise.withResolvers<TestUser>()
+    const verified = Promise.withResolvers<{ ok: boolean }>()
+    const me = vi.fn<() => Promise<TestUser>>().mockReturnValueOnce(stale.promise).mockResolvedValueOnce(OTHER_USER)
+
+    const refresh = vi.fn(async () => {
+      return false
+    })
+
+    const store = createAuthStore(
+      fakeClient({
+        me,
+        refresh,
+        verifyMagicLink: vi.fn(() => {
+          return verified.promise
+        }),
+      }),
+    )
+
+    const seen = recordStates(store)
+
+    void store.fetchMe()
+
+    const pending = store.verify('t')
+
+    verified.resolve({ ok: true })
+    await verified.promise
+    stale.reject(unauthorized())
+
+    expect(await pending).toEqual({ ok: true })
+    expect(store.getState()).toMatchObject({ status: 'authenticated', user: OTHER_USER })
+    expect(me).toHaveBeenCalledTimes(2)
+    expect(refresh).toHaveBeenCalledOnce()
+    expect(seen.some(isAuthenticatedWithoutUser)).toBe(false)
+  })
+
+  it('ignores a pre-verify /me that returns the previously signed-in user', async () => {
+    const stale = Promise.withResolvers<TestUser>()
+    const verified = Promise.withResolvers<{ ok: boolean }>()
+    const me = vi.fn<() => Promise<TestUser>>().mockReturnValueOnce(stale.promise).mockResolvedValueOnce(OTHER_USER)
+
+    const store = createAuthStore(
+      fakeClient({
+        me,
+        verifyMagicLink: vi.fn(() => {
+          return verified.promise
+        }),
+      }),
+      { initialState: { status: 'authenticated', user: USER } },
+    )
+
+    void store.fetchMe()
+
+    const pending = store.verify('t')
+
+    verified.resolve({ ok: true })
+    await verified.promise
+    stale.resolve(USER)
+    await pending
+
+    expect(store.getState().user).toEqual(OTHER_USER)
+    expect(me).toHaveBeenCalledTimes(2)
   })
 })
 
@@ -260,6 +388,29 @@ describe('fetchMe', () => {
     expect(store.getState().status).toBe('unauthenticated')
     expect(callsTo(fetchMock, PATHS.refresh)).toHaveLength(0)
   })
+
+  it.each([
+    ['an HTML page', new Response('<html></html>', { status: 200, headers: { 'content-type': 'text/html' } })],
+    ['JSON null', okResponse(null)],
+    ['a JSON array', okResponse([])],
+  ])('ends unauthenticated without a refresh when /me answers %s', async (_label, response) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        return response
+      }),
+    )
+
+    const refresh = vi.fn(async () => {
+      return true
+    })
+
+    const store = createAuthStore(createAuthClient<TestUser>({ paths: PATHS, refresh }))
+
+    expect(await store.fetchMe()).toBeNull()
+    expect(store.getState().status).toBe('unauthenticated')
+    expect(refresh).not.toHaveBeenCalled()
+  })
 })
 
 describe('logout', () => {
@@ -280,6 +431,76 @@ describe('logout', () => {
     await store.logout()
 
     expect(store.getState()).toMatchObject({ status: 'unauthenticated', user: null })
+  })
+
+  it('drops a /me that resolves after logout', async () => {
+    const me = Promise.withResolvers<TestUser>()
+
+    const store = createAuthStore(
+      fakeClient({
+        me: vi.fn(() => {
+          return me.promise
+        }),
+      }),
+    )
+
+    const pending = store.fetchMe()
+    const loggedOut = store.logout()
+
+    me.resolve(USER)
+
+    expect(await pending).toBeNull()
+    await loggedOut
+    expect(store.getState()).toEqual({
+      status: 'unauthenticated',
+      user: null,
+      isSessionLoading: false,
+      requestLoading: false,
+      sentToEmail: null,
+      requestError: null,
+    })
+  })
+
+  it('keeps a load started after logout as the one in flight', async () => {
+    const before = Promise.withResolvers<TestUser>()
+    const after = Promise.withResolvers<TestUser>()
+    const logoutRequest = Promise.withResolvers<undefined>()
+    const me = vi.fn<() => Promise<TestUser>>().mockReturnValueOnce(before.promise).mockReturnValueOnce(after.promise)
+
+    const store = createAuthStore(
+      fakeClient({
+        me,
+        logout: vi.fn(() => {
+          return logoutRequest.promise
+        }),
+      }),
+    )
+
+    const first = store.fetchMe()
+    const loggedOut = store.logout()
+    const second = store.fetchMe()
+    const seen = recordStates(store)
+
+    before.resolve(OTHER_USER)
+    await first
+
+    expect(store.fetchMe()).toBe(second)
+
+    logoutRequest.resolve(undefined)
+    await loggedOut
+
+    expect(store.getState().isSessionLoading).toBe(true)
+
+    after.resolve(USER)
+
+    expect(await second).toEqual(USER)
+    expect(me).toHaveBeenCalledTimes(2)
+    expect(
+      seen.slice(0, -1).every((state) => {
+        return state.isSessionLoading
+      }),
+    ).toBe(true)
+    expect(store.getState()).toMatchObject({ status: 'authenticated', user: USER, isSessionLoading: false })
   })
 })
 
