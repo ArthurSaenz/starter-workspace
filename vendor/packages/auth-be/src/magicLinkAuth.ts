@@ -1,148 +1,45 @@
-import crypto from 'node:crypto'
-
-import type { MagicLinkEmailKind, MagicLinkEmailText, RenderMagicLinkEmail } from './email.js'
-import { buildMagicLinkUrl, renderMagicLinkEmail } from './email.js'
-import type { AuthErrorCode, CreateAuthError } from './errors.js'
+import type { AuthErrorCode } from './errors.js'
 import { defaultCreateAuthError } from './errors.js'
-import type { CookieOptions, HeaderBag } from './http.js'
+import type { HeaderBag } from './http.js'
 import {
-  buildAccessCookie,
   buildClearCookies,
-  buildRefreshCookie,
   extractAccessToken,
   extractRefreshToken,
   resolveCookieOptions,
   sanitizeRedirectUrl,
 } from './http.js'
 import type {
-  AuthContext,
-  AuthUser,
-  MagicTokenStore,
-  Mailer,
-  RateLimiter,
-  SessionStore,
-  StoredSession,
-  UserStore,
-} from './ports.js'
-import type { AccessTokenPayload, JwtIdentity } from './tokens.js'
+  MagicLinkAuthConfig,
+  RequestMagicLinkInput,
+  RequestMeta,
+  RequestValidationInput,
+  TokenPair,
+  VerifyMagicLinkInput,
+  VerifyMagicLinkResult,
+} from './magicLinkConfig.js'
+import {
+  DEFAULT_INVITE_TOKEN_TTL_MIN,
+  DEFAULT_MAGIC_TOKEN_TTL_MIN,
+  assertMagicLinkConfig,
+  createDefaultVerifyValidator,
+  defaultIsAllowed,
+  defaultRolesOf,
+  defaultValidateRequest,
+  isTokenRecordLive,
+  resolveRateLimits,
+  toMs,
+} from './magicLinkConfig.js'
+import { createMagicLinkSender } from './magicLinkMail.js'
+import type { AuthContext, AuthUser } from './ports.js'
+import { createSessionIssuer } from './sessionIssuer.js'
+import type { AccessTokenPayload } from './tokens.js'
 import {
   DEFAULT_ACCESS_TTL_SEC,
   DEFAULT_REFRESH_TTL_SEC,
-  assertSecret,
-  generateRawToken,
   hashToken,
-  signAccessToken,
-  signRefreshToken,
   verifyAccessToken,
   verifyRefreshToken,
 } from './tokens.js'
-
-export const DEFAULT_MAGIC_TOKEN_TTL_MIN = 15
-// An invite can sit unread for days while a sign-in link is clicked seconds after it is requested;
-// 72 h covers "saw it after the weekend", and re-inviting invalidates the old link.
-export const DEFAULT_INVITE_TOKEN_TTL_MIN = 72 * 60
-
-export interface RateLimitConfig {
-  perEmail: number
-  perIp: number
-  perIpVerify: number
-  perIpRefresh: number
-  windowSec: number
-  /** Key namespace in the limiter's store; two apps sharing one store and one prefix share budgets. */
-  keyPrefix: string
-}
-
-const DEFAULT_RATE_LIMITS: RateLimitConfig = {
-  perEmail: 5,
-  perIp: 20,
-  perIpVerify: 30,
-  perIpRefresh: 60,
-  windowSec: 3600,
-  keyPrefix: 'magic',
-}
-
-export interface RequestMeta {
-  ipAddress?: string
-  userAgent?: string
-}
-
-export interface RequestMagicLinkInput extends RequestMeta {
-  email: string
-  redirectUrl?: string
-}
-
-export interface VerifyMagicLinkInput extends RequestMeta {
-  rawToken: string
-}
-
-export interface TokenPair {
-  accessToken: string
-  refreshToken: string
-  accessCookie: string
-  refreshCookie: string
-}
-
-export interface VerifyMagicLinkResult extends TokenPair {
-  redirectUrl: string
-}
-
-export interface MagicLinkAuthConfig<TUser extends AuthUser, TMe, TCtx extends AuthContext> {
-  users: UserStore<TUser, TCtx>
-  magicTokens: MagicTokenStore<TCtx>
-  sessions: SessionStore<TCtx>
-  rateLimiter: RateLimiter<TCtx>
-  mailer: Mailer<TCtx>
-  jwt: JwtIdentity & { accessSecret: string; refreshSecret: string; accessTtlSec?: number; refreshTtlSec?: number }
-  /** `baseUrl` is the SPA origin; the emailed link is `${baseUrl}${verifyPath}?token=…`. */
-  magicLink: { baseUrl: string; verifyPath?: string; ttlMin?: number; inviteTtlMin?: number }
-  /** Exactly one of `email` (the built-in plain template's copy) and `renderEmail` is required. */
-  email?: MagicLinkEmailText
-  renderEmail?: RenderMagicLinkEmail<TCtx>
-  /** The DTO `GET /auth/me` answers with. */
-  toMe: (user: TUser) => TMe
-  cookies?: CookieOptions
-  rateLimits?: Partial<RateLimitConfig>
-  /**
-   * What a link request from an address that may not sign in gets. `silent` (default) answers like a
-   * success so a public endpoint is not a membership oracle; `reject` throws NOT_INVITED (403) for an
-   * internal tool whose invited users need the feedback.
-   */
-  uninvitedRequest?: 'silent' | 'reject'
-  /** The allowlist; re-asked at request, verify AND refresh so a revoke ends running sessions. */
-  isAllowed?: (user: TUser) => boolean
-  /** Copied into the access token. Informational: authorise from the loaded row, not from the claim. */
-  rolesOf?: (user: TUser) => string[]
-  /** Side effects of a successful sign-in (mark the email verified, record the login…). */
-  onSignIn?: (user: TUser, ctx?: TCtx) => Promise<void>
-  /** Throw to reject. A rejected link request still answers like a success (anti-enumeration). */
-  validate?: {
-    requestMagicLink?: (input: RequestValidationInput, ctx?: TCtx) => void
-    verifyMagicLink?: (input: { rawToken: string }, ctx?: TCtx) => void
-  }
-  createError?: CreateAuthError
-  notInvitedMessage?: string
-}
-
-export interface RequestValidationInput {
-  email: string
-  redirectUrl: string | undefined
-}
-
-// eslint-disable-next-line no-control-regex -- matching control characters is the point
-const UNSAFE_REDIRECT_CHARS = /[\\\u0000-\u001F\u007F]/
-const EMAIL_REGEX = /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/
-const TOKEN_REGEX = /^[a-f0-9]{16,256}$/i
-
-const toMs = (value: Date | string): number => {
-  return value instanceof Date ? value.getTime() : new Date(value).getTime()
-}
-
-const withMeta = (meta: RequestMeta | undefined): RequestMeta => {
-  return {
-    ...(meta?.ipAddress ? { ipAddress: meta.ipAddress } : {}),
-    ...(meta?.userAgent ? { userAgent: meta.userAgent } : {}),
-  }
-}
 
 export type MagicLinkAuth<TUser extends AuthUser, TMe, TCtx extends AuthContext> = ReturnType<
   typeof createMagicLinkAuth<TUser, TMe, TCtx>
@@ -151,59 +48,20 @@ export type MagicLinkAuth<TUser extends AuthUser, TMe, TCtx extends AuthContext>
 export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends AuthContext = AuthContext>(
   config: MagicLinkAuthConfig<TUser, TMe, TCtx>,
 ) => {
-  assertSecret('jwt.accessSecret', config.jwt.accessSecret)
-  assertSecret('jwt.refreshSecret', config.jwt.refreshSecret)
-
-  if (config.jwt.accessSecret === config.jwt.refreshSecret) {
-    throw new Error('auth: jwt.accessSecret and jwt.refreshSecret must differ')
-  }
-
-  if (!config.magicLink.baseUrl) {
-    throw new Error('auth: magicLink.baseUrl is required')
-  }
-
-  const { email: emailText, renderEmail: hostRenderEmail } = config
-
-  if (!emailText === !hostRenderEmail) {
-    throw new Error('auth: pass exactly one of email or renderEmail')
-  }
-
-  const renderEmail: RenderMagicLinkEmail<TCtx> =
-    hostRenderEmail ??
-    (({ to, link, expMin }) => {
-      return renderMagicLinkEmail(to, link, expMin, emailText!)
-    })
+  assertMagicLinkConfig(config)
 
   const { users, magicTokens, sessions, rateLimiter, mailer } = config
-  const identity: JwtIdentity = { issuer: config.jwt.issuer, audience: config.jwt.audience }
-  const accessTtlSec = config.jwt.accessTtlSec ?? DEFAULT_ACCESS_TTL_SEC
-  const refreshTtlSec = config.jwt.refreshTtlSec ?? DEFAULT_REFRESH_TTL_SEC
+  const identity = { issuer: config.jwt.issuer, audience: config.jwt.audience }
   const signInTtlMin = config.magicLink.ttlMin ?? DEFAULT_MAGIC_TOKEN_TTL_MIN
   const inviteTtlMin = config.magicLink.inviteTtlMin ?? DEFAULT_INVITE_TOKEN_TTL_MIN
   const cookies = resolveCookieOptions(config.cookies)
   const maxTokenAgeMs = Math.max(signInTtlMin, inviteTtlMin) * 60 * 1000
-
-  // Per key, so an explicit `undefined` override keeps the default instead of disabling the limit.
-  const limits = Object.fromEntries(
-    Object.entries(DEFAULT_RATE_LIMITS).map(([key, fallback]) => {
-      return [key, config.rateLimits?.[key as keyof RateLimitConfig] ?? fallback]
-    }),
-  ) as unknown as RateLimitConfig
-
+  const limits = resolveRateLimits(config.rateLimits)
   const createError = config.createError ?? defaultCreateAuthError
   const notInvitedMessage = config.notInvitedMessage ?? 'This email is not invited.'
 
-  const isAllowed =
-    config.isAllowed ??
-    ((user: TUser) => {
-      return user.invited === true
-    })
-
-  const rolesOf =
-    config.rolesOf ??
-    ((user: TUser) => {
-      return user.roles ?? []
-    })
+  const isAllowed: (user: TUser) => boolean = config.isAllowed ?? defaultIsAllowed
+  const rolesOf: (user: TUser) => string[] = config.rolesOf ?? defaultRolesOf
 
   const fail = (message: string, code: AuthErrorCode, status: number): Error => {
     return createError({ message, code, status })
@@ -213,23 +71,10 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
     return fail('Invalid session', code, 401)
   }
 
-  const validateRequest =
-    config.validate?.requestMagicLink ??
-    ((input: RequestValidationInput) => {
-      if (input.email.length > 320 || !EMAIL_REGEX.test(input.email)) throw new Error('Invalid email')
+  const validateRequest: (input: RequestValidationInput, ctx?: TCtx) => void =
+    config.validate?.requestMagicLink ?? defaultValidateRequest
 
-      if (input.redirectUrl && (input.redirectUrl.length > 2048 || UNSAFE_REDIRECT_CHARS.test(input.redirectUrl))) {
-        throw new Error('Invalid redirectUrl')
-      }
-    })
-
-  const validateVerify =
-    config.validate?.verifyMagicLink ??
-    ((input: { rawToken: string }) => {
-      if (!TOKEN_REGEX.test(input.rawToken)) {
-        throw fail('rawToken must be hex', 'INVALID_REQUEST', 400)
-      }
-    })
+  const validateVerify = config.validate?.verifyMagicLink ?? createDefaultVerifyValidator(createError)
 
   const checkRate = async (key: string, limit: number, ctx?: TCtx): Promise<boolean> => {
     const gate = await rateLimiter.incrementAndCheck(`${limits.keyPrefix}:${key}`, limit, limits.windowSec, ctx)
@@ -237,54 +82,27 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
     return gate.allowed
   }
 
-  const mintAndSendMagicLink = async (
-    email: string,
-    redirectUrl: string,
-    meta: RequestMeta,
-    kind: MagicLinkEmailKind,
-    ctx?: TCtx,
-  ): Promise<boolean> => {
-    const ttlMin = kind === 'invite' ? inviteTtlMin : signInTtlMin
+  const mintAndSendMagicLink = createMagicLinkSender<TCtx>({
+    magicTokens,
+    mailer,
+    email: config.email,
+    renderEmail: config.renderEmail,
+    magicLink: config.magicLink,
+    signInTtlMin,
+    inviteTtlMin,
+  })
 
-    await magicTokens.invalidateByEmail(email, ctx)
-
-    const rawToken = generateRawToken()
-
-    await magicTokens.create(
-      {
-        email,
-        tokenHash: hashToken(rawToken),
-        redirectUrl,
-        expiresAt: new Date(Date.now() + ttlMin * 60 * 1000),
-        ...withMeta(meta),
-      },
-      ctx,
-    )
-
-    const link = buildMagicLinkUrl(config.magicLink.baseUrl, rawToken, redirectUrl, config.magicLink.verifyPath)
-
-    try {
-      // Rendering sits inside the try: a template that throws leaves the same undelivered token.
-      await mailer.send(await renderEmail({ to: email, link, expMin: ttlMin, kind }, ctx), ctx)
-
-      return true
-    } catch (error) {
-      // A token nobody received must not stay redeemable.
-      ctx?.logger?.error('Magic link send failed; invalidating the undelivered token', {
-        data: { name: (error as Error).name },
-      })
-
-      try {
-        await magicTokens.invalidateByEmail(email, ctx)
-      } catch (cleanupError) {
-        ctx?.logger?.error('Failed to invalidate the undelivered magic token', {
-          data: { name: (cleanupError as Error).name },
-        })
-      }
-
-      return false
-    }
-  }
+  const issuer = createSessionIssuer<TUser, TCtx>({
+    accessSecret: config.jwt.accessSecret,
+    refreshSecret: config.jwt.refreshSecret,
+    identity,
+    accessTtlSec: config.jwt.accessTtlSec ?? DEFAULT_ACCESS_TTL_SEC,
+    refreshTtlSec: config.jwt.refreshTtlSec ?? DEFAULT_REFRESH_TTL_SEC,
+    sessions,
+    cookies,
+    rolesOf,
+    createError,
+  })
 
   const loadUser = async (userId: string, ctx?: TCtx): Promise<TUser> => {
     const user = await users.findById(userId, ctx)
@@ -292,85 +110,6 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
     if (!user) throw fail('User not found', 'USER_NOT_FOUND', 401)
 
     return user
-  }
-
-  /** Mint an access + refresh pair for `user` and persist the refresh session. */
-  const issueSession = async (user: TUser, meta?: RequestMeta, ctx?: TCtx): Promise<TokenPair> => {
-    const userId = String(user.id)
-    const jti = crypto.randomUUID()
-
-    const access = signAccessToken(
-      { sub: userId, roles: rolesOf(user), authMethod: 'magic' },
-      config.jwt.accessSecret,
-      identity,
-      accessTtlSec,
-    )
-
-    const refresh = signRefreshToken({ sub: userId, jti }, config.jwt.refreshSecret, identity, refreshTtlSec)
-
-    await sessions.create(
-      {
-        userId,
-        tokenHash: hashToken(refresh.token),
-        jti,
-        expiresAt: new Date(Date.now() + refresh.expSec * 1000),
-        ...withMeta(meta),
-      },
-      ctx,
-    )
-
-    return toPair(access.token, access.expSec, refresh.token, refresh.expSec)
-  }
-
-  const toPair = (accessToken: string, accessExp: number, refreshToken: string, refreshExp: number): TokenPair => {
-    return {
-      accessToken,
-      refreshToken,
-      accessCookie: buildAccessCookie(cookies, accessToken, accessExp),
-      refreshCookie: buildRefreshCookie(cookies, refreshToken, refreshExp),
-    }
-  }
-
-  const rotateSession = async (session: StoredSession, user: TUser, ctx?: TCtx): Promise<TokenPair> => {
-    const userId = String(user.id)
-    const jti = crypto.randomUUID()
-
-    const access = signAccessToken(
-      { sub: userId, roles: rolesOf(user), authMethod: 'magic' },
-      config.jwt.accessSecret,
-      identity,
-      accessTtlSec,
-    )
-
-    const refresh = signRefreshToken({ sub: userId, jti }, config.jwt.refreshSecret, identity, refreshTtlSec)
-
-    const rotated = await sessions.rotate(
-      String(session.id),
-      {
-        userId,
-        tokenHash: hashToken(refresh.token),
-        jti,
-        expiresAt: new Date(Date.now() + refresh.expSec * 1000),
-        ...withMeta({
-          ...(session.ipAddress ? { ipAddress: session.ipAddress } : {}),
-          ...(session.userAgent ? { userAgent: session.userAgent } : {}),
-        }),
-      },
-      ctx,
-    )
-
-    // The `revokedAt` read in refresh happens outside the rotation transaction, so two refreshes
-    // presenting the same live token (a parallel tab, not an attack) both pass it; `rotate` settles
-    // the race under its row lock. Fail only the loser: the winner's session stays valid.
-    if (!rotated) {
-      ctx?.logger?.warn('Concurrent refresh lost the rotation race; failing this request only', {
-        data: { userId },
-      })
-
-      throw invalidSession()
-    }
-
-    return toPair(access.token, access.expSec, refresh.token, refresh.expSec)
   }
 
   const requireUser = (headers: HeaderBag): AccessTokenPayload => {
@@ -433,13 +172,8 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
      * the mailer or template failed and the link is already dead: tell the admin, do not say "sent".
      */
     async sendInviteLink(email: string, ctx?: TCtx): Promise<{ emailSent: boolean }> {
-      const emailSent = await mintAndSendMagicLink(
-        (email || '').trim().toLowerCase(),
-        sanitizeRedirectUrl(undefined),
-        {},
-        'invite',
-        ctx,
-      )
+      const to = (email || '').trim().toLowerCase()
+      const emailSent = await mintAndSendMagicLink(to, sanitizeRedirectUrl(undefined), {}, 'invite', ctx)
 
       return { emailSent }
     },
@@ -456,22 +190,8 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
 
       if (!record) throw fail('Invalid or expired token', 'INVALID_OR_EXPIRED_TOKEN', 401)
 
-      // `consumeByHash` should already skip expired rows; this re-check uses the token's own expiry
-      // (so a 72 h invite is honoured) and treats an unparseable one as expired, never as "no expiry".
-      const expiresAtMs = toMs(record.expiresAt)
-
-      if (!Number.isFinite(expiresAtMs) || Date.now() > expiresAtMs) {
+      if (!isTokenRecordLive(record, maxTokenAgeMs)) {
         throw fail('Invalid or expired token', 'INVALID_OR_EXPIRED_TOKEN', 401)
-      }
-
-      // Two hosts sharing one token table would otherwise honour each other's TTLs (a 72 h staff
-      // invite redeemed at a 15-minute traveller surface): no token outlives this host's longest TTL.
-      if (record.createdAt !== undefined) {
-        const createdAtMs = toMs(record.createdAt)
-
-        if (!Number.isFinite(createdAtMs) || Date.now() - createdAtMs > maxTokenAgeMs) {
-          throw fail('Invalid or expired token', 'INVALID_OR_EXPIRED_TOKEN', 401)
-        }
       }
 
       // The allowlist may have been revoked between request and verify.
@@ -486,7 +206,7 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
 
       await config.onSignIn?.(user, ctx)
 
-      const pair = await issueSession(user, input, ctx)
+      const pair = await issuer.issue(user, input, ctx)
 
       return { ...pair, redirectUrl: sanitizeRedirectUrl(record.redirectUrl) }
     },
@@ -530,7 +250,7 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
         throw fail(notInvitedMessage, 'NOT_INVITED', 403)
       }
 
-      return rotateSession(session, user, ctx)
+      return issuer.rotate(session, user, ctx)
     },
 
     async logout(refreshToken: string | null, ctx?: TCtx): Promise<void> {
@@ -557,7 +277,7 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
       return config.toMe(await loadUser(payload.sub, ctx))
     },
 
-    issueSession,
+    issueSession: issuer.issue,
 
     extractAccessToken(headers: HeaderBag): string | null {
       return extractAccessToken(headers, cookies.accessName)

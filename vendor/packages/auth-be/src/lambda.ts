@@ -1,7 +1,8 @@
 import { AuthError } from './errors.js'
 import type { HeaderBag } from './http.js'
 import { readHeader } from './http.js'
-import type { MagicLinkAuth, RequestMeta } from './magicLinkAuth.js'
+import type { MagicLinkAuth } from './magicLinkAuth.js'
+import type { RequestMeta } from './magicLinkConfig.js'
 import type { AuthContext, AuthUser } from './ports.js'
 
 /** The slice of an API Gateway (REST, v1) proxy event the routes read. */

@@ -18,9 +18,10 @@ export {
 export type { CookieOptions, HeaderBag, ResolvedCookieOptions } from './http.js'
 export { createAuthRoutes, extractSourceIp, extractUserAgent, toLambdaHandler } from './lambda.js'
 export type { AuthRoute, AuthRoutesOptions, LambdaEvent, LambdaResult, ToLambdaHandlerOptions } from './lambda.js'
-export { createMagicLinkAuth, DEFAULT_INVITE_TOKEN_TTL_MIN, DEFAULT_MAGIC_TOKEN_TTL_MIN } from './magicLinkAuth.js'
+export { createMagicLinkAuth } from './magicLinkAuth.js'
+export type { MagicLinkAuth } from './magicLinkAuth.js'
+export { DEFAULT_INVITE_TOKEN_TTL_MIN, DEFAULT_MAGIC_TOKEN_TTL_MIN } from './magicLinkConfig.js'
 export type {
-  MagicLinkAuth,
   MagicLinkAuthConfig,
   RateLimitConfig,
   RequestMagicLinkInput,
@@ -29,7 +30,7 @@ export type {
   TokenPair,
   VerifyMagicLinkInput,
   VerifyMagicLinkResult,
-} from './magicLinkAuth.js'
+} from './magicLinkConfig.js'
 export type {
   AuthContext,
   AuthLogger,

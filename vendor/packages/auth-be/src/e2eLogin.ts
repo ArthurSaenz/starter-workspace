@@ -3,7 +3,7 @@ import crypto from 'node:crypto'
 
 import type { CreateAuthError } from './errors.js'
 import { defaultCreateAuthError } from './errors.js'
-import type { RequestMeta, TokenPair } from './magicLinkAuth.js'
+import type { RequestMeta, TokenPair } from './magicLinkConfig.js'
 import type { AuthContext, AuthUser } from './ports.js'
 import { MIN_SECRET_LENGTH } from './tokens.js'
 

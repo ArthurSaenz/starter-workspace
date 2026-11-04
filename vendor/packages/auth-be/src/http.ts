@@ -29,12 +29,12 @@ const buildCookie = (name: string, value: string, path: string, maxAgeSec: numbe
   return `${name}=${value}; HttpOnly; Secure; SameSite=Lax; Path=${path}; Max-Age=${maxAgeSec}`
 }
 
-export const buildAccessCookie = (cookies: ResolvedCookieOptions, token: string, expSec: number): string => {
-  return buildCookie(cookies.accessName, token, cookies.accessPath, expSec)
+export const buildAccessCookie = (cookies: ResolvedCookieOptions, token: string, maxAgeSec: number): string => {
+  return buildCookie(cookies.accessName, token, cookies.accessPath, maxAgeSec)
 }
 
-export const buildRefreshCookie = (cookies: ResolvedCookieOptions, token: string, expSec: number): string => {
-  return buildCookie(cookies.refreshName, token, cookies.refreshPath, expSec)
+export const buildRefreshCookie = (cookies: ResolvedCookieOptions, token: string, maxAgeSec: number): string => {
+  return buildCookie(cookies.refreshName, token, cookies.refreshPath, maxAgeSec)
 }
 
 export const buildClearCookies = (cookies: ResolvedCookieOptions): string[] => {
@@ -100,22 +100,20 @@ export const extractRefreshToken = (headers: HeaderBag, cookieName = 'refresh_to
   return parseCookieHeader(readHeader(headers, 'cookie'))[cookieName] || null
 }
 
-const hasControlChars = (value: string): boolean => {
+/** Control characters, or a backslash: browsers read `/\evil.com` as the protocol-relative `//evil.com`. */
+export const hasUnsafeRedirectChars = (value: string): boolean => {
   for (let i = 0; i < value.length; i++) {
     const code = value.charCodeAt(i)
 
     if (code < 0x20 || code === 0x7f) return true
   }
 
-  return false
+  return value.includes('\\')
 }
 
-/**
- * Only an in-app path survives; anything that could leave the origin becomes `/`. Backslashes are
- * refused because browsers read `/\evil.com` as the protocol-relative `//evil.com`.
- */
+/** Only an in-app path survives; anything that could leave the origin becomes `/`. */
 export const sanitizeRedirectUrl = (input: string | undefined | null): string => {
-  if (!input || input.length > 2048 || hasControlChars(input) || input.includes('\\')) return '/'
+  if (!input || input.length > 2048 || hasUnsafeRedirectChars(input)) return '/'
 
   if (input.startsWith('http://') || input.startsWith('https://') || input.startsWith('//')) return '/'
 

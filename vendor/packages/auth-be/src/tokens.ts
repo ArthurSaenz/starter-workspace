@@ -29,6 +29,9 @@ export interface JwtIdentity {
 
 export interface SignedToken {
   token: string
+  /** Lifetime in seconds, not an expiry timestamp. */
+  ttlSec: number
+  /** @deprecated use `ttlSec`; same value. */
   expSec: number
 }
 
@@ -48,7 +51,7 @@ const sign = (payload: object, secret: string, identity: JwtIdentity, ttlSec: nu
     audience: identity.audience,
   })
 
-  return { token, expSec: ttlSec }
+  return { token, ttlSec, expSec: ttlSec }
 }
 
 export const signAccessToken = (

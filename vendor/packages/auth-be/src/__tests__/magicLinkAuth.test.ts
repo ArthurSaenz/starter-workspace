@@ -4,8 +4,9 @@ import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 
 import type { RenderMagicLinkEmail } from '../email.js'
 import { AuthError } from '../errors.js'
-import type { MagicLinkAuth, TokenPair } from '../magicLinkAuth.js'
+import type { MagicLinkAuth } from '../magicLinkAuth.js'
 import { createMagicLinkAuth } from '../magicLinkAuth.js'
+import type { TokenPair } from '../magicLinkConfig.js'
 import type { SessionStore } from '../ports.js'
 import { hashToken, signRefreshToken } from '../tokens.js'
 import type { TestUser } from './helpers/fakes.js'
@@ -333,6 +334,12 @@ describe('engine shape', () => {
     expectTypeOf(auth.issueSession).returns.resolves.toEqualTypeOf<TokenPair>()
     expectTypeOf(auth.refreshSession).returns.resolves.toEqualTypeOf<TokenPair>()
   })
+
+  it('issues a session when issueSession is called unbound', async () => {
+    const { issueSession } = createMagicLinkAuth(createFakes([invitedUser()]).config)
+
+    await expect(issueSession(invitedUser())).resolves.toMatchObject({ accessToken: expect.any(String) })
+  })
 })
 
 describe('verifyMagicLink', () => {
@@ -510,6 +517,19 @@ describe('refreshSession', () => {
 
     await expectAuthError(auth.refreshSession(result.refreshToken), 'INVALID_REFRESH_TOKEN', 401)
     expect(fakes.sessionStore.revokeAllForUser).not.toHaveBeenCalled()
+  })
+
+  it('logs the lost rotation race and answers 401 through the host error factory', async () => {
+    const fakes = createFakes([invitedUser()])
+    const { auth, result } = await signIn(fakes)
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+
+    fakes.sessionStore.rotate.mockResolvedValueOnce(null)
+
+    await expectAuthError(auth.refreshSession(result.refreshToken, { logger }), 'INVALID_REFRESH_TOKEN', 401)
+    expect(logger.warn).toHaveBeenCalledWith('Concurrent refresh lost the rotation race; failing this request only', {
+      data: { userId: 'u1' },
+    })
   })
 
   it('types rotate so an adapter must say whether it rotated', () => {

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import { formatExpiry } from '../email.js'
-import { sanitizeRedirectUrl } from '../http.js'
+import { hasUnsafeRedirectChars, sanitizeRedirectUrl } from '../http.js'
 import { verifySession } from '../session.js'
-import { signAccessToken } from '../tokens.js'
-import { ACCESS_SECRET, IDENTITY } from './helpers/fakes.js'
+import { signAccessToken, signRefreshToken } from '../tokens.js'
+import { ACCESS_SECRET, IDENTITY, REFRESH_SECRET } from './helpers/fakes.js'
 
 const token = signAccessToken({ sub: 'u1', roles: ['user'], authMethod: 'magic' }, ACCESS_SECRET, IDENTITY).token
 const options = { ...IDENTITY, accessSecret: ACCESS_SECRET }
@@ -53,5 +53,29 @@ describe('formatExpiry', () => {
     [72 * 60, '3 days'],
   ])('%i min → %s', (minutes, expected) => {
     expect(formatExpiry(minutes)).toBe(expected)
+  })
+})
+
+describe('hasUnsafeRedirectChars', () => {
+  it.each([
+    ['/trips', false],
+    ['/a?b=c#d', false],
+    ['/\\evil.com', true],
+    ['/a\u0000', true],
+    ['/a\nb', true],
+    ['/a\u007F', true],
+  ])('%j → %s', (input, unsafe) => {
+    expect(hasUnsafeRedirectChars(input)).toBe(unsafe)
+  })
+})
+
+describe('signed tokens', () => {
+  it('carries the lifetime as ttlSec, with expSec kept as a deprecated alias', () => {
+    const access = signAccessToken({ sub: 'u1', roles: [], authMethod: 'magic' }, ACCESS_SECRET, IDENTITY, 60)
+    const refresh = signRefreshToken({ sub: 'u1', jti: 'j1' }, REFRESH_SECRET, IDENTITY, 120)
+
+    expect(access.ttlSec).toBe(60)
+    expect(refresh.ttlSec).toBe(120)
+    expect(access.expSec).toBe(access.ttlSec)
   })
 })
