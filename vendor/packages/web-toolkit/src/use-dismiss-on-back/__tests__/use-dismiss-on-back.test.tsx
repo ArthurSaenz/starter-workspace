@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 
-import { dismissTopLayer, useDismissOnBack } from '..'
+import { dismissTopLayer, subscribeHasOpenLayers, useDismissOnBack } from '..'
 import type { BackDismissTrigger } from '..'
 
 interface LayerProps {
@@ -90,5 +90,34 @@ describe('useDismissOnBack', () => {
     expect(onDismiss).not.toHaveBeenCalled()
 
     screen.unmount()
+  })
+
+  it('reports open layers only on the first open and the last close', async () => {
+    const listener = vi.fn()
+    const unsubscribe = subscribeHasOpenLayers(listener)
+
+    const screen = await render(
+      <>
+        <Layer isOpen={true} onDismiss={vi.fn()} locationKey="/" />
+        <Layer isOpen={true} onDismiss={vi.fn()} locationKey="/" />
+      </>,
+    )
+
+    expect(listener.mock.calls).toEqual([[false], [true]])
+
+    await screen.rerender(
+      <>
+        <Layer isOpen={true} onDismiss={vi.fn()} locationKey="/" />
+        <Layer isOpen={false} onDismiss={vi.fn()} locationKey="/" />
+      </>,
+    )
+
+    expect(listener.mock.calls).toEqual([[false], [true]])
+
+    screen.unmount()
+
+    expect(listener.mock.calls).toEqual([[false], [true], [false]])
+
+    unsubscribe()
   })
 })
