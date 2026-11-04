@@ -82,7 +82,7 @@ export const createFakes = (seed: TestUser[] = []) => {
         }) ?? null
       )
     }),
-    rotate: vi.fn(async (oldId: string, next: NewSession): Promise<unknown> => {
+    rotate: vi.fn(async (oldId: string, next: NewSession): Promise<StoredSession | null> => {
       const old = sessions.find((session) => {
         return session.id === oldId
       })

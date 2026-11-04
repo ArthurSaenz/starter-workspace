@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { RenderMagicLinkEmail } from '../email.js'
 import { AuthError } from '../errors.js'
 import { createMagicLinkAuth } from '../magicLinkAuth.js'
+import type { SessionStore } from '../ports.js'
 import { hashToken, signRefreshToken } from '../tokens.js'
 import { ACCESS_SECRET, IDENTITY, REFRESH_SECRET, createFakes, invitedUser, tokenFromEmail } from './helpers/fakes.js'
 
@@ -416,6 +417,31 @@ describe('refreshSession', () => {
 
     await expectAuthError(auth.refreshSession(result.refreshToken), 'INVALID_REFRESH_TOKEN', 401)
     expect(fakes.sessionStore.revokeAllForUser).not.toHaveBeenCalled()
+  })
+
+  it('types rotate so an adapter must say whether it rotated', () => {
+    interface NomadreamSessionRow {
+      userId: string
+      tokenHash: string
+      jti: string
+      expiresAt: Date
+      ipAddress?: string
+      userAgent?: string
+      id: string
+      createdAt: Date
+      revokedAt?: Date | null
+      replacedBy?: string | null
+    }
+
+    const ok: SessionStore['rotate'] = async (): Promise<NomadreamSessionRow | null> => {
+      return null
+    }
+
+    // @ts-expect-error a void adapter would fail every refresh
+    const bad: SessionStore['rotate'] = async (): Promise<void> => {}
+
+    expect(ok).toBeTypeOf('function')
+    expect(bad).toBeTypeOf('function')
   })
 
   it('ends every session of a user whose invite was revoked', async () => {

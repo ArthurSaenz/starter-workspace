@@ -74,11 +74,11 @@ export interface SessionStore<TCtx extends AuthContext = AuthContext> {
   create: (data: NewSession, ctx?: TCtx) => Promise<unknown>
   findByTokenHash: (tokenHash: string, ctx?: TCtx) => Promise<StoredSession | null>
   /**
-   * Revoke `oldId` and insert its successor atomically. Must return `null` when a concurrent caller
-   * already rotated `oldId`: the engine then fails the request instead of handing out a refresh
-   * token whose session row was never written.
+   * Revoke `oldId` and insert its successor atomically, resolving the new row. Must resolve `null`
+   * when a concurrent caller already rotated `oldId`: the engine then fails the request instead of
+   * handing out a refresh token whose session row was never written.
    */
-  rotate: (oldId: string, next: NewSession, ctx?: TCtx) => Promise<unknown>
+  rotate: (oldId: string, next: NewSession, ctx?: TCtx) => Promise<StoredSession | null>
   revokeByTokenHash: (tokenHash: string, ctx?: TCtx) => Promise<void>
   revokeAllForUser: (userId: string, ctx?: TCtx) => Promise<void>
 }
