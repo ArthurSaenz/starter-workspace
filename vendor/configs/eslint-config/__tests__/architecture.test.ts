@@ -172,6 +172,22 @@ describe('architecture: platform access', () => {
     expectFlagged(messages, 'no-restricted-syntax', '`components` prop')
   })
 
+  it('flags a PascalCase prop typed as `typeof` a component', async () => {
+    const messages = await lintCase({
+      fileName: 'src/features/packages/containers/packages-details-container.tsx',
+      source: code`
+        import { FlightsDetailsComponent } from '../components/flights-details-component'
+
+        export interface PackagesDetailsProps {
+          FlightsDetails: typeof FlightsDetailsComponent
+          schema: typeof FlightsDetailsComponent
+        }
+      `,
+    })
+
+    expectFlagged(messages, 'no-restricted-syntax', '`components` prop')
+  })
+
   it('allows the components bag, slots, render functions and polymorphic `as`', async () => {
     const messages = await lintCase({
       fileName: 'src/features/hotels/components/hotel-view-component.tsx',
