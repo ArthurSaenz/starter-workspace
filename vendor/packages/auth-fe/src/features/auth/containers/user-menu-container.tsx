@@ -1,4 +1,4 @@
-import { useAuth, useAuthStore } from '../services/auth-context.js'
+import { useAuth, useAuthStore } from '../../../lib/auth-context.js'
 import type { AuthState, UserMenuContainerProps } from '../types.js'
 
 export const UserMenuContainer = <TUser,>(props: UserMenuContainerProps<TUser>) => {

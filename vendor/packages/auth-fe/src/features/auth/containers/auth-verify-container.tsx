@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 
-import { useAuthStore } from '../services/auth-context.js'
-import { safeRedirect } from '../services/safe-redirect.js'
-import { useLatest } from '../services/use-latest.js'
+import { useAuthStore } from '../../../lib/auth-context.js'
+import { useLatest } from '../../../lib/use-latest.js'
+import { safeRedirect } from '../services/libs.js'
 import type { AuthVerifyContainerProps, AuthVerifyState } from '../types.js'
 
 export const AuthVerifyContainer = (props: AuthVerifyContainerProps) => {

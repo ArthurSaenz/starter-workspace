@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 
-import { useAuth, useAuthStore } from '../services/auth-context.js'
-import { useLatest } from '../services/use-latest.js'
+import { useAuth, useAuthStore } from '../../../lib/auth-context.js'
+import { useLatest } from '../../../lib/use-latest.js'
 import type { AuthState, RequireAuthContainerProps } from '../types.js'
 
 export const RequireAuthContainer = <TUser,>(props: RequireAuthContainerProps<TUser>) => {

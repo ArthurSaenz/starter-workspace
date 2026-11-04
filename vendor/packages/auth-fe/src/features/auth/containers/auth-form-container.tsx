@@ -1,18 +1,16 @@
 import { useEffect } from 'react'
 
-import { useAuth, useAuthStore } from '../services/auth-context.js'
-import { safeRedirect } from '../services/safe-redirect.js'
-import { useLatest } from '../services/use-latest.js'
-import type { AuthFormContainerProps, AuthState } from '../types.js'
+import { useAuth, useAuthStore } from '../../../lib/auth-context.js'
+import { useLatest } from '../../../lib/use-latest.js'
+import { safeRedirect } from '../services/libs.js'
+import type { AuthFormContainerProps } from '../types.js'
 
 export const AuthFormContainer = (props: AuthFormContainerProps) => {
   const { redirect, onAuthenticated, render } = props
 
   const store = useAuthStore<unknown>()
 
-  const state = useAuth((current: AuthState<unknown>) => {
-    return current
-  })
+  const state = useAuth<unknown>()
 
   const onAuthenticatedRef = useLatest(onAuthenticated)
 

@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 
 import { AuthFormContainer } from '../containers/auth-form-container.js'
-import { AuthProvider } from '../containers/auth-provider.js'
+import { AuthProvider, AuthProviderContainer } from '../containers/auth-provider-container.js'
 import { AuthVerifyContainer } from '../containers/auth-verify-container.js'
 import { RequireAuthContainer } from '../containers/require-auth-container.js'
 import { UserMenuContainer } from '../containers/user-menu-container.js'
-import { createAuthStore } from '../services/auth-store.js'
+import { createAuthStore } from '../services/main.js'
 import type { AuthClient, AuthState } from '../types.js'
 import { USER } from './fixtures.js'
 import type { TestUser } from './fixtures.js'
@@ -31,6 +31,12 @@ const fakeClient = (overrides: Partial<AuthClient<TestUser>> = {}): AuthClient<T
 const storeWith = (initialState: Partial<AuthState<TestUser>>, client = fakeClient()) => {
   return createAuthStore(client, { initialState })
 }
+
+describe('authProviderContainer', () => {
+  it('is also exported under its original name', () => {
+    expect(AuthProvider).toBe(AuthProviderContainer)
+  })
+})
 
 describe('authFormContainer', () => {
   it('resolves an unknown session through fetchMe', async () => {

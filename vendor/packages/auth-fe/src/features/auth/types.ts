@@ -1,6 +1,22 @@
 import type { ReactNode } from 'react'
 
-export type AuthStatus = 'unknown' | 'authenticated' | 'unauthenticated'
+import type {
+  AuthState,
+  AuthStatus,
+  AuthStore,
+  MagicLinkRequest,
+  MagicLinkResult,
+  VerifyMagicLinkResult,
+} from '../../lib/auth-types.js'
+
+export type {
+  AuthState,
+  AuthStatus,
+  AuthStore,
+  MagicLinkRequest,
+  MagicLinkResult,
+  VerifyMagicLinkResult,
+} from '../../lib/auth-types.js'
 
 export interface AuthPaths {
   /** POST `{ email, redirectUrl? }` — emails the sign-in link. */
@@ -30,23 +46,6 @@ export interface AuthClientOptions {
   refresh?: () => Promise<boolean>
 }
 
-export interface MagicLinkRequest {
-  email: string
-  redirectUrl?: string
-}
-
-export interface MagicLinkResult {
-  ok: boolean
-  email: string
-}
-
-export interface VerifyMagicLinkResult {
-  ok: boolean
-  redirect?: string
-  /** The error body's `type` (e.g. `INVALID_OR_EXPIRED_TOKEN`); absent on a network failure. */
-  errorCode?: string
-}
-
 export interface AuthClient<TUser> {
   /** Rejects on any non-2xx or network failure. */
   requestMagicLink: (request: MagicLinkRequest) => Promise<void>
@@ -63,48 +62,18 @@ export interface AuthClient<TUser> {
   logout: () => Promise<void>
 }
 
-export interface AuthState<TUser> {
-  status: AuthStatus
-  user: TUser | null
-  /** A magic-link request is in flight. */
-  requestLoading: boolean
-  /** Where the last link went; the form shows its "check your inbox" state while set. */
-  sentToEmail: string | null
-  requestError: string | null
-  /** A `fetchMe` is in flight. */
-  isSessionLoading: boolean
-}
-
 export interface AuthStoreOptions<TUser> {
   /** The text `requestError` takes when a magic-link request fails. */
   requestErrorText?: string
   initialState?: Partial<AuthState<TUser>>
 }
 
-export interface AuthStore<TUser> {
-  getState: () => AuthState<TUser>
-  subscribe: (listener: () => void) => () => void
-  /** Trims and lower-cases the email before sending it. */
-  submitEmail: (request: MagicLinkRequest) => Promise<MagicLinkResult>
-  resetSentEmail: () => void
-  /** Concurrent callers share one in-flight request; a 401 gets one silent refresh and one retry. */
-  fetchMe: () => Promise<TUser | null>
-  /**
-   * Exchanges the token for the session cookies and, on success, loads the user before resolving,
-   * so `authenticated` is only ever published with a user; it never sets `status` itself. A `/me`
-   * already in flight was sent with the pre-verify cookies, so it is awaited and then repeated. A
-   * `logout` during `verify` skips the load.
-   */
-  verify: (token: string) => Promise<VerifyMagicLinkResult>
-  /** Clears the local session even when the request fails; a `/me` still in flight is discarded. */
-  logout: () => Promise<void>
-  refresh: () => Promise<boolean>
-}
-
 export interface AuthProviderProps<TUser> {
   store: AuthStore<TUser>
   children?: ReactNode
 }
+
+export type AuthProviderContainerProps<TUser> = AuthProviderProps<TUser>
 
 export interface AuthFormRenderProps {
   status: AuthStatus

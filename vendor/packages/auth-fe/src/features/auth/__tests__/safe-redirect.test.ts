@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { safeRedirect } from '../services/safe-redirect.js'
+import { safeRedirect } from '../services/libs.js'
 
 describe('safeRedirect', () => {
   it('passes through an in-app relative path', () => {
@@ -21,4 +21,17 @@ describe('safeRedirect', () => {
     expect(safeRedirect('/a\u0000b')).toBe('/')
     expect(safeRedirect('/a\u007Fb')).toBe('/')
   })
+
+  it('refuses a colon anywhere and a path longer than 2048 characters', () => {
+    expect(safeRedirect('/a:b')).toBe('/')
+    expect(safeRedirect(`/${'x'.repeat(2048)}`)).toBe('/')
+    expect(safeRedirect(`/${'x'.repeat(2047)}`)).toBe(`/${'x'.repeat(2047)}`)
+  })
+
+  it.each(['//evil.com', '/\\evil.com', '/a\u0000', 'javascript:x', 'https://e.com'])(
+    'refuses %j like the backend sanitiser does',
+    (input) => {
+      expect(safeRedirect(input)).toBe('/')
+    },
+  )
 })

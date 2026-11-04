@@ -1,11 +1,11 @@
 import { createContext, useContext, useSyncExternalStore } from 'react'
 
-import type { AuthState, AuthStore } from '../types.js'
+import type { AuthState, AuthStore } from './auth-types.js'
 
 export const AuthContext = createContext<AuthStore<unknown> | null>(null)
 
 /**
- * The store `AuthProvider` was given — for its actions (`fetchMe`, `logout`, `refresh`, …).
+ * The store `AuthProviderContainer` was given — for its actions (`fetchMe`, `logout`, `refresh`, …).
  *
  * @example
  *     const { fetchMe } = useAuthStore<User>()

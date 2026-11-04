@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { AuthHttpError, createAuthClient, isUnauthorized } from '../services/auth-client.js'
+import { AuthHttpError, createAuthClient, isUnauthorized } from '../services/api.js'
 import { PATHS, USER, errorResponse, okResponse } from './fixtures.js'
 import type { TestUser } from './fixtures.js'
 

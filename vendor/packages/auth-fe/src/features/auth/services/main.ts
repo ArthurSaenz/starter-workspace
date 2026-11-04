@@ -1,5 +1,5 @@
 import type { AuthClient, AuthState, AuthStore, AuthStoreOptions, MagicLinkRequest, MagicLinkResult } from '../types.js'
-import { isUnauthorized } from './auth-client.js'
+import { isUnauthorized } from './api.js'
 
 export const DEFAULT_REQUEST_ERROR_TEXT = 'We could not send your sign-in link. Please try again.'
 

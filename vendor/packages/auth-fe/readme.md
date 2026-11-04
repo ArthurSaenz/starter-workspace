@@ -16,7 +16,7 @@ the containers wire the router, toasts and the app's UI components into the pack
 
 Root barrel (`src/index.ts`, re-exporting `src/features/auth/index.ts`):
 
-- `createAuthClient<TUser>(options)` → `AuthClient<TUser>` (`services/auth-client.ts`). Plain `fetch`,
+- `createAuthClient<TUser>(options)` → `AuthClient<TUser>` (`services/api.ts`). Plain `fetch`,
   JSON bodies, `credentials: 'same-origin'` by default. Options:
   - `paths: { requestMagicLink, verifyMagicLink, me, refresh, logout }` — required.
   - `baseUrl` (default `''`), `fetch` (default the global, looked up at call time so a stub installed
@@ -33,7 +33,7 @@ Root barrel (`src/index.ts`, re-exporting `src/features/auth/index.ts`):
   body that is not a JSON object rejects with `type: 'INVALID_RESPONSE'` (no refresh). GETs send no
   `content-type`; POSTs always send `application/json`.
 
-- `createAuthStore<TUser>(client, options?)` → `AuthStore<TUser>` (`services/auth-store.ts`). A
+- `createAuthStore<TUser>(client, options?)` → `AuthStore<TUser>` (`services/main.ts`). A
   framework-agnostic external store: `getState()`, `subscribe(listener)`, and the actions
   - `submitEmail({ email, redirectUrl? })` — trims and lower-cases the email, toggles
     `requestLoading`, clears `requestError` on start, sets `sentToEmail` on success or `requestError`
@@ -54,7 +54,7 @@ Root barrel (`src/index.ts`, re-exporting `src/features/auth/index.ts`):
 
 - `AuthState<TUser>`: `status` (`'unknown' | 'authenticated' | 'unauthenticated'`), `user`,
   `requestLoading`, `sentToEmail`, `requestError`, `isSessionLoading`.
-- `AuthProvider` (`{ store, children }`), `useAuthStore<TUser>()` (the store, for its actions; throws
+- `AuthProviderContainer` (`{ store, children }`; also exported as `AuthProvider`), `useAuthStore<TUser>()` (the store, for its actions; throws
   outside a provider) and `useAuth(selector?)` (`useSyncExternalStore` over the store; the server
   snapshot is the same read). Return a primitive or a stored reference from `selector`.
 - Containers (`containers/`), all render-prop and headless:
@@ -75,8 +75,8 @@ Root barrel (`src/index.ts`, re-exporting `src/features/auth/index.ts`):
   Host callbacks are read through a ref, so an inline arrow does not re-run a container's effect (and
   re-navigate) on every render.
 
-- `safeRedirect(value?)` — the value when it is an in-app path (`/…`, not `//…`, no backslash or
-  control character), else `'/'`. Browsers read `/\evil.com` as `//evil.com`.
+- `safeRedirect(value?)` — the value when it is an in-app path (`/…`, not `//…`, no backslash,
+  `:` or control character, at most 2048 characters), else `'/'`. Browsers read `/\evil.com` as `//evil.com`.
 - `AuthHttpError`, `isUnauthorized(error)` (duck-typed on `status === 401`, so a custom `AuthClient`
   only has to throw something carrying `status`), `DEFAULT_REQUEST_ERROR_TEXT`.
 - Types: `AuthClient`, `AuthClientOptions`, `AuthPaths`, `AuthStore`, `AuthStoreOptions`, `AuthState`,
@@ -91,7 +91,7 @@ Usage:
 const authStore = createAuthStore(createAuthClient<User>({ paths: AUTH_PATHS }))
 
 // root
-;<AuthProvider store={authStore}>{children}</AuthProvider>
+;<AuthProviderContainer store={authStore}>{children}</AuthProviderContainer>
 
 // sign-in page
 ;<AuthFormContainer
@@ -119,14 +119,15 @@ To verify a copy (not automated):
 
 1. New Vite + React 19 app; copy `vendor/packages/auth-fe/src` and `tsconfig*.json`.
 2. `tsc --noEmit` clean.
-3. Build a store against your API, mount `AuthProvider`, render `AuthFormContainer` and
+3. Build a store against your API, mount `AuthProviderContainer`, render `AuthFormContainer` and
    `AuthVerifyContainer` with your own form and navigation; sign in end to end.
 
 ## Layout
 
-- `src/features/auth/services/` — `auth-client.ts`, `auth-store.ts`, `auth-context.ts` (context +
-  hooks), `safe-redirect.ts`, `use-latest.ts`.
-- `src/features/auth/containers/` — `auth-provider.tsx` and the four headless containers.
+- `src/features/auth/services/` — `api.ts` (the client), `main.ts` (the store), `libs.ts` (`safeRedirect`).
+- `src/lib/` — `auth-context.ts` (context + hooks), `use-latest.ts`, and `auth-types.ts`, the types the
+  hooks need (re-exported from `features/auth/types.ts`).
+- `src/features/auth/containers/` — `auth-provider-container.tsx` and the four headless containers.
 - `src/features/auth/__tests__/` — client, store, `safeRedirect` and container tests (browser mode).
 
 ## Commands

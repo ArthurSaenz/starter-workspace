@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { createAuthClient } from '../services/auth-client.js'
-import { DEFAULT_REQUEST_ERROR_TEXT, createAuthStore } from '../services/auth-store.js'
+import { createAuthClient } from '../services/api.js'
+import { DEFAULT_REQUEST_ERROR_TEXT, createAuthStore } from '../services/main.js'
 import type { AuthClient, AuthState, AuthStore, AuthStoreOptions } from '../types.js'
 import { PATHS, USER, callsTo, errorResponse, okResponse } from './fixtures.js'
 import type { TestUser } from './fixtures.js'
