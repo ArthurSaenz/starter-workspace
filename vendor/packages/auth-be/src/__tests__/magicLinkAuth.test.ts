@@ -1,12 +1,14 @@
 /* eslint-disable sonarjs/no-hardcoded-ip, sonarjs/assertions-in-tests -- fixture client IPs; `expectAuthError` asserts, and the rule does not follow helpers */
 import jwt from 'jsonwebtoken'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 
 import type { RenderMagicLinkEmail } from '../email.js'
 import { AuthError } from '../errors.js'
+import type { MagicLinkAuth, TokenPair } from '../magicLinkAuth.js'
 import { createMagicLinkAuth } from '../magicLinkAuth.js'
 import type { SessionStore } from '../ports.js'
 import { hashToken, signRefreshToken } from '../tokens.js'
+import type { TestUser } from './helpers/fakes.js'
 import { ACCESS_SECRET, IDENTITY, REFRESH_SECRET, createFakes, invitedUser, tokenFromEmail } from './helpers/fakes.js'
 
 const cookieValue = (cookie: string): string => {
@@ -239,6 +241,97 @@ describe('sendInviteLink', () => {
     expect(fakes.sent[0]!.text).toContain('This link expires in 3 days.')
     expect(fakes.rateLimiter.incrementAndCheck).not.toHaveBeenCalled()
     expect((fakes.tokens[0]!.expiresAt as Date).getTime() - Date.now()).toBeGreaterThan(71 * 3600 * 1000)
+  })
+
+  it('reports a delivered email', async () => {
+    const fakes = createFakes()
+
+    await expect(createMagicLinkAuth(fakes.config).sendInviteLink('new@example.com')).resolves.toEqual({
+      emailSent: true,
+    })
+  })
+
+  it('reports an undelivered email after invalidating its token', async () => {
+    const fakes = createFakes()
+
+    fakes.mailer.send.mockRejectedValueOnce(new Error('provider down'))
+
+    await expect(createMagicLinkAuth(fakes.config).sendInviteLink('new@example.com')).resolves.toEqual({
+      emailSent: false,
+    })
+    expect(fakes.magicTokens.invalidateByEmail).toHaveBeenCalledTimes(2)
+    expect(fakes.magicTokens.invalidateByEmail.mock.invocationCallOrder[1]!).toBeGreaterThan(
+      fakes.mailer.send.mock.invocationCallOrder[0]!,
+    )
+    expect(fakes.tokens[0]!.spent).toBe(true)
+  })
+
+  it('reports an undelivered email, without throwing, when the cleanup fails too', async () => {
+    const fakes = createFakes()
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+
+    fakes.mailer.send.mockRejectedValueOnce(new Error('provider down'))
+    fakes.magicTokens.invalidateByEmail.mockResolvedValueOnce().mockRejectedValueOnce(new Error('db down'))
+
+    await expect(createMagicLinkAuth(fakes.config).sendInviteLink('new@example.com', { logger })).resolves.toEqual({
+      emailSent: false,
+    })
+    expect(logger.error).toHaveBeenCalledWith('Failed to invalidate the undelivered magic token', {
+      data: { name: 'Error' },
+    })
+  })
+
+  it('reports an undelivered email when the renderer throws', async () => {
+    const fakes = createFakes()
+
+    const renderEmail = vi.fn(() => {
+      throw new Error('template broke')
+    })
+
+    await expect(
+      createMagicLinkAuth(withRenderEmail(fakes, renderEmail)).sendInviteLink('new@example.com'),
+    ).resolves.toEqual({ emailSent: false })
+    expect(fakes.tokens[0]!.spent).toBe(true)
+  })
+
+  it('leaves a sign-in request silent when the mailer fails', async () => {
+    const fakes = createFakes([invitedUser()])
+
+    fakes.mailer.send.mockRejectedValueOnce(new Error('provider down'))
+
+    await expect(
+      createMagicLinkAuth(fakes.config).requestMagicLink({ email: 'ada@example.com' }),
+    ).resolves.toBeUndefined()
+  })
+})
+
+describe('engine shape', () => {
+  it('keeps its method set and return types', () => {
+    const auth = createMagicLinkAuth(createFakes().config)
+
+    const keys: Record<keyof MagicLinkAuth<TestUser, { id: string; email: string }, object>, true> = {
+      cookies: true,
+      identity: true,
+      uninvitedRequest: true,
+      requestMagicLink: true,
+      sendInviteLink: true,
+      verifyMagicLink: true,
+      refreshSession: true,
+      logout: true,
+      requireUser: true,
+      authenticate: true,
+      getMe: true,
+      issueSession: true,
+      extractAccessToken: true,
+      extractRefreshToken: true,
+      clearCookies: true,
+    }
+
+    expect(Object.keys(keys)).toHaveLength(15)
+    expect(Object.keys(auth).sort()).toEqual(Object.keys(keys).sort())
+    expectTypeOf(auth.sendInviteLink).returns.resolves.toEqualTypeOf<{ emailSent: boolean }>()
+    expectTypeOf(auth.issueSession).returns.resolves.toEqualTypeOf<TokenPair>()
+    expectTypeOf(auth.refreshSession).returns.resolves.toEqualTypeOf<TokenPair>()
   })
 })
 

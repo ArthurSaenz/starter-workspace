@@ -243,7 +243,7 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
     meta: RequestMeta,
     kind: MagicLinkEmailKind,
     ctx?: TCtx,
-  ): Promise<void> => {
+  ): Promise<boolean> => {
     const ttlMin = kind === 'invite' ? inviteTtlMin : signInTtlMin
 
     await magicTokens.invalidateByEmail(email, ctx)
@@ -266,6 +266,8 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
     try {
       // Rendering sits inside the try: a template that throws leaves the same undelivered token.
       await mailer.send(await renderEmail({ to: email, link, expMin: ttlMin, kind }, ctx), ctx)
+
+      return true
     } catch (error) {
       // A token nobody received must not stay redeemable.
       ctx?.logger?.error('Magic link send failed; invalidating the undelivered token', {
@@ -279,6 +281,8 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
           data: { name: (cleanupError as Error).name },
         })
       }
+
+      return false
     }
   }
 
@@ -425,10 +429,19 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
 
     /**
      * Email a sign-in link on an admin's behalf: no rate limit and no allowlist check, because the
-     * caller has just authorised this address. Uses the longer invite TTL.
+     * caller has just authorised this address. Uses the longer invite TTL. `emailSent: false` means
+     * the mailer or template failed and the link is already dead: tell the admin, do not say "sent".
      */
-    async sendInviteLink(email: string, ctx?: TCtx): Promise<void> {
-      await mintAndSendMagicLink((email || '').trim().toLowerCase(), sanitizeRedirectUrl(undefined), {}, 'invite', ctx)
+    async sendInviteLink(email: string, ctx?: TCtx): Promise<{ emailSent: boolean }> {
+      const emailSent = await mintAndSendMagicLink(
+        (email || '').trim().toLowerCase(),
+        sanitizeRedirectUrl(undefined),
+        {},
+        'invite',
+        ctx,
+      )
+
+      return { emailSent }
     },
 
     async verifyMagicLink(input: VerifyMagicLinkInput, ctx?: TCtx): Promise<VerifyMagicLinkResult> {

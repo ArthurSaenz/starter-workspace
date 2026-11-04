@@ -55,6 +55,9 @@ honour the same cookie.
   and a refresh by a no-longer-allowed user revokes all their sessions.
 - A replayed (already rotated) refresh token revokes every session of its user.
 - Losing a concurrent rotation fails only that request.
+- `sendInviteLink` resolves `{ emailSent }`. `false` means the mailer or the template threw and the
+  link is already invalidated: show the admin that the invite did not go out. `requestMagicLink`
+  stays silent whatever happens, so an anonymous caller learns nothing.
 - The redirect target is sanitised on write and on read: only an in-app path survives.
 
 ### Host wiring
