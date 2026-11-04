@@ -35,7 +35,8 @@ export interface AuthRoutesOptions {
   requestMagicLinkMessage?: string
   /**
    * The rate limits key on this IP. `trustedProxyHops` counts the proxies you run in front of API
-   * Gateway (e.g. 1 for CloudFront); 0 trusts only `sourceIp`. See the readme's topology table.
+   * Gateway; 0 trusts only `sourceIp`. Measure it in a dev stage, never guess: see the readme's
+   * topology table.
    */
   clientIp: { trustedProxyHops: number }
 }

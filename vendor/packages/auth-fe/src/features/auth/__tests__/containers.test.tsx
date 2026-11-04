@@ -364,6 +364,44 @@ describe('requireAuthContainer', () => {
 
     await expect.element(screen.getByTestId('protected')).toBeInTheDocument()
   })
+
+  it('stays signed out when logout lands while the session is loading', async () => {
+    const onUnauthenticated = vi.fn()
+    const me = Promise.withResolvers<TestUser>()
+
+    const client = fakeClient({
+      me: vi.fn(() => {
+        return me.promise
+      }),
+    })
+
+    const store = storeWith({}, client)
+
+    const screen = await render(
+      <AuthProvider store={store}>
+        <RequireAuthContainer<TestUser>
+          onUnauthenticated={onUnauthenticated}
+          onLoggedOut={vi.fn()}
+          fallback={<div data-testid="fallback" />}
+        >
+          <div data-testid="protected" />
+        </RequireAuthContainer>
+      </AuthProvider>,
+    )
+
+    await vi.waitFor(() => {
+      expect(client.me).toHaveBeenCalledOnce()
+    })
+    await store.logout()
+    me.resolve(USER)
+
+    await vi.waitFor(() => {
+      expect(onUnauthenticated).toHaveBeenCalledOnce()
+    })
+    await expect.element(screen.getByTestId('fallback')).toBeInTheDocument()
+    expect(screen.container.querySelector('[data-testid="protected"]')).toBeNull()
+    expect(store.getState()).toMatchObject({ status: 'unauthenticated', user: null })
+  })
 })
 
 describe('authProvider', () => {

@@ -79,7 +79,9 @@ export interface MagicLinkAuthConfig<TUser extends AuthUser, TMe, TCtx extends A
   /**
    * What a link request from an address that may not sign in gets. `silent` (default) answers like a
    * success so a public endpoint is not a membership oracle; `reject` throws NOT_INVITED (403) for an
-   * internal tool whose invited users need the feedback.
+   * internal tool whose invited users need the feedback. `silent` makes the body uniform, not the
+   * timing: a known address answers slower (token write + mail), so a host that must hide membership
+   * sends mail from a queue. The per-email limit caps probes per address.
    */
   uninvitedRequest?: 'silent' | 'reject'
   /** The allowlist; re-asked at request, verify AND refresh so a revoke ends running sessions. */

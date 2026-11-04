@@ -45,7 +45,7 @@ honour the same cookie.
 | `email`                                                                 | one of   | `{ subject, intro, linkLabel, expiryPrefix?, warning? }`: the copy for the built-in plain HTML email, HTML-escaped in its html part.                          |
 | `renderEmail`                                                           | one of   | `({ to, link, expMin, kind: 'sign-in' \| 'invite' }, ctx) => { to, subject, text, html }`, sync or async: host-owned templates (e.g. `@wl/auth-emails`).      |
 | `toMe`                                                                  | yes      | Row → the `GET me` DTO.                                                                                                                                       |
-| `uninvitedRequest`                                                      | no       | `'silent'` (default: public surface, no membership oracle) or `'reject'` (NOT_INVITED 403, for internal tools).                                               |
+| `uninvitedRequest`                                                      | no       | `'silent'` (default: public surface, same body for every address) or `'reject'` (NOT_INVITED 403, for internal tools). See "Timing" below.                    |
 | `isAllowed`, `rolesOf`, `onSignIn`                                      | no       | Allowlist predicate (default `invited === true`), roles claim (default `roles ?? []`), sign-in side effects.                                                  |
 | `cookies`, `rateLimits`, `validate`, `createError`, `notInvitedMessage` | no       | Cookie names/paths (default `access_token` `/`, `refresh_token` `/api/v1/auth`), budgets (5/email, 20/IP per hour…), validators, error mapping.               |
 
@@ -59,6 +59,15 @@ honour the same cookie.
   link is already invalidated: show the admin that the invite did not go out. `requestMagicLink`
   stays silent whatever happens, so an anonymous caller learns nothing.
 - The redirect target is sanitised on write and on read: only an in-app path survives. A link to `/` carries no `redirect` parameter.
+
+### Timing
+
+`silent` makes the response body the same for every address, not the response time. A known,
+allowed address costs a token write and a mail send (roughly 100–300 ms), while an unknown one
+returns after the lookup, so a patient caller can still tell them apart. The per-email limit
+(5/hour by default) caps probes per address, and the per-IP limits only help once `clientIp` is
+right. A public host that must hide membership sends mail from a queue (e.g. SQS) so every request
+returns at the same point. `reject` discloses membership by design.
 
 ### Host wiring
 
