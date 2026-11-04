@@ -32,7 +32,16 @@ export const buildMagicLinkUrl = (
 ): string => {
   const base = `${baseUrl}${verifyPath}?token=${rawToken}`
 
-  return redirectUrl ? `${base}&redirect=${encodeURIComponent(redirectUrl)}` : base
+  // Verify lands on `/` without one, so `redirect=%2F` would only lengthen the link.
+  return redirectUrl && redirectUrl !== '/' ? `${base}&redirect=${encodeURIComponent(redirectUrl)}` : base
+}
+
+const HTML_ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
+
+export const escapeHtml = (value: string): string => {
+  return value.replace(/["&'<>]/g, (char) => {
+    return HTML_ESCAPES[char] ?? char
+  })
 }
 
 /** Largest whole unit, so a 72 h invite reads "3 days" rather than "4320 minutes". */
@@ -62,9 +71,9 @@ export const renderMagicLinkEmail = (
     subject: text.subject,
     text: `${text.intro}\n\n${link}\n\n${expiryLine}\n\n${warning}`,
     html:
-      `<p>${text.intro}</p>` +
-      `<p><a href="${link}">${text.linkLabel}</a></p>` +
-      `<p>${expiryLine}</p>` +
-      `<p>${warning}</p>`,
+      `<p>${escapeHtml(text.intro)}</p>` +
+      `<p><a href="${link}">${escapeHtml(text.linkLabel)}</a></p>` +
+      `<p>${escapeHtml(expiryLine)}</p>` +
+      `<p>${escapeHtml(warning)}</p>`,
   }
 }

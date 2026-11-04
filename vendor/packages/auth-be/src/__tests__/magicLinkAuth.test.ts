@@ -137,6 +137,15 @@ describe('requestMagicLink', () => {
     expect(fakes.tokens[0]!.tokenHash).toBe(hashToken(tokenFromEmail(fakes.sent[0]!)))
   })
 
+  it('leaves the redirect off a link that lands on /', async () => {
+    const fakes = createFakes([invitedUser()])
+
+    await createMagicLinkAuth(fakes.config).requestMagicLink({ email: 'ada@example.com' })
+
+    expect(fakes.sent[0]!.text).toContain('https://app.test/auth/verify?token=')
+    expect(fakes.sent[0]!.text).not.toContain('redirect=')
+  })
+
   it.each([
     ['unknown', []],
     ['uninvited', [invitedUser({ invited: false })]],

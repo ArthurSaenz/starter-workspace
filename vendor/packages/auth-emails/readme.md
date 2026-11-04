@@ -26,12 +26,12 @@ A template that throws is treated like a failed send: the undelivered token is i
 
 ## Public API
 
-| Export                               | What it is                                                                         |
-| ------------------------------------ | ---------------------------------------------------------------------------------- |
-| `createAuthEmailRenderer(options)`   | `{ brand, copy? }` → the `renderEmail` function for `createMagicLinkAuth`.         |
-| `DEFAULT_AUTH_EMAIL_COPY`            | The English copy for each kind.                                                    |
-| `MagicLinkEmail`                     | The React component, for a host that renders it inside its own layout or pipeline. |
-| `AuthEmailBrand`, `AuthEmailCopy`, … | Option types.                                                                      |
+| Export                               | What it is                                                                                                                                 |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `createAuthEmailRenderer(options)`   | `{ brand, copy?, lang? }` → the `renderEmail` function for `createMagicLinkAuth`; `lang` (default `'en'`) is set on `<html>` and `<body>`. |
+| `DEFAULT_AUTH_EMAIL_COPY`            | The English copy for each kind.                                                                                                            |
+| `MagicLinkEmail`                     | The React component, for a host that renders it inside its own layout or pipeline.                                                         |
+| `AuthEmailBrand`, `AuthEmailCopy`, … | Option types.                                                                                                                              |
 
 ## Preview
 

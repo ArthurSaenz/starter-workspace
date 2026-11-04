@@ -42,7 +42,7 @@ honour the same cookie.
 | `mailer`                                                                | yes      | `{ send({ to, subject, text, html }) }`. A throw invalidates the undelivered token.                                                                           |
 | `jwt`                                                                   | yes      | `{ accessSecret, refreshSecret, issuer, audience, accessTtlSec?, refreshTtlSec? }`. Secrets ≥ 32 chars and different from each other, or construction throws. |
 | `magicLink`                                                             | yes      | `{ baseUrl, verifyPath = '/auth/verify', ttlMin = 15, inviteTtlMin = 4320 }`.                                                                                 |
-| `email`                                                                 | one of   | `{ subject, intro, linkLabel, expiryPrefix?, warning? }`: the copy for the built-in plain HTML email.                                                         |
+| `email`                                                                 | one of   | `{ subject, intro, linkLabel, expiryPrefix?, warning? }`: the copy for the built-in plain HTML email, HTML-escaped in its html part.                          |
 | `renderEmail`                                                           | one of   | `({ to, link, expMin, kind: 'sign-in' \| 'invite' }, ctx) => { to, subject, text, html }`, sync or async: host-owned templates (e.g. `@wl/auth-emails`).      |
 | `toMe`                                                                  | yes      | Row → the `GET me` DTO.                                                                                                                                       |
 | `uninvitedRequest`                                                      | no       | `'silent'` (default: public surface, no membership oracle) or `'reject'` (NOT_INVITED 403, for internal tools).                                               |
@@ -58,7 +58,7 @@ honour the same cookie.
 - `sendInviteLink` resolves `{ emailSent }`. `false` means the mailer or the template threw and the
   link is already invalidated: show the admin that the invite did not go out. `requestMagicLink`
   stays silent whatever happens, so an anonymous caller learns nothing.
-- The redirect target is sanitised on write and on read: only an in-app path survives.
+- The redirect target is sanitised on write and on read: only an in-app path survives. A link to `/` carries no `redirect` parameter.
 
 ### Host wiring
 

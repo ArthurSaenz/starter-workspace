@@ -7,17 +7,20 @@ export interface MagicLinkEmailProps {
   expiry: string
   brand: AuthEmailBrand
   copy: AuthEmailCopy
+  /** The document language; `'en'` by default. */
+  lang?: string
 }
 
 export const MagicLinkEmail = (props: MagicLinkEmailProps) => {
-  const { link, expiry, brand, copy } = props
+  const { link, expiry, brand, copy, lang = 'en' } = props
 
   return (
-    <Html lang="en">
+    <Html lang={lang}>
       <Head />
       <Preview>{copy.preview}</Preview>
       <Tailwind>
-        <Body className="m-0 bg-gray-100 py-10 font-sans">
+        {/* react-email's Body sets its own `lang="en"`, which would override the html one for the content. */}
+        <Body lang={lang} className="m-0 bg-gray-100 py-10 font-sans">
           <Container className="mx-auto max-w-120 rounded-lg bg-white p-8">
             {brand.logoUrl ? <Img src={brand.logoUrl} alt={brand.name} height="32" className="mb-6" /> : null}
             <Heading as="h1" className="m-0 mb-4 text-2xl font-semibold text-gray-900">

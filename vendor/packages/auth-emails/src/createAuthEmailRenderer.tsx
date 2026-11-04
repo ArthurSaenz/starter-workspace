@@ -30,16 +30,19 @@ export const DEFAULT_AUTH_EMAIL_COPY: Record<MagicLinkEmailKind, AuthEmailCopy> 
 export interface AuthEmailRendererOptions {
   brand: AuthEmailBrand
   copy?: Partial<Record<MagicLinkEmailKind, Partial<AuthEmailCopy>>>
+  /** The `lang` of every email; set it with translated `copy`. `'en'` by default. */
+  lang?: string
 }
 
 /** The `renderEmail` for `createMagicLinkAuth`: React Email templates rendered to HTML + plain text. */
 export const createAuthEmailRenderer = <TCtx extends AuthContext = AuthContext>({
   brand,
   copy: copyOverrides,
+  lang = 'en',
 }: AuthEmailRendererOptions): RenderMagicLinkEmail<TCtx> => {
   return async ({ to, link, expMin, kind }) => {
     const copy = { ...DEFAULT_AUTH_EMAIL_COPY[kind], ...copyOverrides?.[kind] }
-    const email = <MagicLinkEmail link={link} expiry={formatExpiry(expMin)} brand={brand} copy={copy} />
+    const email = <MagicLinkEmail link={link} expiry={formatExpiry(expMin)} brand={brand} copy={copy} lang={lang} />
     const [html, text] = await Promise.all([render(email), render(email, { plainText: true })])
 
     return { to, subject: copy.subject, html, text }

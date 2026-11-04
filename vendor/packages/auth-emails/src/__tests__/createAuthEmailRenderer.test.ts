@@ -62,4 +62,15 @@ describe('createAuthEmailRenderer', () => {
     expect((await withLogo(input)).html).toContain('src="https://cdn.test/logo.png"')
     expect((await withoutLogo(input)).html).not.toContain('<img')
   })
+
+  it('sets the html and body lang, English by default', async () => {
+    const input = { to: 'ada@example.com', link: LINK, expMin: 15, kind: 'sign-in' } as const
+    const he = (await createAuthEmailRenderer({ brand: { name: 'Acme' }, lang: 'he' })(input)).html
+    const en = (await createAuthEmailRenderer({ brand: { name: 'Acme' } })(input)).html
+
+    // react-email writes `dir` before `lang`, so the tag reads `<html dir="ltr" lang="…"`.
+    expect(he).toMatch(/<html [^>]*lang="he"/)
+    expect(he).toMatch(/<body [^>]*lang="he"/)
+    expect(en).toMatch(/<html [^>]*lang="en"/)
+  })
 })
