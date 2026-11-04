@@ -61,6 +61,17 @@ describe('createE2eLogin', () => {
     expect(resolveAccount).not.toHaveBeenCalled()
   })
 
+  it('logs only the domain of an email off the allowlist', async () => {
+    const { e2e } = setup()
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+
+    await expectAuthError(e2e.login({ email: 'Eve@Example.com', providedSecret: SECRET }, { logger }), 'FORBIDDEN', 403)
+    expect(logger.warn).toHaveBeenCalledWith('E2E login rejected: email not on allowlist', {
+      data: { emailDomain: 'example.com' },
+    })
+    expect(logger.warn.mock.calls[0]![1].data).not.toHaveProperty('email')
+  })
+
   it('refuses a short secret at construction', () => {
     expect(() => {
       return setup('short')

@@ -72,7 +72,7 @@ export const createE2eLogin = <TUser extends AuthUser, TCtx extends AuthContext>
     async login(input: E2eLoginInput, ctx?: TCtx): Promise<TokenPair> {
       if (!config.secret) throw createError({ message: 'Not found', code: 'NOT_FOUND', status: 404 })
 
-      // A wrong secret never reveals whether the endpoint is enabled; 401 mirrors a bad magic token.
+      // 404 vs 401 reveals that the endpoint is enabled; fine, the gates are the secret and the allowlist.
       if (!safeSecretEqual(input.providedSecret, config.secret)) {
         ctx?.logger?.warn('E2E login rejected: bad secret')
         throw createError({ message: 'Invalid or expired token', code: 'UNAUTHENTICATED', status: 401 })
@@ -81,7 +81,9 @@ export const createE2eLogin = <TUser extends AuthUser, TCtx extends AuthContext>
       const email = (input.email || '').trim().toLowerCase()
 
       if (!email || !allowedEmails.includes(email)) {
-        ctx?.logger?.warn('E2E login rejected: email not on allowlist', { data: { email } })
+        ctx?.logger?.warn('E2E login rejected: email not on allowlist', {
+          data: { emailDomain: email.split('@')[1] ?? '' },
+        })
         throw createError({ message: 'E2E login is not permitted for this email.', code: 'FORBIDDEN', status: 403 })
       }
 
