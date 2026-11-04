@@ -65,7 +65,41 @@ describe('auth routes', () => {
     fakes.userStore.findByEmail.mockRejectedValueOnce(new Error('db down'))
     expect((await handler({ body: '{"email":"ada@example.com"}' })).statusCode).toBe(200)
     expect(fakes.rateLimiter.incrementAndCheck).toHaveBeenCalledWith('magic:ip:1.2.3.4', 20, 3600, undefined)
+    // The last request carried no sourceIp.
+    expect(fakes.rateLimiter.incrementAndCheck).toHaveBeenLastCalledWith('magic:ip:unknown', 20, 3600, undefined)
   })
+
+  it.each(['silent', 'reject'] as const)(
+    'requestMagicLink answers a malformed body with the generic 200 on a %s host, sending nothing',
+    async (mode) => {
+      const { routes, wrap, fakes } = setup(mode)
+      const handler = wrap(routes.requestMagicLink)
+
+      for (const body of ['null', '1', '"x"', '[]', '{"email":1}']) {
+        const result = await handler({ body })
+
+        expect(result.statusCode).toBe(200)
+        expect(JSON.parse(result.body)).toEqual({ message: 'If that email exists, a sign-in link has been sent.' })
+      }
+
+      expect(fakes.mailer.send).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each(['silent', 'reject'] as const)(
+    'requestMagicLink drops a non-string redirectUrl on a %s host',
+    async (mode) => {
+      const { routes, wrap, fakes, auth } = setup(mode)
+      const spy = vi.spyOn(auth, 'requestMagicLink')
+
+      const result = await wrap(routes.requestMagicLink)({ body: '{"email":"ada@example.com","redirectUrl":5}' })
+
+      expect(result.statusCode).toBe(200)
+      expect(spy.mock.calls[0]![0]).toMatchObject({ email: 'ada@example.com' })
+      expect(spy.mock.calls[0]![0]).not.toHaveProperty('redirectUrl')
+      expect(fakes.mailer.send).toHaveBeenCalledTimes(1)
+    },
+  )
 
   it('requestMagicLink surfaces NOT_INVITED on a `reject` host', async () => {
     const { routes, wrap } = setup('reject')

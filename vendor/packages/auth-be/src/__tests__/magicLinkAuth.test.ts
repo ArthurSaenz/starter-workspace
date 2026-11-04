@@ -311,6 +311,25 @@ describe('verifyMagicLink', () => {
     await expectAuthError(auth.verifyMagicLink({ rawToken: 'ab'.repeat(32) }), 'INVALID_OR_EXPIRED_TOKEN', 401)
   })
 
+  it.each([
+    ['unparseable', 'not-a-date'],
+    ['null', null as never],
+  ])('refuses a token whose createdAt is %s', async (_label, createdAt) => {
+    const fakes = createFakes([invitedUser()])
+
+    fakes.magicTokens.consumeByHash.mockResolvedValueOnce({
+      email: 'ada@example.com',
+      createdAt,
+      expiresAt: new Date(Date.now() + 60_000),
+    })
+
+    await expectAuthError(
+      createMagicLinkAuth(fakes.config).verifyMagicLink({ rawToken: 'ab'.repeat(32) }),
+      'INVALID_OR_EXPIRED_TOKEN',
+      401,
+    )
+  })
+
   it('keeps a default rate limit when an override is undefined', async () => {
     const fakes = createFakes([invitedUser()])
 
@@ -446,6 +465,22 @@ describe('refreshSession', () => {
       'RATE_LIMITED',
       429,
     )
+  })
+})
+
+describe('a missing client IP', () => {
+  it('shares the `unknown` per-IP bucket instead of skipping the limit', async () => {
+    const fakes = createFakes([invitedUser()])
+    const { auth, result } = await signIn(fakes)
+
+    await auth.verifyMagicLink({ rawToken: 'ab'.repeat(32) }).catch(() => {
+      return undefined
+    })
+    await auth.refreshSession(result.refreshToken)
+
+    expect(fakes.rateLimiter.incrementAndCheck).toHaveBeenCalledWith('magic:ip:unknown', 20, 3600, undefined)
+    expect(fakes.rateLimiter.incrementAndCheck).toHaveBeenCalledWith('magic:verify:ip:unknown', 30, 3600, undefined)
+    expect(fakes.rateLimiter.incrementAndCheck).toHaveBeenCalledWith('magic:refresh:ip:unknown', 60, 3600, undefined)
   })
 })
 

@@ -397,7 +397,8 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
 
       const redirectUrl = sanitizeRedirectUrl(input.redirectUrl)
       const emailAllowed = await checkRate(`email:${email}`, limits.perEmail, ctx)
-      const ipAllowed = input.ipAddress ? await checkRate(`ip:${input.ipAddress}`, limits.perIp, ctx) : true
+      // A missing IP shares one bucket rather than skipping the per-IP limit.
+      const ipAllowed = await checkRate(`ip:${input.ipAddress || 'unknown'}`, limits.perIp, ctx)
 
       if (!emailAllowed || !ipAllowed) {
         ctx?.logger?.warn('Magic link rate limit exceeded', { data: { emailAllowed, ipAllowed } })
@@ -433,7 +434,7 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
     async verifyMagicLink(input: VerifyMagicLinkInput, ctx?: TCtx): Promise<VerifyMagicLinkResult> {
       validateVerify({ rawToken: input.rawToken }, ctx)
 
-      if (input.ipAddress && !(await checkRate(`verify:ip:${input.ipAddress}`, limits.perIpVerify, ctx))) {
+      if (!(await checkRate(`verify:ip:${input.ipAddress || 'unknown'}`, limits.perIpVerify, ctx))) {
         ctx?.logger?.warn('Magic link verify rate limit exceeded', { data: { ipAddress: input.ipAddress } })
         throw fail('Too many requests', 'RATE_LIMITED', 429)
       }
@@ -452,8 +453,12 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
 
       // Two hosts sharing one token table would otherwise honour each other's TTLs (a 72 h staff
       // invite redeemed at a 15-minute traveller surface): no token outlives this host's longest TTL.
-      if (record.createdAt !== undefined && Date.now() - toMs(record.createdAt) > maxTokenAgeMs) {
-        throw fail('Invalid or expired token', 'INVALID_OR_EXPIRED_TOKEN', 401)
+      if (record.createdAt !== undefined) {
+        const createdAtMs = toMs(record.createdAt)
+
+        if (!Number.isFinite(createdAtMs) || Date.now() - createdAtMs > maxTokenAgeMs) {
+          throw fail('Invalid or expired token', 'INVALID_OR_EXPIRED_TOKEN', 401)
+        }
       }
 
       // The allowlist may have been revoked between request and verify.
@@ -476,8 +481,8 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
     async refreshSession(refreshToken: string, ctx?: TCtx, meta?: RequestMeta): Promise<TokenPair> {
       if (!refreshToken) throw invalidSession('UNAUTHENTICATED')
 
-      if (meta?.ipAddress && !(await checkRate(`refresh:ip:${meta.ipAddress}`, limits.perIpRefresh, ctx))) {
-        ctx?.logger?.warn('Refresh rate limit exceeded', { data: { ipAddress: meta.ipAddress } })
+      if (!(await checkRate(`refresh:ip:${meta?.ipAddress || 'unknown'}`, limits.perIpRefresh, ctx))) {
+        ctx?.logger?.warn('Refresh rate limit exceeded', { data: { ipAddress: meta?.ipAddress } })
         throw fail('Too many requests', 'RATE_LIMITED', 429)
       }
 

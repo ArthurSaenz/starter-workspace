@@ -134,20 +134,24 @@ export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthC
 
   const requestMagicLink: AuthRoute<TCtx> = {
     handle: async (event, ctx) => {
-      let body: { email?: string; redirectUrl?: string } = {}
+      let parsed: unknown = null
 
       if (event.body) {
         try {
-          body = JSON.parse(event.body)
+          parsed = JSON.parse(event.body)
         } catch {
           return genericOk()
         }
       }
 
+      // Any other JSON (null, a number, an array, a non-string field) falls through to validation as ''.
+      const body: { email?: unknown; redirectUrl?: unknown } =
+        typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? parsed : {}
+
       await auth.requestMagicLink(
         {
-          email: body.email || '',
-          ...(body.redirectUrl ? { redirectUrl: body.redirectUrl } : {}),
+          email: typeof body.email === 'string' ? body.email : '',
+          ...(typeof body.redirectUrl === 'string' && body.redirectUrl ? { redirectUrl: body.redirectUrl } : {}),
           ...requestMeta(event, ctx),
         },
         ctx,
