@@ -33,6 +33,13 @@ const ANTFU_RESTRICTED_GLOBALS = [
 
 export type RestrictedSyntax = string | { selector: string; message: string }
 
+const COMPONENT_TYPE =
+  'TSTypeReference:matches([typeName.name=/^(ComponentType|ComponentClass)$/], [typeName.right.name=/^(ComponentType|ComponentClass)$/])'
+
+// `ElementType` stays allowed: a polymorphic `as` prop picks the host element, it injects nothing.
+const FLAT_PROP_TYPE = `:matches(TSInterfaceDeclaration[id.name=/Props$/] > TSInterfaceBody, TSTypeAliasDeclaration[id.name=/Props$/] > TSTypeLiteral) > TSPropertySignature[key.name!='components'] > TSTypeAnnotation`
+const FLAT_INJECTED_COMPONENT = `${FLAT_PROP_TYPE} > ${COMPONENT_TYPE}, ${FLAT_PROP_TYPE} > TSUnionType > ${COMPONENT_TYPE}`
+
 const FE_RESTRICTED_SYNTAX: RestrictedSyntax[] = [
   {
     selector: "MemberExpression[object.type='MetaProperty'][property.name='env']",
@@ -55,6 +62,11 @@ const FE_RESTRICTED_SYNTAX: RestrictedSyntax[] = [
   {
     selector: 'TSTypeReference[typeName.name=/^(FC|FunctionComponent)$/]',
     message: 'Type props with a `{Component}Props` interface instead of `FC`.',
+  },
+  {
+    selector: FLAT_INJECTED_COMPONENT,
+    message:
+      "Inject components through one `components` prop, e.g. `components: Pick<XComponents, 'Foo'>`. ReactNode slots and render functions stay flat props.",
   },
 ]
 
