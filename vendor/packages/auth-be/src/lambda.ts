@@ -61,7 +61,8 @@ export const extractSourceIp = (event: LambdaEvent, trustedProxyHops = 0): strin
 
   const chain = forwardedChain(event)
 
-  return (chain.length >= trustedProxyHops ? chain[chain.length - trustedProxyHops] : undefined) ?? sourceIp
+  // A short chain, or a hop count that is not a positive integer, indexes past the array.
+  return chain[chain.length - trustedProxyHops] ?? sourceIp
 }
 
 export const extractUserAgent = (event: LambdaEvent): string => {

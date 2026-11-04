@@ -39,10 +39,8 @@ export interface AuthStore<TUser> {
   /** Concurrent callers share one in-flight request; a 401 gets one silent refresh and one retry. */
   fetchMe: () => Promise<TUser | null>
   /**
-   * Exchanges the token for the session cookies and, on success, loads the user before resolving,
-   * so `authenticated` is only ever published with a user; it never sets `status` itself. A `/me`
-   * already in flight was sent with the pre-verify cookies, so it is awaited and then repeated. A
-   * `logout` during `verify` skips the load.
+   * Exchanges the token for the session cookies, then loads the user before resolving, so
+   * `authenticated` never appears without a user. A logout during `verify` skips the load.
    */
   verify: (token: string) => Promise<VerifyMagicLinkResult>
   /** Clears the local session even when the request fails; a `/me` still in flight is discarded. */
