@@ -78,10 +78,15 @@ export interface MagicLinkAuthConfig<TUser extends AuthUser, TMe, TCtx extends A
   rateLimits?: Partial<RateLimitConfig>
   /**
    * What a link request from an address that may not sign in gets. `silent` (default) answers like a
-   * success, so the body is no membership oracle (the timing still is; see the readme's "Timing");
+   * success, so the body is no membership oracle (the timing is, unless `minResponseMs` covers it);
    * `reject` throws NOT_INVITED (403) for an internal tool whose invited users need the feedback.
    */
   uninvitedRequest?: 'silent' | 'reject'
+  /**
+   * Floor on how long `requestMagicLink` takes, whatever the outcome, so a known address does not
+   * answer slower than an unknown one. Set it above the mail path's p99; 0 (default) adds nothing.
+   */
+  minResponseMs?: number
   /** The allowlist; re-asked at request, verify AND refresh so a revoke ends running sessions. */
   isAllowed?: (user: TUser) => boolean
   /** Copied into the access token. Informational: authorise from the loaded row, not from the claim. */
@@ -187,6 +192,10 @@ export const assertMagicLinkConfig = <TUser extends AuthUser, TMe, TCtx extends 
 
   if (!config.magicLink.baseUrl) {
     throw new Error('auth: magicLink.baseUrl is required')
+  }
+
+  if (config.minResponseMs !== undefined && !(Number.isFinite(config.minResponseMs) && config.minResponseMs >= 0)) {
+    throw new Error('auth: minResponseMs must be a non-negative number')
   }
 
   if (!config.email === !config.renderEmail) {

@@ -28,7 +28,7 @@ honour the same cookie.
 | `extractSourceIp(event, trustedProxyHops = 0)`                                             | The rate-limit client IP: `sourceIp`, or the X-Forwarded-For entry `trustedProxyHops` from the right.                                                                                                                  |
 | `toLambdaHandler(route, options)`                                                          | A complete handler for hosts without their own controller envelope (maps `AuthError`, honours fallback / clear-cookies).                                                                                               |
 | `verifySession(headers, { issuer, audience, accessSecret })`                               | For another service behind the same origin: the access-token payload or `null`. Fails closed.                                                                                                                          |
-| `signAccessToken` / `verifyAccessToken` / `signRefreshToken` / `verifyRefreshToken`        | HS256 with issuer + audience pinning. A signed token is `{ token, ttlSec }`, `ttlSec` being its lifetime in seconds; `expSec` is a deprecated alias of it.                                                             |
+| `signAccessToken` / `verifyAccessToken` / `signRefreshToken` / `verifyRefreshToken`        | HS256 with issuer + audience pinning. A signed token is `{ token, ttlSec }`, `ttlSec` being its lifetime in seconds.                                                                                                   |
 | `sanitizeRedirectUrl`, `extractAccessToken`, `extractRefreshToken`, `buildClearCookies`, … | The pure helpers the engine is built from.                                                                                                                                                                             |
 
 ### `createMagicLinkAuth` config
@@ -47,6 +47,7 @@ honour the same cookie.
 | `toMe`                                                                  | yes      | Row → the `GET me` DTO.                                                                                                                                       |
 | `uninvitedRequest`                                                      | no       | `'silent'` (default: public surface, same body for every address) or `'reject'` (NOT_INVITED 403, for internal tools). See "Timing" below.                    |
 | `isAllowed`, `rolesOf`, `onSignIn`                                      | no       | Allowlist predicate (default `invited === true`), roles claim (default `roles ?? []`), sign-in side effects.                                                  |
+| `minResponseMs`                                                         | no       | Floor on `requestMagicLink`'s response time, every outcome included (default 0). See "Timing" below.                                                          |
 | `cookies`, `rateLimits`, `validate`, `createError`, `notInvitedMessage` | no       | Cookie names/paths (default `access_token` `/`, `refresh_token` `/api/v1/auth`), budgets (5/email, 20/IP per hour…), validators, error mapping.               |
 
 ### Invariants the engine keeps
@@ -66,8 +67,10 @@ honour the same cookie.
 allowed address costs a token write and a mail send (roughly 100–300 ms), while an unknown one
 returns after the lookup, so a patient caller can still tell them apart. The per-email limit
 (5/hour by default) caps probes per address, and the per-IP limits only help once `clientIp` is
-right. A public host that must hide membership sends mail from a queue (e.g. SQS) so every request
-returns at the same point. `reject` discloses membership by design.
+right. A public host that must hide membership sets `minResponseMs` above the mail path's p99, so
+every request answers no sooner than that. It costs that latency on every request and a send slower
+than the floor still shows; mailing from a queue (e.g. SQS) closes the gap fully. `reject` discloses
+membership by design.
 
 ### Host wiring
 

@@ -56,6 +56,14 @@ describe('createMagicLinkAuth config guards', () => {
     }).toThrow()
   })
 
+  it.each([-1, Number.NaN, Number.POSITIVE_INFINITY])('refuses minResponseMs %s', (minResponseMs) => {
+    const { config } = createFakes()
+
+    expect(() => {
+      return createMagicLinkAuth({ ...config, minResponseMs })
+    }).toThrow(/minResponseMs/)
+  })
+
   it('refuses a missing magic-link base URL', () => {
     const { config } = createFakes()
 
@@ -164,6 +172,79 @@ describe('requestMagicLink', () => {
 
     await expectAuthError(auth.requestMagicLink({ email: 'ada@example.com' }), 'NOT_INVITED', 403)
     expect(fakes.sent).toHaveLength(0)
+  })
+
+  describe('minResponseMs', () => {
+    const settleTime = async (promise: Promise<unknown>): Promise<number> => {
+      const startedAt = Date.now()
+
+      const settledAt = promise.then(
+        () => {
+          return Date.now()
+        },
+        () => {
+          return Date.now()
+        },
+      )
+
+      await vi.runAllTimersAsync()
+
+      return (await settledAt) - startedAt
+    }
+
+    it.each([
+      ['an invited address that is emailed', [invitedUser()]],
+      ['an unknown address', []],
+    ])('answers %s no sooner than the floor', async (_label, seed) => {
+      vi.useFakeTimers()
+
+      try {
+        const auth = createMagicLinkAuth({ ...createFakes(seed).config, minResponseMs: 400 })
+
+        expect(await settleTime(auth.requestMagicLink({ email: 'ada@example.com' }))).toBe(400)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('holds a rejection to the floor too', async () => {
+      vi.useFakeTimers()
+
+      try {
+        const fakes = createFakes([invitedUser({ invited: false })])
+        const auth = createMagicLinkAuth({ ...fakes.config, uninvitedRequest: 'reject', minResponseMs: 400 })
+        const request = auth.requestMagicLink({ email: 'ada@example.com' })
+        const outcome = expectAuthError(request, 'NOT_INVITED', 403)
+
+        expect(await settleTime(request)).toBe(400)
+        await outcome
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('adds nothing when the work already took longer than the floor', async () => {
+      vi.useFakeTimers()
+
+      try {
+        const fakes = createFakes([invitedUser()])
+        const slowFind = fakes.userStore.findByEmail.getMockImplementation()!
+
+        fakes.userStore.findByEmail.mockImplementation(async (...args) => {
+          await new Promise((resolve) => {
+            setTimeout(resolve, 900)
+          })
+
+          return slowFind(...args)
+        })
+
+        const auth = createMagicLinkAuth({ ...fakes.config, minResponseMs: 400 })
+
+        expect(await settleTime(auth.requestMagicLink({ email: 'ada@example.com' }))).toBe(900)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 
   it('swallows a validation failure', async () => {

@@ -59,6 +59,7 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
   const limits = resolveRateLimits(config.rateLimits)
   const createError = config.createError ?? defaultCreateAuthError
   const notInvitedMessage = config.notInvitedMessage ?? 'This email is not invited.'
+  const minResponseMs = config.minResponseMs ?? 0
 
   const isAllowed: (user: TUser) => boolean = config.isAllowed ?? defaultIsAllowed
   const rolesOf: (user: TUser) => string[] = config.rolesOf ?? defaultRolesOf
@@ -120,50 +121,68 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
     return verifyAccessToken(token, config.jwt.accessSecret, identity, createError)
   }
 
+  const handleLinkRequest = async (input: RequestMagicLinkInput, ctx?: TCtx): Promise<void> => {
+    const email = (input.email || '').trim().toLowerCase()
+
+    try {
+      validateRequest({ email, redirectUrl: input.redirectUrl }, ctx)
+    } catch (validationError) {
+      ctx?.logger?.info('Magic link request rejected by validation; answering the generic OK', {
+        data: { reason: (validationError as Error).name },
+      })
+
+      return
+    }
+
+    const redirectUrl = sanitizeRedirectUrl(input.redirectUrl)
+    const emailAllowed = await checkRate(`email:${email}`, limits.perEmail, ctx)
+    // A missing IP shares one bucket rather than skipping the per-IP limit.
+    const ipAllowed = await checkRate(`ip:${input.ipAddress || 'unknown'}`, limits.perIp, ctx)
+
+    if (!emailAllowed || !ipAllowed) {
+      ctx?.logger?.warn('Magic link rate limit exceeded', { data: { emailAllowed, ipAllowed } })
+
+      return
+    }
+
+    // Never create a user here: an address that is not already allowed gets no row, no token and
+    // no email. Creating on request is how an invite-only surface ends up open to the internet.
+    const user = await users.findByEmail(email, ctx)
+
+    if (!user || !isAllowed(user)) {
+      ctx?.logger?.warn('Magic link requested by an address that may not sign in', {
+        data: { exists: Boolean(user) },
+      })
+
+      if (config.uninvitedRequest === 'reject') throw fail(notInvitedMessage, 'NOT_INVITED', 403)
+
+      return
+    }
+
+    await mintAndSendMagicLink(email, redirectUrl, input, 'sign-in', ctx)
+  }
+
+  const delay = async (ms: number): Promise<void> => {
+    if (ms <= 0) return
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, ms)
+    })
+  }
+
   return {
     cookies,
     identity,
     uninvitedRequest: config.uninvitedRequest ?? 'silent',
 
     async requestMagicLink(input: RequestMagicLinkInput, ctx?: TCtx): Promise<void> {
-      const email = (input.email || '').trim().toLowerCase()
+      const startedAt = Date.now()
 
       try {
-        validateRequest({ email, redirectUrl: input.redirectUrl }, ctx)
-      } catch (validationError) {
-        ctx?.logger?.info('Magic link request rejected by validation; answering the generic OK', {
-          data: { reason: (validationError as Error).name },
-        })
-
-        return
+        return await handleLinkRequest(input, ctx)
+      } finally {
+        await delay(minResponseMs - (Date.now() - startedAt))
       }
-
-      const redirectUrl = sanitizeRedirectUrl(input.redirectUrl)
-      const emailAllowed = await checkRate(`email:${email}`, limits.perEmail, ctx)
-      // A missing IP shares one bucket rather than skipping the per-IP limit.
-      const ipAllowed = await checkRate(`ip:${input.ipAddress || 'unknown'}`, limits.perIp, ctx)
-
-      if (!emailAllowed || !ipAllowed) {
-        ctx?.logger?.warn('Magic link rate limit exceeded', { data: { emailAllowed, ipAllowed } })
-
-        return
-      }
-
-      // Never create a user here: an address that is not already allowed gets no row, no token and
-      // no email. Creating on request is how an invite-only surface ends up open to the internet.
-      const user = await users.findByEmail(email, ctx)
-
-      if (!user || !isAllowed(user)) {
-        ctx?.logger?.warn('Magic link requested by an address that may not sign in', {
-          data: { exists: Boolean(user) },
-        })
-
-        if (config.uninvitedRequest === 'reject') throw fail(notInvitedMessage, 'NOT_INVITED', 403)
-
-        return
-      }
-
-      await mintAndSendMagicLink(email, redirectUrl, input, 'sign-in', ctx)
     },
 
     /**
