@@ -70,12 +70,12 @@ describe('hasUnsafeRedirectChars', () => {
 })
 
 describe('signed tokens', () => {
-  it('carries the lifetime as ttlSec, with expSec kept as a deprecated alias', () => {
+  it('carries the lifetime as ttlSec', () => {
     const access = signAccessToken({ sub: 'u1', roles: [], authMethod: 'magic' }, ACCESS_SECRET, IDENTITY, 60)
     const refresh = signRefreshToken({ sub: 'u1', jti: 'j1' }, REFRESH_SECRET, IDENTITY, 120)
 
     expect(access.ttlSec).toBe(60)
     expect(refresh.ttlSec).toBe(120)
-    expect(access.expSec).toBe(access.ttlSec)
+    expect(access).not.toHaveProperty('expSec')
   })
 })
