@@ -1,13 +1,13 @@
 import crypto from 'node:crypto'
 
-import type { CreateAuthError } from './errors.js'
-import type { ResolvedCookieOptions } from './http.js'
-import { buildAccessCookie, buildRefreshCookie } from './http.js'
-import type { RequestMeta, TokenPair } from './magicLinkConfig.js'
-import { withMeta } from './magicLinkConfig.js'
-import type { AuthContext, AuthUser, NewSession, SessionStore, StoredSession } from './ports.js'
-import type { JwtIdentity, SignedToken } from './tokens.js'
-import { hashToken, signAccessToken, signRefreshToken } from './tokens.js'
+import type { CreateAuthError } from '../errors.js'
+import type { ResolvedCookieOptions } from '../http/cookies.js'
+import { buildAccessCookie, buildRefreshCookie } from '../http/cookies.js'
+import type { AuthContext, AuthUser, NewSession, SessionStore, StoredSession } from '../ports.js'
+import type { JwtIdentity, SignedToken } from '../tokens.js'
+import { hashToken, signAccessToken, signRefreshToken } from '../tokens.js'
+import type { RequestMeta, TokenPair } from './types.js'
+import { withMeta } from './types.js'
 
 export interface SessionIssuerDeps<TUser extends AuthUser, TCtx extends AuthContext> {
   accessSecret: string

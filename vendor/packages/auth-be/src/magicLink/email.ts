@@ -1,4 +1,4 @@
-import type { AuthContext, MagicLinkEmail } from './ports.js'
+import type { AuthContext, MagicLinkEmail } from '../ports.js'
 
 export interface MagicLinkEmailText {
   subject: string
@@ -36,11 +36,11 @@ export const buildMagicLinkUrl = (
   return redirectUrl && redirectUrl !== '/' ? `${base}&redirect=${encodeURIComponent(redirectUrl)}` : base
 }
 
-const HTML_ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as const
 
 export const escapeHtml = (value: string): string => {
   return value.replace(/["&'<>]/g, (char) => {
-    return HTML_ESCAPES[char] ?? char
+    return HTML_ESCAPES[char as keyof typeof HTML_ESCAPES]
   })
 }
 

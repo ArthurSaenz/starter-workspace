@@ -1,9 +1,10 @@
 /* eslint-disable sonarjs/no-hardcoded-ip -- fixture client IPs */
 import { describe, expect, it, vi } from 'vitest'
 
-import { createAuthRoutes, extractSourceIp, toLambdaHandler } from '../lambda.js'
-import { createMagicLinkAuth } from '../magicLinkAuth.js'
-import { createFakes, invitedUser, tokenFromEmail } from './helpers/fakes.js'
+import { createFakes, invitedUser, tokenFromEmail } from '../../__tests__/helpers/fakes.js'
+import { createMagicLinkAuth } from '../../magicLink/magicLinkAuth.js'
+import { toLambdaHandler } from '../handler.js'
+import { createAuthRoutes } from '../routes.js'
 
 const CORS = { 'Access-Control-Allow-Origin': 'https://app.test', 'Access-Control-Allow-Credentials': 'true' }
 
@@ -216,22 +217,6 @@ describe('auth routes', () => {
 
     expect(JSON.parse(result.body)).toEqual({ message: 'Check your inbox.' })
     expect(fakes.userStore.findByEmail).toHaveBeenCalledWith('ada@example.com', ctx)
-  })
-})
-
-describe('extractSourceIp', () => {
-  it.each<[{ xff?: string; sourceIp?: string; hops?: number }, string]>([
-    [{ xff: '6.6.6.6', sourceIp: '9.9.9.9', hops: 0 }, '9.9.9.9'],
-    [{ xff: '6.6.6.6, 1.2.3.4', hops: 1 }, '1.2.3.4'],
-    [{ xff: '1.2.3.4', sourceIp: '9.9.9.9', hops: 2 }, '9.9.9.9'],
-    [{}, ''],
-  ])('%o → %s', ({ xff, sourceIp, hops }, expected) => {
-    const event = {
-      ...(xff ? { headers: { 'X-Forwarded-For': xff } } : {}),
-      ...(sourceIp ? { requestContext: { identity: { sourceIp } } } : {}),
-    }
-
-    expect(extractSourceIp(event, hops)).toBe(expected)
   })
 })
 

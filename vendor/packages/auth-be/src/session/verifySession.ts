@@ -1,7 +1,7 @@
-import type { HeaderBag } from './http.js'
-import { extractAccessToken } from './http.js'
-import type { AccessTokenPayload, JwtIdentity } from './tokens.js'
-import { MIN_SECRET_LENGTH, verifyAccessToken } from './tokens.js'
+import { extractAccessToken } from '../http/cookies.js'
+import type { HeaderBag } from '../http/headers.js'
+import type { AccessTokenPayload, JwtIdentity } from '../tokens.js'
+import { MIN_SECRET_LENGTH, verifyAccessToken } from '../tokens.js'
 
 export interface VerifySessionOptions extends JwtIdentity {
   /** The minting API's access secret. A missing or short one means nobody is signed in. */

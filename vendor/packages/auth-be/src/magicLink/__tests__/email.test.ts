@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildMagicLinkUrl, escapeHtml, renderMagicLinkEmail } from '../email.js'
+import { buildMagicLinkUrl, escapeHtml, formatExpiry, renderMagicLinkEmail } from '../email.js'
 
 const TEXT = { subject: 'Sign in', intro: 'Use the link below:', linkLabel: 'Sign in' }
 
@@ -41,5 +41,17 @@ describe('renderMagicLinkEmail', () => {
 
     expect(email.html).toContain('didn&#39;t')
     expect(email.text).toContain("didn't")
+  })
+})
+
+describe('formatExpiry', () => {
+  it.each([
+    [15, '15 minutes'],
+    [1, '1 minute'],
+    [60, '1 hour'],
+    [120, '2 hours'],
+    [72 * 60, '3 days'],
+  ])('%i min → %s', (minutes, expected) => {
+    expect(formatExpiry(minutes)).toBe(expected)
   })
 })

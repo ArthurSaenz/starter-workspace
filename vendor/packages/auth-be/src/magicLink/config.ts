@@ -1,39 +1,17 @@
+import type { CreateAuthError } from '../errors.js'
+import type { CookieOptions } from '../http/cookies.js'
+import type { AuthContext, AuthUser, MagicTokenStore, Mailer, RateLimiter, SessionStore, UserStore } from '../ports.js'
+import type { RateLimitConfig } from '../rateLimit.js'
+import type { RequestMeta, TokenPair } from '../session/types.js'
+import type { JwtIdentity } from '../tokens.js'
+import { assertSecret } from '../tokens.js'
 import type { MagicLinkEmailText, RenderMagicLinkEmail } from './email.js'
-import type { CreateAuthError } from './errors.js'
-import type { CookieOptions } from './http.js'
-import { hasUnsafeRedirectChars } from './http.js'
-import type {
-  AuthContext,
-  AuthUser,
-  MagicTokenStore,
-  Mailer,
-  RateLimiter,
-  SessionStore,
-  StoredMagicToken,
-  UserStore,
-} from './ports.js'
-import type { JwtIdentity } from './tokens.js'
-import { assertSecret } from './tokens.js'
+import type { RequestValidationInput } from './validation.js'
 
 export const DEFAULT_MAGIC_TOKEN_TTL_MIN = 15
 // An invite can sit unread for days while a sign-in link is clicked seconds after it is requested;
 // 72 h covers "saw it after the weekend", and re-inviting invalidates the old link.
 export const DEFAULT_INVITE_TOKEN_TTL_MIN = 72 * 60
-
-export interface RateLimitConfig {
-  perEmail: number
-  perIp: number
-  perIpVerify: number
-  perIpRefresh: number
-  windowSec: number
-  /** Key namespace in the limiter's store; two apps sharing one store and one prefix share budgets. */
-  keyPrefix: string
-}
-
-export interface RequestMeta {
-  ipAddress?: string
-  userAgent?: string
-}
 
 export interface RequestMagicLinkInput extends RequestMeta {
   email: string
@@ -44,20 +22,8 @@ export interface VerifyMagicLinkInput extends RequestMeta {
   rawToken: string
 }
 
-export interface TokenPair {
-  accessToken: string
-  refreshToken: string
-  accessCookie: string
-  refreshCookie: string
-}
-
 export interface VerifyMagicLinkResult extends TokenPair {
   redirectUrl: string
-}
-
-export interface RequestValidationInput {
-  email: string
-  redirectUrl: string | undefined
 }
 
 export interface MagicLinkAuthConfig<TUser extends AuthUser, TMe, TCtx extends AuthContext> {
@@ -100,76 +66,6 @@ export interface MagicLinkAuthConfig<TUser extends AuthUser, TMe, TCtx extends A
   }
   createError?: CreateAuthError
   notInvitedMessage?: string
-}
-
-const DEFAULT_RATE_LIMITS: RateLimitConfig = {
-  perEmail: 5,
-  perIp: 20,
-  perIpVerify: 30,
-  perIpRefresh: 60,
-  windowSec: 3600,
-  keyPrefix: 'magic',
-}
-
-/** Per key, so an explicit `undefined` override keeps the default instead of disabling the limit. */
-export const resolveRateLimits = (overrides: Partial<RateLimitConfig> = {}): RateLimitConfig => {
-  return {
-    perEmail: overrides.perEmail ?? DEFAULT_RATE_LIMITS.perEmail,
-    perIp: overrides.perIp ?? DEFAULT_RATE_LIMITS.perIp,
-    perIpVerify: overrides.perIpVerify ?? DEFAULT_RATE_LIMITS.perIpVerify,
-    perIpRefresh: overrides.perIpRefresh ?? DEFAULT_RATE_LIMITS.perIpRefresh,
-    windowSec: overrides.windowSec ?? DEFAULT_RATE_LIMITS.windowSec,
-    keyPrefix: overrides.keyPrefix ?? DEFAULT_RATE_LIMITS.keyPrefix,
-  }
-}
-
-export const withMeta = (meta: { ipAddress?: string | null; userAgent?: string | null } | undefined): RequestMeta => {
-  return {
-    ...(meta?.ipAddress ? { ipAddress: meta.ipAddress } : {}),
-    ...(meta?.userAgent ? { userAgent: meta.userAgent } : {}),
-  }
-}
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/
-const TOKEN_REGEX = /^[a-f0-9]{16,256}$/i
-
-export const defaultValidateRequest = (input: RequestValidationInput): void => {
-  if (input.email.length > 320 || !EMAIL_REGEX.test(input.email)) throw new Error('Invalid email')
-
-  if (input.redirectUrl && (input.redirectUrl.length > 2048 || hasUnsafeRedirectChars(input.redirectUrl))) {
-    throw new Error('Invalid redirectUrl')
-  }
-}
-
-export const createDefaultVerifyValidator = (createError: CreateAuthError) => {
-  return (input: { rawToken: string }): void => {
-    if (!TOKEN_REGEX.test(input.rawToken)) {
-      throw createError({ message: 'rawToken must be hex', code: 'INVALID_REQUEST', status: 400 })
-    }
-  }
-}
-
-export const toMs = (value: Date | string): number => {
-  return value instanceof Date ? value.getTime() : new Date(value).getTime()
-}
-
-/**
- * `consumeByHash` should already skip expired rows; this re-check uses the token's own expiry (so a
- * 72 h invite is honoured) and treats an unparseable timestamp as expired, never as "no expiry".
- * Two hosts sharing one token table would otherwise honour each other's TTLs (a 72 h staff invite
- * redeemed at a 15-minute traveller surface), so no token outlives `maxTokenAgeMs` either.
- */
-export const isTokenRecordLive = (record: StoredMagicToken, maxTokenAgeMs: number): boolean => {
-  const now = Date.now()
-  const expiresAtMs = toMs(record.expiresAt)
-
-  if (!Number.isFinite(expiresAtMs) || now > expiresAtMs) return false
-
-  if (record.createdAt === undefined) return true
-
-  const createdAtMs = toMs(record.createdAt)
-
-  return Number.isFinite(createdAtMs) && now - createdAtMs <= maxTokenAgeMs
 }
 
 export const defaultIsAllowed = (user: AuthUser): boolean => {

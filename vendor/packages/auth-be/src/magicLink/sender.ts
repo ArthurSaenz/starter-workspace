@@ -1,11 +1,11 @@
+import type { AuthContext, MagicTokenStore, Mailer } from '../ports.js'
+import type { RequestMeta } from '../session/types.js'
+import { withMeta } from '../session/types.js'
+import { generateRawToken, hashToken } from '../tokens.js'
 import type { MagicLinkEmailKind, MagicLinkEmailText, RenderMagicLinkEmail } from './email.js'
 import { buildMagicLinkUrl, renderMagicLinkEmail } from './email.js'
-import type { RequestMeta } from './magicLinkConfig.js'
-import { withMeta } from './magicLinkConfig.js'
-import type { AuthContext, MagicTokenStore, Mailer } from './ports.js'
-import { generateRawToken, hashToken } from './tokens.js'
 
-export interface MagicLinkMailDeps<TCtx extends AuthContext> {
+export interface MagicLinkSenderDeps<TCtx extends AuthContext> {
   magicTokens: MagicTokenStore<TCtx>
   mailer: Mailer<TCtx>
   /** Exactly one of the two, checked by `assertMagicLinkConfig`. */
@@ -17,7 +17,7 @@ export interface MagicLinkMailDeps<TCtx extends AuthContext> {
 }
 
 /** Mint a single-use link and email it; `false` means it was not delivered and is already dead. */
-export const createMagicLinkSender = <TCtx extends AuthContext>(deps: MagicLinkMailDeps<TCtx>) => {
+export const createMagicLinkSender = <TCtx extends AuthContext>(deps: MagicLinkSenderDeps<TCtx>) => {
   const { magicTokens, mailer, email: emailText, magicLink } = deps
 
   const renderEmail: RenderMagicLinkEmail<TCtx> =

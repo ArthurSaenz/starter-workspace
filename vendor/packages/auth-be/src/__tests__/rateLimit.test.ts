@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { resolveRateLimits } from '../magicLinkConfig.js'
+import { resolveRateLimits } from '../rateLimit.js'
 
 const DEFAULTS = { perEmail: 5, perIp: 20, perIpVerify: 30, perIpRefresh: 60, windowSec: 3600, keyPrefix: 'magic' }
 

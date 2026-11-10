@@ -7,7 +7,7 @@ token / session / rate-limit stores and mailer in as small interfaces (`src/port
 counterpart: `@wl/auth-fe`.
 
 A host can run several instances side by side (e.g. one over a customers table, one over a staff
-table); each host's wiring is one `createAuth(...)` call. A sibling API can call `verifySession` to
+table); each host's wiring is one `createMagicLinkAuth(...)` call. A sibling API can call `verifySession` to
 honour the same cookie.
 
 ## Portability contract
@@ -21,15 +21,16 @@ honour the same cookie.
 
 ## Public API
 
-| Export                                                                                     | What it is                                                                                                                                                                                                             |
-| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `createMagicLinkAuth(config)`                                                              | The engine: `requestMagicLink`, `sendInviteLink`, `verifyMagicLink`, `refreshSession`, `logout`, `requireUser`, `authenticate`, `getMe`, `issueSession`, cookie helpers.                                               |
-| `createAuthRoutes(auth, { corsHeaders, clientIp, requestMagicLinkMessage? })`              | The five endpoints as Lambda bodies (`requestMagicLink`, `verifyMagicLink`, `refresh`, `logout`, `me`), each `{ handle, fallbackResponse?, clearCookiesOn401? }`. `clientIp` is required: see [Client IP](#client-ip). |
-| `extractSourceIp(event, trustedProxyHops = 0)`                                             | The rate-limit client IP: `sourceIp`, or the X-Forwarded-For entry `trustedProxyHops` from the right.                                                                                                                  |
-| `toLambdaHandler(route, options)`                                                          | A complete handler for hosts without their own controller envelope (maps `AuthError`, honours fallback / clear-cookies).                                                                                               |
-| `verifySession(headers, { issuer, audience, accessSecret })`                               | For another service behind the same origin: the access-token payload or `null`. Fails closed.                                                                                                                          |
-| `signAccessToken` / `verifyAccessToken` / `signRefreshToken` / `verifyRefreshToken`        | HS256 with issuer + audience pinning. A signed token is `{ token, ttlSec }`, `ttlSec` being its lifetime in seconds.                                                                                                   |
-| `sanitizeRedirectUrl`, `extractAccessToken`, `extractRefreshToken`, `buildClearCookies`, … | The pure helpers the engine is built from.                                                                                                                                                                             |
+| Export                                                                                                                | What it is                                                                                                                                                                                                             |
+| --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createMagicLinkAuth(config)`                                                                                         | The engine: `requestMagicLink`, `sendInviteLink`, `verifyMagicLink`, `refreshSession`, `logout`, `requireUser`, `authenticate`, `getMe`, `issueSession`, cookie helpers.                                               |
+| `createAuthRoutes(auth, { corsHeaders, clientIp, requestMagicLinkMessage? })`                                         | The five endpoints as Lambda bodies (`requestMagicLink`, `verifyMagicLink`, `refresh`, `logout`, `me`), each `{ handle, fallbackResponse?, clearCookiesOn401? }`. `clientIp` is required: see [Client IP](#client-ip). |
+| `extractSourceIp(event, trustedProxyHops = 0)`                                                                        | The rate-limit client IP: `sourceIp`, or the X-Forwarded-For entry `trustedProxyHops` from the right.                                                                                                                  |
+| `createAuthHandlers(auth, { corsHeaders, clientIp, requestMagicLinkMessage?, context?, toErrorResponse?, onError? })` | `createAuthRoutes` + `toLambdaHandler` in one call: the five endpoints as ready Lambda handlers.                                                                                                                       |
+| `toLambdaHandler(route, options)`                                                                                     | A complete handler for hosts without their own controller envelope (maps `AuthError`, honours fallback / clear-cookies).                                                                                               |
+| `verifySession(headers, { issuer, audience, accessSecret })`                                                          | For another service behind the same origin: the access-token payload or `null`. Fails closed.                                                                                                                          |
+| `signAccessToken` / `verifyAccessToken` / `signRefreshToken` / `verifyRefreshToken`                                   | HS256 with issuer + audience pinning. A signed token is `{ token, ttlSec }`, `ttlSec` being its lifetime in seconds.                                                                                                   |
+| `sanitizeRedirectUrl`, `extractAccessToken`, `extractRefreshToken`, `buildClearCookies`, …                            | The pure helpers the engine is built from.                                                                                                                                                                             |
 
 ### `createMagicLinkAuth` config
 
@@ -49,6 +50,9 @@ honour the same cookie.
 | `isAllowed`, `rolesOf`, `onSignIn`                                      | no       | Allowlist predicate (default `invited === true`), roles claim (default `roles ?? []`), sign-in side effects.                                                  |
 | `minResponseMs`                                                         | no       | Floor on `requestMagicLink`'s response time, every outcome included (default 0). See "Timing" below.                                                          |
 | `cookies`, `rateLimits`, `validate`, `createError`, `notInvitedMessage` | no       | Cookie names/paths (default `access_token` `/`, `refresh_token` `/api/v1/auth`), budgets (5/email, 20/IP per hour…), validators, error mapping.               |
+
+Every flow takes its input object first and the host context second: `requestMagicLink(input, ctx)`,
+`verifyMagicLink({ rawToken, ...meta }, ctx)`, `refreshSession({ refreshToken, ...meta }, ctx)`.
 
 ### Invariants the engine keeps
 
@@ -86,10 +90,17 @@ const auth = createMagicLinkAuth<Customer, Me, Options>({
   email: { subject: 'Sign in', intro: 'Use the link below to sign in:', linkLabel: 'Sign in' },
   toMe: (u) => ({ id: u.id, email: u.email }),
 })
-const routes = createAuthRoutes(auth, { corsHeaders, clientIp: { trustedProxyHops: 0 } })
 
 // one Lambda per route
-export const handler = toLambdaHandler(routes.verifyMagicLink, { corsHeaders, clearCookies: auth.clearCookies })
+const handlers = createAuthHandlers(auth, { corsHeaders, clientIp: { trustedProxyHops: 0 } })
+export const verifyMagicLink = handlers.verifyMagicLink
+```
+
+A host with its own controller envelope takes the bare routes instead and wraps each `handle` itself,
+honouring `fallbackResponse` and `clearCookiesOn401`:
+
+```ts
+const routes = createAuthRoutes(auth, { corsHeaders, clientIp: { trustedProxyHops: 0 } })
 ```
 
 ### Client IP
@@ -113,3 +124,32 @@ With `0`, the routes log one warning per `createAuthRoutes` instance when the le
 (`X-Forwarded-For names a client other than sourceIp; check clientIp.trustedProxyHops`, data
 `{ forwardedCount }`): that is what a CloudFront in front looks like. A spoofed header triggers it
 too.
+
+## Layout
+
+One folder per concern; `src/index.ts` is the only public entry, so files can move without touching
+a host.
+
+| Path                     | Owns                                                                                                                                                                                |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ports.ts`               | What the host implements: user / token / session stores, rate limiter, mailer, logger.                                                                                              |
+| `errors.ts`, `tokens.ts` | `AuthError` and its codes; JWT signing and verifying, raw link tokens.                                                                                                              |
+| `rateLimit.ts`           | Budgets, their defaults, and the gate every flow counts against.                                                                                                                    |
+| `http/`                  | Framework-free request helpers: `headers.ts`, `cookies.ts`, `redirect.ts`.                                                                                                          |
+| `session/`               | What a session does whichever way it was opened: `sessionIssuer.ts` (mint, rotate), `sessionService.ts` (refresh, logout, request readers), `verifySession.ts` (for a sibling API). |
+| `magicLink/`             | The sign-in method: `config.ts`, `validation.ts`, `email.ts` (built-in template), `sender.ts` (mint + mail), `magicLinkAuth.ts` (the engine that wires it to `session/`).           |
+| `lambda/`                | The API Gateway adapter: `clientIp.ts`, `routes.ts`, `handler.ts`. Nothing outside it knows about Lambda.                                                                           |
+| `e2eLogin.ts`            | The test-only sign-in, built on `issueSession`.                                                                                                                                     |
+
+Tests sit in the `__tests__/` beside the code they cover; the in-memory stores and the sign-in round
+trip they share are in `src/__tests__/helpers/`. `pnpm run test-report` enforces 100% coverage.
+
+### Extending
+
+- Another storage, mailer or rate limiter: implement the interface in `ports.ts`; nothing else changes.
+- Another transport (Express, Fastify, API Gateway v2): call the engine's methods directly, the way
+  `lambda/routes.ts` does. Only `lambda/` reads a Lambda event.
+- Another way to sign in: resolve the user your own way, then call `auth.issueSession(user, meta, ctx)`
+  for the same cookies and session row. `e2eLogin.ts` is the worked example.
+- Host-specific behaviour goes through config (`isAllowed`, `rolesOf`, `onSignIn`, `validate`,
+  `renderEmail`, `createError`), never through a fork of the engine.

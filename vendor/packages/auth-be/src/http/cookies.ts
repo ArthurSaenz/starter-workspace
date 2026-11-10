@@ -1,4 +1,5 @@
-export type HeaderBag = Record<string, string | undefined> | null | undefined
+import type { HeaderBag } from './headers.js'
+import { readHeader } from './headers.js'
 
 export interface CookieOptions {
   accessName?: string
@@ -44,18 +45,6 @@ export const buildClearCookies = (cookies: ResolvedCookieOptions): string[] => {
   ]
 }
 
-export const readHeader = (headers: HeaderBag, name: string): string | undefined => {
-  if (!headers) return undefined
-
-  const wanted = name.toLowerCase()
-
-  for (const [key, value] of Object.entries(headers)) {
-    if (key.toLowerCase() === wanted) return value ?? undefined
-  }
-
-  return undefined
-}
-
 export const parseCookieHeader = (header: string | undefined): Record<string, string> => {
   const result: Record<string, string> = {}
 
@@ -98,26 +87,4 @@ export const extractAccessToken = (headers: HeaderBag, cookieName = 'access_toke
 
 export const extractRefreshToken = (headers: HeaderBag, cookieName = 'refresh_token'): string | null => {
   return parseCookieHeader(readHeader(headers, 'cookie'))[cookieName] || null
-}
-
-/** Control characters, or a backslash: browsers read `/\evil.com` as the protocol-relative `//evil.com`. */
-export const hasUnsafeRedirectChars = (value: string): boolean => {
-  for (let i = 0; i < value.length; i++) {
-    const code = value.charCodeAt(i)
-
-    if (code < 0x20 || code === 0x7f) return true
-  }
-
-  return value.includes('\\')
-}
-
-/** Only an in-app path survives; anything that could leave the origin becomes `/`. */
-export const sanitizeRedirectUrl = (input: string | undefined | null): string => {
-  if (!input || input.length > 2048 || hasUnsafeRedirectChars(input)) return '/'
-
-  if (input.startsWith('http://') || input.startsWith('https://') || input.startsWith('//')) return '/'
-
-  if (input.includes(':')) return '/'
-
-  return input.startsWith('/') ? input : `/${input}`
 }

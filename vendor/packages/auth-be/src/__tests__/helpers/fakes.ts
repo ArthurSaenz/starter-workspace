@@ -1,6 +1,6 @@
 import { vi } from 'vitest'
 
-import type { MagicLinkAuthConfig } from '../../magicLinkConfig.js'
+import type { MagicLinkAuthConfig } from '../../magicLink/config.js'
 import type {
   AuthUser,
   MagicLinkEmail,

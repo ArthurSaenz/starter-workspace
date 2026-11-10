@@ -3,8 +3,8 @@ import crypto from 'node:crypto'
 
 import type { CreateAuthError } from './errors.js'
 import { defaultCreateAuthError } from './errors.js'
-import type { RequestMeta, TokenPair } from './magicLinkConfig.js'
 import type { AuthContext, AuthUser } from './ports.js'
+import type { RequestMeta, TokenPair } from './session/types.js'
 import { MIN_SECRET_LENGTH } from './tokens.js'
 
 /** Constant-time; false for any missing value or length mismatch (timingSafeEqual throws on those). */

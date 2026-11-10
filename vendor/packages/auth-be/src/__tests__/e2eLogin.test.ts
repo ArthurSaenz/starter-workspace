@@ -2,8 +2,8 @@ import jwt from 'jsonwebtoken'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createE2eLogin, parseAllowedEmails, safeSecretEqual } from '../e2eLogin.js'
-import { AuthError } from '../errors.js'
-import { createMagicLinkAuth } from '../magicLinkAuth.js'
+import { createMagicLinkAuth } from '../magicLink/magicLinkAuth.js'
+import { expectAuthError } from './helpers/engine.js'
 import { createFakes, invitedUser } from './helpers/fakes.js'
 
 const SECRET = 's'.repeat(32)
@@ -26,12 +26,6 @@ const setup = (secret = SECRET, user = invitedUser({ roles: [] })) => {
       resolveAccount,
     }),
   }
-}
-
-const expectAuthError = async (promise: Promise<unknown>, code: string, status: number) => {
-  await expect(promise).rejects.toSatisfy((error: unknown) => {
-    return error instanceof AuthError && error.code === code && error.status === status
-  })
 }
 
 describe('createE2eLogin', () => {
@@ -70,6 +64,53 @@ describe('createE2eLogin', () => {
       data: { emailDomain: 'example.com' },
     })
     expect(logger.warn.mock.calls[0]![1].data).not.toHaveProperty('email')
+  })
+
+  it.each(['', 'not-an-email'])('refuses %j like any address off the allowlist', async (email) => {
+    const { e2e } = setup()
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+
+    await expectAuthError(e2e.login({ email, providedSecret: SECRET }, { logger }), 'FORBIDDEN', 403)
+    expect(logger.warn).toHaveBeenCalledWith('E2E login rejected: email not on allowlist', {
+      data: { emailDomain: '' },
+    })
+  })
+
+  it("keeps the account's own roles, and logs the session it issued", async () => {
+    const { e2e } = setup(SECRET, invitedUser({ roles: ['admin'] }))
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    const pair = await e2e.login({ email: 'ada@example.com', providedSecret: SECRET }, { logger })
+
+    expect((jwt.decode(pair.accessToken) as { roles: string[] }).roles).toEqual(['admin'])
+    expect(logger.info).toHaveBeenCalledWith('E2E login issued session', { data: { userId: 'u1' } })
+  })
+
+  it('logs a wrong secret without it', async () => {
+    const { e2e } = setup()
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+
+    await expectAuthError(
+      e2e.login({ email: 'ada@example.com', providedSecret: null }, { logger }),
+      'UNAUTHENTICATED',
+      401,
+    )
+    expect(logger.warn).toHaveBeenCalledWith('E2E login rejected: bad secret')
+  })
+
+  it('maps its errors through the host factory', async () => {
+    const fakes = createFakes([invitedUser()])
+
+    const e2e = createE2eLogin({
+      issueSession: createMagicLinkAuth(fakes.config).issueSession,
+      secret: '',
+      allowedEmails: [],
+      resolveAccount: vi.fn(),
+      createError: (init) => {
+        return new Error(`host:${init.code}`)
+      },
+    })
+
+    await expect(e2e.login({ email: 'ada@example.com', providedSecret: SECRET })).rejects.toThrow('host:NOT_FOUND')
   })
 
   it('refuses a short secret at construction', () => {

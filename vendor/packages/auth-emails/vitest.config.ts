@@ -5,7 +5,7 @@ export default defineNodeConfig(import.meta.dirname, {
     coverage: {
       include: ['src/**'],
       exclude: ['src/**/__tests__/**', 'src/index.ts'],
-      thresholds: { lines: 90, branches: 80, functions: 90, statements: 90 },
+      thresholds: { lines: 100, branches: 100, functions: 100, statements: 100 },
     },
   },
 })
