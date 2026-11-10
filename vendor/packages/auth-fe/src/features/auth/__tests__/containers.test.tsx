@@ -130,9 +130,14 @@ describe('authFormContainer', () => {
 })
 
 describe('authVerifyContainer', () => {
-  const renderVerify = (token: string | undefined, client: AuthClient<TestUser>, onVerified = vi.fn()) => {
+  const renderVerify = (
+    token: string | undefined,
+    client: AuthClient<TestUser>,
+    onVerified = vi.fn(),
+    store = storeWith({}, client),
+  ) => {
     return render(
-      <AuthProvider store={storeWith({}, client)}>
+      <AuthProvider store={store}>
         <AuthVerifyContainer
           token={token}
           redirect="/fallback"
@@ -215,6 +220,35 @@ describe('authVerifyContainer', () => {
       expect(onVerified).toHaveBeenCalledOnce()
     })
     expect(client.me).toHaveBeenCalledOnce()
+  })
+
+  it('does not hand off a verify that resolves after the page unmounted', async () => {
+    const onVerified = vi.fn()
+    const verified = Promise.withResolvers<{ ok: boolean; redirect?: string }>()
+
+    const client = fakeClient({
+      verifyMagicLink: vi.fn(() => {
+        return verified.promise
+      }),
+    })
+
+    const store = storeWith({}, client)
+    const verify = vi.spyOn(store, 'verify')
+    const screen = await renderVerify('good', client, onVerified, store)
+
+    await vi.waitFor(() => {
+      expect(client.verifyMagicLink).toHaveBeenCalledOnce()
+    })
+    await screen.unmount()
+    verified.resolve({ ok: true, redirect: '/chat' })
+    await verify.mock.results[0]!.value
+    // The container's continuation runs after the store's promise settles.
+    await new Promise((resolve) => {
+      setTimeout(resolve)
+    })
+
+    expect(store.getState().status).toBe('authenticated')
+    expect(onVerified).not.toHaveBeenCalled()
   })
 
   it('errors without onVerified or a /me when logout lands during verify', async () => {
@@ -348,6 +382,65 @@ describe('requireAuthContainer', () => {
 
     await expect.element(screen.getByTestId('denied')).toHaveTextContent(USER.email)
     expect(screen.container.querySelector('[data-testid="protected"]')).toBeNull()
+  })
+
+  const denyAll = () => {
+    return false
+  }
+
+  it('lets a denied user log out, then calls onLoggedOut', async () => {
+    const onLoggedOut = vi.fn()
+    const store = storeWith({ status: 'authenticated', user: USER })
+
+    const screen = await render(
+      <AuthProvider store={store}>
+        <RequireAuthContainer<TestUser>
+          onUnauthenticated={vi.fn()}
+          onLoggedOut={onLoggedOut}
+          fallback={<div data-testid="fallback" />}
+          isAllowed={denyAll}
+          renderDenied={(props) => {
+            return (
+              <button
+                type="button"
+                onClick={() => {
+                  return void props.onLogout()
+                }}
+              >
+                leave
+              </button>
+            )
+          }}
+        >
+          <div data-testid="protected" />
+        </RequireAuthContainer>
+      </AuthProvider>,
+    )
+
+    await screen.getByRole('button', { name: 'leave' }).click()
+
+    await vi.waitFor(() => {
+      expect(onLoggedOut).toHaveBeenCalledOnce()
+    })
+    expect(store.getState()).toMatchObject({ status: 'unauthenticated', user: null })
+    await expect.element(screen.getByTestId('fallback')).toBeInTheDocument()
+  })
+
+  it('renders nothing for a denied user when the host passed no denied slot', async () => {
+    const screen = await render(
+      <AuthProvider store={storeWith({ status: 'authenticated', user: USER })}>
+        <RequireAuthContainer<TestUser>
+          onUnauthenticated={vi.fn()}
+          onLoggedOut={vi.fn()}
+          fallback={<div data-testid="fallback" />}
+          isAllowed={denyAll}
+        >
+          <div data-testid="protected" />
+        </RequireAuthContainer>
+      </AuthProvider>,
+    )
+
+    expect(screen.container.querySelector('[data-testid]')).toBeNull()
   })
 
   it('shows the fallback and calls onUnauthenticated for a signed-out visitor', async () => {

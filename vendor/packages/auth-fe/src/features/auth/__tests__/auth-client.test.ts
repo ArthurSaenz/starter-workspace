@@ -137,6 +137,10 @@ describe('createAuthClient', () => {
 
   it.each([
     ['an HTML page', new Response('<html></html>', { status: 200, headers: { 'content-type': 'text/html' } })],
+    [
+      'a body that is not the JSON it claims',
+      new Response('{oops', { status: 200, headers: { 'content-type': 'application/json' } }),
+    ],
     ['JSON null', okResponse(null)],
     ['a JSON array', okResponse([])],
   ])('rejects me with INVALID_RESPONSE, not a 401, when it answers %s', async (_label, response) => {

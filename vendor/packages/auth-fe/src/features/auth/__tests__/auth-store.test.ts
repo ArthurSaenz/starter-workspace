@@ -461,6 +461,65 @@ describe('logout', () => {
     })
   })
 
+  it('drops a /me that fails after logout', async () => {
+    const me = Promise.withResolvers<TestUser>()
+
+    const store = createAuthStore(
+      fakeClient({
+        me: vi.fn(() => {
+          return me.promise
+        }),
+      }),
+    )
+
+    const pending = store.fetchMe()
+
+    await store.logout()
+
+    const seen = recordStates(store)
+
+    me.reject(new Error('network'))
+
+    expect(await pending).toBeNull()
+    expect(seen).toEqual([])
+    expect(store.getState()).toMatchObject({ status: 'unauthenticated', user: null, isSessionLoading: false })
+  })
+
+  it('skips the post-verify load when logout lands while a pre-verify /me is awaited', async () => {
+    const staleMe = Promise.withResolvers<TestUser>()
+
+    const me = vi.fn(() => {
+      return staleMe.promise
+    })
+
+    const verified = Promise.withResolvers<{ ok: boolean }>()
+
+    const store = createAuthStore(
+      fakeClient({
+        me,
+        verifyMagicLink: vi.fn(() => {
+          return verified.promise
+        }),
+      }),
+    )
+
+    const pending = store.fetchMe()
+    const verifying = store.verify('good')
+
+    verified.resolve({ ok: true })
+    // A macrotask drains every microtask, so verify is parked on the in-flight /me when logout lands.
+    await new Promise((resolve) => {
+      setTimeout(resolve)
+    })
+    await store.logout()
+    staleMe.resolve(OTHER_USER)
+
+    expect(await verifying).toEqual({ ok: true })
+    expect(await pending).toBeNull()
+    expect(me).toHaveBeenCalledOnce()
+    expect(store.getState()).toMatchObject({ status: 'unauthenticated', user: null })
+  })
+
   it('keeps a load started after logout as the one in flight', async () => {
     const before = Promise.withResolvers<TestUser>()
     const after = Promise.withResolvers<TestUser>()

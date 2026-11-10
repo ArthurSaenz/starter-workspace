@@ -8,6 +8,7 @@ export default defineReactBrowserConfig(import.meta.dirname, {
     coverage: {
       include: ['src/**'],
       exclude: ['src/**/__tests__/**', 'src/**/index.ts', 'src/typings/**'],
+      thresholds: { lines: 100, branches: 100, functions: 100, statements: 100 },
     },
   },
 })

@@ -125,10 +125,12 @@ To verify a copy (not automated):
 ## Layout
 
 - `src/features/auth/services/` — `api.ts` (the client), `main.ts` (the store), `libs.ts` (`safeRedirect`).
-- `src/lib/` — `auth-context.ts` (context + hooks), `use-latest.ts`, and `auth-types.ts`, the types the
-  hooks need (re-exported from `features/auth/types.ts`).
+- `src/lib/` — `auth-context.ts` (context + hooks), `use-latest.ts`, `use-logout.ts` (the `onLogout` the
+  session containers share), and `auth-types.ts`, the types the hooks need (re-exported from
+  `features/auth/types.ts`).
 - `src/features/auth/containers/` — `auth-provider-container.tsx` and the four headless containers.
 - `src/features/auth/__tests__/` — client, store, `safeRedirect` and container tests (browser mode).
+  `pnpm run test-report` enforces 100% coverage.
 
 ## Commands
 

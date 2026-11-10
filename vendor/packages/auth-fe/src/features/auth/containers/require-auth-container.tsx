@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 
 import { useAuth, useAuthStore } from '../../../lib/auth-context.js'
 import { useLatest } from '../../../lib/use-latest.js'
+import { useLogout } from '../../../lib/use-logout.js'
 import type { AuthState, RequireAuthContainerProps } from '../types.js'
 
 export const RequireAuthContainer = <TUser,>(props: RequireAuthContainerProps<TUser>) => {
@@ -19,6 +20,8 @@ export const RequireAuthContainer = <TUser,>(props: RequireAuthContainerProps<TU
 
   const onUnauthenticatedRef = useLatest(onUnauthenticated)
 
+  const onLogout = useLogout(onLoggedOut)
+
   useEffect(() => {
     if (status === 'unknown') {
       void store.fetchMe()
@@ -30,17 +33,7 @@ export const RequireAuthContainer = <TUser,>(props: RequireAuthContainerProps<TU
   if (status === 'authenticated' && user) {
     // A signed-in user the host does not allow never mounts the protected tree.
     if (isAllowed && !isAllowed(user)) {
-      return (
-        <>
-          {renderDenied?.({
-            user,
-            onLogout: async () => {
-              await store.logout()
-              await onLoggedOut()
-            },
-          }) ?? null}
-        </>
-      )
+      return <>{renderDenied?.({ user, onLogout })}</>
     }
 
     return <>{children}</>
