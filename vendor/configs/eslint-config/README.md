@@ -106,6 +106,12 @@ Reaching into their internals is an error:
 - ❌ `import { client } from '#root/services/email/client'` — deep import, blocked
 - ✅ `import { Email } from '#root/services/email'` — barrel (public API)
 - ✅ `import { local } from './local'` — relative intra-element import
+- ❌ `import { toRouterTarget } from '#root/lib/navigation/results-url'` — deep lib import, blocked
+- ✅ `import { toRouterTarget } from '#root/lib/navigation'` — lib module barrel
+
+`src/lib/<module>` follows the same rule via `#root/lib/*/**`. The glob is anchored on `#root/`, so
+package subpaths like `highlight.js/lib/languages/xml` stay allowed. Inside a lib module, import
+siblings relatively (`./types`), never through `#root/lib/<same-module>/…`.
 
 This is enforced by `no-restricted-imports` with the globs `**/features/*/**` and
 `**/services/*/**`. The pattern is anchored on the `features/`/`services/` segment, so it

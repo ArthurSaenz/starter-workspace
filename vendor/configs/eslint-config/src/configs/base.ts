@@ -19,6 +19,13 @@ export const publicApiPatterns = [
     group: ['**/services/*/**', '!**/services/*/index', '!**/services/*/index.*'],
     message: "Importing private modules from a service is prohibited. Use the service's public API (index.ts) instead.",
   },
+  {
+    // `\#`: gitignore syntax reads a leading `#` as a comment. Anchored on `#root/` (= src/) because a bare
+    // `**/lib/*/**` would also block package subpaths like `highlight.js/lib/…`.
+    group: ['\\#root/lib/*/**', '!\\#root/lib/*/index', '!\\#root/lib/*/index.*'],
+    message:
+      "Importing private modules from a lib module is prohibited. Use the module's public API (index.ts) instead.",
+  },
 ]
 
 /** Base antfu options shared by every mode. Framework flags (react/svelte) are merged in the factory. */

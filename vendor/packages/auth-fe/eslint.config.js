@@ -30,6 +30,11 @@ export default config({
                   "Importing private modules from a service is prohibited. Use the service's public API (index.ts) instead.",
               },
               {
+                group: ['\\#root/lib/*/**', '!\\#root/lib/*/index', '!\\#root/lib/*/index.*'],
+                message:
+                  "Importing private modules from a lib module is prohibited. Use the module's public API (index.ts) instead.",
+              },
+              {
                 group: ['@wl/auth-fe/*'],
                 message: 'import from a relative path — the package import resolves to dist',
               },
