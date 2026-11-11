@@ -14,6 +14,10 @@
  *   resolve(source, file, config) -> { found: boolean, path?: string }
  * Returning `{ found: false }` hands the specifier to the next resolver in the chain, which
  * is how every non-`#root` import still reaches the node resolver.
+ *
+ * It also claims one relative form: a NodeNext specifier (`./x.js`) whose emitted file is not on
+ * disk. The node resolver looks that name up literally and misses `x.ts`, which leaves the import
+ * unclassified and so unpoliced. Extensionless relative specifiers stay with the node resolver.
  */
 
 const fs = require('node:fs')
@@ -35,6 +39,8 @@ const resolutionCache = new Map()
 
 /** NodeNext specifiers name the emitted file (`./x.js`); the source on disk is its TS counterpart. */
 const TS_SOURCE_EXTENSIONS = { '.js': ['.ts', '.tsx'], '.jsx': ['.tsx'], '.mjs': ['.mts'], '.cjs': ['.cts'] }
+
+const isRelative = (source) => /^\.\.?\//.test(source)
 
 /** Nearest ancestor directory containing a package.json, or null at the filesystem root. */
 function findPackageRoot(startDir) {
@@ -120,7 +126,17 @@ function resolve(source, file, config) {
   const baseDir = config?.baseDir ?? 'src'
   const extensions = config?.extensions ?? DEFAULT_EXTENSIONS
 
-  if (typeof source !== 'string' || !source.startsWith(alias)) return { found: false }
+  if (typeof source !== 'string') return { found: false }
+
+  if (isRelative(source)) {
+    if (!TS_SOURCE_EXTENSIONS[path.extname(source)]) return { found: false }
+
+    const resolved = resolveWithExtensions(path.resolve(path.dirname(path.resolve(file)), source), [])
+
+    return resolved ? { found: true, path: resolved } : { found: false }
+  }
+
+  if (!source.startsWith(alias)) return { found: false }
 
   const packageRoot = findPackageRoot(path.dirname(path.resolve(file)))
   if (!packageRoot) return { found: false }

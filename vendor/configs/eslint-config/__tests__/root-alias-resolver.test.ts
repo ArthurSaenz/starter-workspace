@@ -109,6 +109,29 @@ describe('root-alias resolver: NodeNext specifiers', () => {
   })
 })
 
+describe('root-alias resolver: relative NodeNext specifiers', () => {
+  it.each([
+    ['./rel-next.js', 'src/features/beta/rel-next.ts'],
+    ['../alpha/rel-view.js', 'src/features/alpha/rel-view.tsx'],
+    ['../alpha/rel-modern.mjs', 'src/features/alpha/rel-modern.mts'],
+  ])('resolves %s against the importing file to its TS source', (specifier, rel) => {
+    const abs = write(rel)
+
+    expect(resolver.resolve(specifier, importer())).toEqual({ found: true, path: abs })
+  })
+
+  it('reports not-found for a relative .js specifier with no counterpart', () => {
+    expect(resolver.resolve('./missing.js', importer())).toEqual({ found: false })
+  })
+
+  it('leaves relative specifiers without an emitted extension to the node resolver', () => {
+    write('src/features/beta/plain.ts')
+
+    expect(resolver.resolve('./plain', importer())).toEqual({ found: false })
+    expect(resolver.resolve('./plain.ts', importer())).toEqual({ found: false })
+  })
+})
+
 describe('root-alias resolver: caching', () => {
   it('does not remember a miss — a file created later in the same process resolves', () => {
     expect(resolver.resolve('#root/features/later/index', importer())).toEqual({ found: false })

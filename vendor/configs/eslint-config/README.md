@@ -163,9 +163,10 @@ automatically.
 
 **Alias resolution:** boundaries must resolve an import to classify its target; an unresolved
 target is `unknown` and silently not enforced. `#root/*` (⇒ `<package>/src/*`) is resolved by the
-bundled `resolvers/root-alias.cjs`, including NodeNext-style `#root/x.js` ⇒ `x.ts`. Everything else
-goes to the node resolver (extended with TS extensions), which does **not** map a relative `./x.js`
-to `x.ts` — such imports are invisible to this layer.
+bundled `resolvers/root-alias.cjs`, including NodeNext-style `#root/x.js` ⇒ `x.ts`. The same
+resolver maps a relative NodeNext specifier (`./x.js`, `../y/index.mjs`) to its TS source, so those
+imports are checked exactly like extensionless ones. Everything else goes to the node resolver
+(extended with TS extensions).
 
 ## E2E import direction (Playwright packages)
 

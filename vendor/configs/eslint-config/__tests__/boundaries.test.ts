@@ -237,6 +237,62 @@ describe('boundaries: aliased imports (#root)', () => {
   })
 })
 
+// NodeNext packages must write the emitted name (`./x.js`). The node resolver looks for that file
+// literally, finds nothing beside `x.ts`, and the target classifies as `unknown` — never reported.
+describe('boundaries: relative imports written NodeNext-style (.js)', () => {
+  it('flags a runtime cross-feature import through the barrel', async () => {
+    expectFlagged(
+      await lintAt(
+        'src/features/beta/x.ts',
+        code`
+          import { thing } from '../alpha/index.js'
+
+          export const a = thing
+        `,
+      ),
+    )
+  })
+
+  it('flags a runtime deep import into shared', async () => {
+    expectFlagged(
+      await lintAt(
+        'src/features/beta/x.ts',
+        code`
+          import { sharedUtil } from '../../shared/util.js'
+
+          export const a = sharedUtil
+        `,
+      ),
+    )
+  })
+
+  it('allows a runtime import of shared through its barrel', async () => {
+    expectClean(
+      await lintAt(
+        'src/features/beta/x.ts',
+        code`
+          import { sharedUtil } from '../../shared/index.js'
+
+          export const a = sharedUtil
+        `,
+      ),
+    )
+  })
+
+  it('allows a same-feature relative import', async () => {
+    expectClean(
+      await lintAt(
+        'src/features/beta/x.ts',
+        code`
+          import { util } from './local/util.js'
+
+          export const a = util
+        `,
+      ),
+    )
+  })
+})
+
 describe('boundaries: shared layer', () => {
   it('allows a feature to import shared at runtime through its barrel', async () => {
     expectClean(
