@@ -53,6 +53,34 @@ describe('createMagicLinkAuth config guards', () => {
     }).toThrow(/baseUrl/)
   })
 
+  it.each(['app.test', '/auth', 'javascript:alert(1)', 'https://'])(
+    'refuses a base URL that is not absolute: %s',
+    (baseUrl) => {
+      const { config } = createFakes()
+
+      expect(() => {
+        return createMagicLinkAuth({ ...config, magicLink: { baseUrl } })
+      }).toThrow(/absolute/)
+    },
+  )
+
+  it.each([
+    ['jwt.accessTtlSec', { accessTtlSec: Number.NaN }, {}],
+    ['jwt.refreshTtlSec', { refreshTtlSec: 0 }, {}],
+    ['magicLink.ttlMin', {}, { ttlMin: -5 }],
+    ['magicLink.inviteTtlMin', {}, { inviteTtlMin: 1.5 }],
+  ])('refuses a %s that is not a positive integer', (name, jwt, magicLink) => {
+    const { config } = createFakes()
+
+    expect(() => {
+      return createMagicLinkAuth({
+        ...config,
+        jwt: { ...config.jwt, ...jwt },
+        magicLink: { ...config.magicLink, ...magicLink },
+      })
+    }).toThrow(`auth: ${name} must be a positive integer`)
+  })
+
   it('refuses neither of email and renderEmail', () => {
     const config = withRenderEmail(createFakes(), undefined)
 
@@ -253,6 +281,22 @@ describe('requestMagicLink', () => {
     expect(fakes.sent).toHaveLength(0)
   })
 
+  it('stays silent when a host validator throws something that is not an Error', async () => {
+    const fakes = createFakes([invitedUser()])
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+
+    const requestMagicLink = () => {
+      const nothing: unknown = undefined
+
+      throw nothing
+    }
+
+    const auth = createMagicLinkAuth({ ...fakes.config, uninvitedRequest: 'reject', validate: { requestMagicLink } })
+
+    await expect(auth.requestMagicLink({ email: 'ada@example.com' }, { logger })).resolves.toBeUndefined()
+    expect(logger.info).toHaveBeenCalledWith(expect.any(String), { data: { reason: 'undefined' } })
+  })
+
   it('stops quietly past the per-email and per-IP budgets, under the configured key prefix', async () => {
     const fakes = createFakes([invitedUser()])
     const auth = createMagicLinkAuth({ ...fakes.config, rateLimits: { perEmail: 2, keyPrefix: 'bo' } })
@@ -288,6 +332,29 @@ describe('requestMagicLink', () => {
 
     expect(fakes.tokens[0]!.spent).toBe(true)
     expect(logger.error).toHaveBeenCalled()
+  })
+
+  it('invalidates the token when the mailer rejects with no error at all', async () => {
+    const fakes = createFakes()
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+
+    fakes.mailer.send.mockRejectedValueOnce(undefined)
+
+    await expect(createMagicLinkAuth(fakes.config).sendInviteLink('ada@example.com', { logger })).resolves.toEqual({
+      emailSent: false,
+    })
+    expect(fakes.tokens[0]!.spent).toBe(true)
+    expect(logger.error).toHaveBeenCalledWith(expect.any(String), { data: { name: 'undefined' } })
+  })
+
+  it('does not mail a double slash when the base URL ends in one', async () => {
+    const fakes = createFakes([invitedUser()])
+
+    await createMagicLinkAuth({ ...fakes.config, magicLink: { baseUrl: 'https://app.test/' } }).requestMagicLink({
+      email: 'ada@example.com',
+    })
+
+    expect(fakes.sent[0]!.text).toContain('https://app.test/auth/verify?token=')
   })
 
   it('logs, not throws, when the cleanup after a failed send fails too', async () => {

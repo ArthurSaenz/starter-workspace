@@ -1,5 +1,5 @@
 import type { AuthErrorCode } from '../errors.js'
-import { defaultCreateAuthError } from '../errors.js'
+import { defaultCreateAuthError, errorName } from '../errors.js'
 import { resolveCookieOptions } from '../http/cookies.js'
 import { sanitizeRedirectUrl } from '../http/redirect.js'
 import type { AuthContext, AuthUser } from '../ports.js'
@@ -67,12 +67,15 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
     return createError({ message, code, status })
   }
 
+  const { baseUrl } = config.magicLink
+
   const sendMagicLink = createMagicLinkSender<TCtx>({
     magicTokens,
     mailer: config.mailer,
     email: config.email,
     renderEmail: config.renderEmail,
-    magicLink: config.magicLink,
+    // `https://app.test/` + `/auth/verify` would mail a `//auth/verify` link no SPA route matches.
+    magicLink: { ...config.magicLink, baseUrl: baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl },
     signInTtlMin,
     inviteTtlMin,
   })
@@ -102,7 +105,7 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
       validateRequest({ email, redirectUrl: input.redirectUrl }, ctx)
     } catch (validationError) {
       ctx?.logger?.info('Magic link request rejected by validation; answering the generic OK', {
-        data: { reason: (validationError as Error).name },
+        data: { reason: errorName(validationError) },
       })
 
       return

@@ -1,4 +1,5 @@
 import type { AuthErrorCode, CreateAuthError } from '../errors.js'
+import { errorName } from '../errors.js'
 import type { ResolvedCookieOptions } from '../http/cookies.js'
 import { buildClearCookies, extractAccessToken, extractRefreshToken } from '../http/cookies.js'
 import type { HeaderBag } from '../http/headers.js'
@@ -88,7 +89,10 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
       throw invalidSession()
     }
 
-    if (toMs(session.expiresAt) < Date.now()) throw invalidSession()
+    const expiresAtMs = toMs(session.expiresAt)
+
+    // An unparseable timestamp is expired, never "no expiry".
+    if (!Number.isFinite(expiresAtMs) || expiresAtMs < Date.now()) throw invalidSession()
 
     const user = await users.findById(payload.sub, ctx)
 
@@ -115,7 +119,7 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
     try {
       await sessions.revokeByTokenHash(hashToken(refreshToken), ctx)
     } catch (error) {
-      ctx?.logger?.warn('Failed to revoke session on logout', { data: { name: (error as Error).name } })
+      ctx?.logger?.warn('Failed to revoke session on logout', { data: { name: errorName(error) } })
     }
   }
 

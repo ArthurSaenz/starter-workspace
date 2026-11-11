@@ -1,3 +1,4 @@
+import { errorName } from '../errors.js'
 import type { AuthContext, MagicTokenStore, Mailer } from '../ports.js'
 import type { RequestMeta } from '../session/types.js'
 import { withMeta } from '../session/types.js'
@@ -60,14 +61,14 @@ export const createMagicLinkSender = <TCtx extends AuthContext>(deps: MagicLinkS
     } catch (error) {
       // A token nobody received must not stay redeemable.
       ctx?.logger?.error('Magic link send failed; invalidating the undelivered token', {
-        data: { name: (error as Error).name },
+        data: { name: errorName(error) },
       })
 
       try {
         await magicTokens.invalidateByEmail(email, ctx)
       } catch (cleanupError) {
         ctx?.logger?.error('Failed to invalidate the undelivered magic token', {
-          data: { name: (cleanupError as Error).name },
+          data: { name: errorName(cleanupError) },
         })
       }
 

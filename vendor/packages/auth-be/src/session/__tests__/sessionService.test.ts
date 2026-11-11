@@ -118,6 +118,14 @@ describe('refreshSession', () => {
     await expectAuthError(auth.refreshSession({ refreshToken: result.refreshToken }), 'USER_NOT_FOUND', 401)
   })
 
+  it('refuses a session row whose expiry does not parse', async () => {
+    const fakes = createFakes([invitedUser()])
+    const { auth, result } = await signIn(fakes)
+
+    fakes.sessions[0]!.expiresAt = 'not a date' as unknown as Date
+    await expectAuthError(auth.refreshSession({ refreshToken: result.refreshToken }), 'INVALID_REFRESH_TOKEN', 401)
+  })
+
   it('rate-limits refresh per IP', async () => {
     const fakes = createFakes([invitedUser()])
     const { auth, result } = await signIn(fakes)
@@ -168,6 +176,10 @@ describe('session reads', () => {
 
     fakes.sessionStore.revokeByTokenHash.mockRejectedValueOnce(new Error('db down'))
     await expect(auth.logout(result.refreshToken)).resolves.toBeUndefined()
+    fakes.sessionStore.revokeByTokenHash.mockRejectedValueOnce(undefined)
+    await expect(
+      auth.logout(result.refreshToken, { logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }),
+    ).resolves.toBeUndefined()
     await expect(auth.logout(null)).resolves.toBeUndefined()
   })
 

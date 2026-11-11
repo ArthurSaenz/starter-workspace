@@ -51,6 +51,9 @@ honour the same cookie.
 | `minResponseMs`                                                         | no       | Floor on `requestMagicLink`'s response time, every outcome included (default 0). See "Timing" below.                                                          |
 | `cookies`, `rateLimits`, `validate`, `createError`, `notInvitedMessage` | no       | Cookie names/paths (default `access_token` `/`, `refresh_token` `/api/v1/auth`), budgets (5/email, 20/IP per hour…), validators, error mapping.               |
 
+`magicLink.baseUrl` must be an absolute http(s) URL and every TTL (`jwt.*TtlSec`, `magicLink.*TtlMin`) a
+positive integer, or construction throws: a bad TTL would otherwise fail only after verify spent the link.
+
 Every flow takes its input object first and the host context second: `requestMagicLink(input, ctx)`,
 `verifyMagicLink({ rawToken, ...meta }, ctx)`, `refreshSession({ refreshToken, ...meta }, ctx)`.
 

@@ -90,6 +90,24 @@ export const assertMagicLinkConfig = <TUser extends AuthUser, TMe, TCtx extends 
     throw new Error('auth: magicLink.baseUrl is required')
   }
 
+  if (!/^https?:\/\/[^/]/i.test(config.magicLink.baseUrl)) {
+    throw new Error('auth: magicLink.baseUrl must be an absolute http(s) URL')
+  }
+
+  // A bad TTL would otherwise surface only after verify has spent the link (jwt.sign throws on NaN).
+  const ttls = {
+    'jwt.accessTtlSec': config.jwt.accessTtlSec,
+    'jwt.refreshTtlSec': config.jwt.refreshTtlSec,
+    'magicLink.ttlMin': config.magicLink.ttlMin,
+    'magicLink.inviteTtlMin': config.magicLink.inviteTtlMin,
+  }
+
+  for (const [name, ttl] of Object.entries(ttls)) {
+    if (ttl !== undefined && !(Number.isInteger(ttl) && ttl > 0)) {
+      throw new Error(`auth: ${name} must be a positive integer`)
+    }
+  }
+
   if (config.minResponseMs !== undefined && !(Number.isFinite(config.minResponseMs) && config.minResponseMs >= 0)) {
     throw new Error('auth: minResponseMs must be a non-negative number')
   }

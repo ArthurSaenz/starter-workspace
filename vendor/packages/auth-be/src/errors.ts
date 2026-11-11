@@ -36,3 +36,8 @@ export type CreateAuthError = (init: AuthErrorInit) => Error
 export const defaultCreateAuthError: CreateAuthError = (init) => {
   return new AuthError(init)
 }
+
+/** For log data. A host adapter may reject with anything, `undefined` included. */
+export const errorName = (error: unknown): string => {
+  return error instanceof Error ? error.name : typeof error
+}
