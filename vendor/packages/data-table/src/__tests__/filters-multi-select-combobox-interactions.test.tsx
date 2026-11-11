@@ -105,6 +105,20 @@ describe('multiSelectCombobox — keyboard', () => {
     await expect.element(screen.getByRole('listbox')).not.toBeInTheDocument()
   })
 
+  it('ignores Enter once a closeOnSelect pick has closed the list', async () => {
+    const onChange = vi.fn()
+    const screen = await render(<Harness closeOnSelect onChange={onChange} />)
+
+    await screen.getByRole('combobox').fill('alp')
+    await userEvent.keyboard('{Enter}')
+    await expect.element(screen.getByRole('listbox')).not.toBeInTheDocument()
+
+    await userEvent.keyboard('{Enter}')
+
+    expect(onChange).toHaveBeenCalledTimes(1)
+    await expect.element(screen.getByRole('button', { name: 'Remove Alpha' })).toBeVisible()
+  })
+
   it('creates the query on Enter when nothing matches and allowCreate is set', async () => {
     const onChange = vi.fn()
     const screen = await render(<Harness allowCreate onChange={onChange} />)
@@ -144,6 +158,33 @@ describe('multiSelectCombobox — list actions', () => {
     expect(onChange).toHaveBeenLastCalledWith([])
   })
 
+  it('keeps created values when Select all adds every option', async () => {
+    const onChange = vi.fn()
+    const screen = await render(<Harness showSelectAll allowCreate initialValue={['Zeta']} onChange={onChange} />)
+
+    await screen.getByRole('combobox').click()
+    await screen.getByRole('button', { name: 'Select all' }).click()
+
+    expect(onChange).toHaveBeenLastCalledWith(['Zeta', 'a', 'b', 'c'])
+  })
+
+  it('selects a duplicated option value once from Select all', async () => {
+    const onChange = vi.fn()
+
+    const options = [
+      { value: 'a', label: 'Alpha' },
+      { value: 'a', label: 'Alpha (again)' },
+      { value: 'b', label: 'Beta' },
+    ]
+
+    const screen = await render(<Harness showSelectAll options={options} onChange={onChange} />)
+
+    await screen.getByRole('combobox').click()
+    await screen.getByRole('button', { name: 'Select all' }).click()
+
+    expect(onChange).toHaveBeenLastCalledWith(['a', 'b'])
+  })
+
   it('hides the Select all row while a query is typed', async () => {
     const screen = await render(<Harness showSelectAll />)
 
@@ -170,6 +211,26 @@ describe('multiSelectCombobox — list actions', () => {
     await screen.getByRole('combobox').fill('a')
 
     await expect.element(screen.getByRole('button', { name: 'Add "a"' })).not.toBeInTheDocument()
+  })
+
+  it('collapses a wall of chips behind Show more / Show less', async () => {
+    const options = Array.from({ length: 51 }, (_unused, index) => {
+      return { value: `v${String(index)}`, label: `Value ${String(index)}` }
+    })
+
+    const screen = await render(
+      <Harness
+        options={options}
+        initialValue={options.map((option) => {
+          return option.value
+        })}
+      />,
+    )
+
+    await screen.getByRole('button', { name: 'Show more' }).click()
+    await screen.getByRole('button', { name: 'Show less' }).click()
+
+    await expect.element(screen.getByRole('button', { name: 'Show more' })).toBeVisible()
   })
 
   it('removes a value through its chip', async () => {
