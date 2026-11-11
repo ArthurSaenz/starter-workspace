@@ -26,6 +26,7 @@ const ourMarkdown = (flat: Flat) => {
 }
 const wlRule = (flat: Flat) => flat.find((c) => c?.rules?.['@wl/props-destructuring-newline'])
 const ourShadcn = (flat: Flat) => flat.find((c) => c?.name === 'wl/shadcn')
+const ourFileNaming = (flat: Flat) => flat.find((c) => c?.name === 'wl/file-naming')
 const ourArchitecture = (flat: Flat) => flat.filter((c) => c?.name?.startsWith('wl/architecture/'))
 
 describe('options: group toggles drop exactly their contribution', () => {
@@ -80,6 +81,15 @@ describe('options: group toggles drop exactly their contribution', () => {
 
     expect(ourShadcn(base)).toBeDefined()
     expect(ourShadcn(off)).toBeUndefined()
+    expect(off.length).toBe(base.length - 1)
+  })
+
+  it('fileNaming:false removes the file-naming item only', async () => {
+    const base = await config()
+    const off = await config({ fileNaming: false })
+
+    expect(ourFileNaming(base)).toBeDefined()
+    expect(ourFileNaming(off)).toBeUndefined()
     expect(off.length).toBe(base.length - 1)
   })
 })

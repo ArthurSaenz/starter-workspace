@@ -8,6 +8,7 @@ import { wlComponentsRecommended } from './configs/components.js'
 import { jsdoc, markdown } from './configs/docs.js'
 import { e2eBoundaries } from './configs/e2e-boundaries.js'
 import { e2ePlaywright } from './configs/e2e-playwright.js'
+import { fileNaming } from './configs/file-naming.js'
 import { frameworks } from './configs/frameworks/index.js'
 import { ignores } from './configs/ignores.js'
 import { shadcnConfig } from './configs/shadcn.js'
@@ -57,6 +58,7 @@ export const createConfig = async (userOptions: ConfigOptions = {}): Promise<Typ
     ...(o.jsdoc ? [jsdoc] : []),
     ...(o.markdown ? [markdown] : []),
     ...(o.shadcn ? [shadcnConfig] : []),
+    ...(o.fileNaming ? [fileNaming] : []),
     // Appended after all rule layers so its `'off'` wins, but before consumer rules so they can override.
     tempDisabledRules(o),
     ignores(o.ignores),

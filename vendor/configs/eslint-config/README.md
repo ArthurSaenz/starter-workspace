@@ -15,8 +15,8 @@ The package is authored in TypeScript under `src/` and built to `dist/` with `ts
 
 ## Options
 
-All options are optional; the defaults reproduce the historical config **byte-for-byte**, so existing
-consumers calling `config()` / `config({ ignores })` are unaffected.
+All options are optional. The defaults reproduce the historical config, except for `fileNaming`, which is
+on by default and flags every non-kebab-case source file and folder.
 
 | Option             | Type                            | Default   | Effect                                                                                                     |
 | ------------------ | ------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------- |
@@ -27,6 +27,7 @@ consumers calling `config()` / `config({ ignores })` are unaffected.
 | `markdown`         | `boolean`                       | `true`    | Markdown sonarjs-off layer.                                                                                |
 | `components`       | `boolean`                       | `true`    | White-label component conventions (`@wl`).                                                                 |
 | `shadcn`           | `boolean`                       | `true`    | Tailwind design-system rules from [`@shadcn/lint`](https://github.com/shadcn-ui/lint).                     |
+| `fileNaming`       | `boolean`                       | `true`    | Kebab-case file and folder names (see [File naming](#file-naming)).                                        |
 | `architecture`     | `boolean`                       | `true`    | React-only layer: rules of hooks, platform access, dumb-component imports (`src/configs/architecture.ts`). |
 | `restrictedSyntax` | `RestrictedSyntax[]`            | `[]`      | Extra `no-restricted-syntax` entries for frontend code, appended to the shared ones.                       |
 | `rules`            | `ConfigRules`                   | `{}`      | Consumer rule overrides, merged **last** (highest precedence). Omitted from the call when empty.           |
@@ -95,11 +96,38 @@ src/
     e2e-playwright.ts # eslint-plugin-playwright trust rules, Playwright packages only
     components.ts   # @wl component conventions
     shadcn.ts       # @shadcn/lint Tailwind design-system rules
+    file-naming.ts  # kebab-case file and folder names
     docs.ts         # JSDoc + markdown layers
     ignores.ts      # built-in + user ignores
     temp-disabled.ts # central mute list, appended after every rule layer
     frameworks/     # framework registry (index.ts) + per-framework blocks (svelte.ts)
 ```
+
+## File naming
+
+Source files (`js`/`ts` family and `.svelte`) and every folder above them, up to the directory ESLint
+runs in, must be kebab-case: `user-card.tsx`, `data-source/`. Only the part before the first dot is a
+name; `user-card.test.ts` and `home.page.ts` pass. Files go through `unicorn/filename-case`; folders go
+through `wl-config/folder-case`, a small rule in `src/configs/file-naming.ts`.
+
+Exempt, because a tool or framework fixes the name:
+
+- `index.*`, a leading `_` (`__root.tsx`, `_layout.tsx`) or `$` (`$.tsx`, `$postId.tsx`)
+- TanStack Router: `-` prefixed files and folders, `posts_.$id.tsx`, `(group)/`, `_pathless/`; Vike:
+  `+Page.tsx`, `+config.ts`; bracket params such as `[id]/`
+- dotfolders (`.storybook/`), tooling folders (`__tests__/`, `__mocks__/`, `__fixtures__/`, …) and
+  scoped-package mocks (`__mocks__/@aws-sdk/`)
+- files the layer never reads: Markdown (`README.md`, `CLAUDE.md`) and the built-in ignores
+  (`routeTree.gen.ts`)
+
+A package with names still to rename turns the layer off until it is done:
+
+```js
+export default config({ fileNaming: false })
+```
+
+To keep the folder rule while files are renamed, override one rule instead:
+`rules: { 'unicorn/filename-case': 'off' }`.
 
 ## Architecture import rules (public-API boundaries)
 
