@@ -101,6 +101,25 @@ describe('poll', () => {
       expect(fn).toHaveBeenCalledTimes(2)
     })
 
+    it('rejects when aborted during the call that ends the polling', async () => {
+      const controller = new AbortController()
+
+      await expect(
+        poll({
+          fn: async () => {
+            controller.abort()
+
+            return 1
+          },
+          condition: () => {
+            return false
+          },
+          intervalMs: 10,
+          signal: controller.signal,
+        }),
+      ).rejects.toMatchObject({ name: 'AbortError' })
+    })
+
     it('never calls fn when already aborted', async () => {
       const fn = counter()
       const reason = new Error('left the page')

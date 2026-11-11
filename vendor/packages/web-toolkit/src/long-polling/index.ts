@@ -4,7 +4,7 @@ export interface PollArgs<T> {
   intervalMs: number
   maxAttempts?: number
   firstDelayMs?: number
-  /** Stops polling: the returned promise rejects with `signal.reason` at the next wait or attempt. */
+  /** Stops polling: the returned promise rejects with `signal.reason` at the next wait, or once the running attempt settles. */
   signal?: AbortSignal
 }
 
@@ -32,10 +32,13 @@ export const poll = async <T>(args: PollArgs<T>): Promise<T> => {
   let result = await fn()
   let attempts = 0
 
+  signal?.throwIfAborted()
+
   while (condition(result) && attempts < maxAttempts) {
     await wait(intervalMs, signal)
     attempts++
     result = await fn()
+    signal?.throwIfAborted()
   }
 
   return result
