@@ -78,6 +78,14 @@ describe('file naming: folder classification', () => {
     ['__type-tests__', true],
     ['[_]dev', true],
     ['magicLink', false],
+    ['activeTrail', false],
+    ['dataSource', false],
+    ['_LEGACY_holiday-finder', false],
+    ['posts.$postId', true],
+    ['{-$lang}', true],
+    ['pt-BR', true],
+    ['en_US', true],
+    ['pt-br-BR', false],
   ])('%s -> %s', (name, expected) => {
     expect(isKebabFolder(name)).toBe(expected)
   })
