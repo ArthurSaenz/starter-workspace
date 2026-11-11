@@ -142,6 +142,10 @@ Reaching into their internals is an error:
 - ❌ `import { toRouterTarget } from '#root/lib/navigation/results-url'` — deep lib import, blocked
 - ✅ `import { toRouterTarget } from '#root/lib/navigation'` — lib module barrel
 
+The React architecture rules (hooks, platform access, dumb-component imports), the component rules and
+the JSDoc layer share one exemption list (`GLOB_TS_DOC_EXCLUDE`): tests, stories, `__stories__/` helpers
+and declaration files are not checked by any of them.
+
 `src/lib/<module>` follows the same rule via `#root/lib/*/**`. The glob is anchored on `#root/`, so
 package subpaths like `highlight.js/lib/languages/xml` stay allowed. Inside a lib module, import
 siblings relatively (`./types`), never through `#root/lib/<same-module>/…`.
