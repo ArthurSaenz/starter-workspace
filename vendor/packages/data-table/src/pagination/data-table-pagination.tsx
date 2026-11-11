@@ -82,7 +82,7 @@ const ServerPagination = (props: ServerPaginationProps) => {
   const { config, className } = props
 
   const {
-    page: currentPage,
+    page: requestedPage,
     pageSize,
     totalCount,
     onPageChange,
@@ -95,9 +95,9 @@ const ServerPagination = (props: ServerPaginationProps) => {
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
   // `page` is the consumer's state and can outlive a shrinking `totalCount` for a render.
-  const labelPage = Math.min(currentPage, totalPages)
-  const firstItem = totalCount === 0 ? 0 : (labelPage - 1) * pageSize + 1
-  const lastItem = Math.min(labelPage * pageSize, totalCount)
+  const currentPage = Math.min(requestedPage, totalPages)
+  const firstItem = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1
+  const lastItem = Math.min(currentPage * pageSize, totalCount)
   const pageInputRef = useRef<HTMLInputElement>(null)
 
   const commitPageInput = (value: number) => {

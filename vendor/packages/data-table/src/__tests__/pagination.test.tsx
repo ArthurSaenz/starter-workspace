@@ -47,6 +47,50 @@ describe('dataTablePagination server mode', () => {
     await expect.element(screen.getByText('11–15 of 15 items')).toBeInTheDocument()
   })
 
+  it('treats a page index past the last page as the last page', async () => {
+    const onPageChange = vi.fn()
+
+    const screen = await render(
+      <DataTablePagination
+        config={{
+          mode: 'server',
+          page: 5,
+          pageSize: 10,
+          totalCount: 25,
+          onPageChange,
+          onPageSizeChange: vi.fn(),
+          showExtendedControls: false,
+        }}
+      />,
+    )
+
+    await expect.element(screen.getByText('21–25 of 25 items')).toBeInTheDocument()
+    await expect.element(screen.getByText('Page 3 of 3')).toBeInTheDocument()
+    await expect.element(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+    expect(onPageChange).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Previous' }))
+
+    expect(onPageChange).toHaveBeenCalledExactlyOnceWith(2)
+  })
+
+  it('shows the last page in the page field when the page index is past it', async () => {
+    const screen = await render(
+      <DataTablePagination
+        config={{
+          mode: 'server',
+          page: 5,
+          pageSize: 10,
+          totalCount: 25,
+          onPageChange: vi.fn(),
+          onPageSizeChange: vi.fn(),
+        }}
+      />,
+    )
+
+    await expect.element(screen.getByRole('textbox', { name: 'Page number' })).toHaveValue('3')
+  })
+
   it('calls onPageChange when next is clicked', async () => {
     const onPageChange = vi.fn()
 
