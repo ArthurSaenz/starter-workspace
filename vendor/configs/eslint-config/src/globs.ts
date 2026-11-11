@@ -1,5 +1,8 @@
-/** Every lintable source extension (boundaries layer scope). */
-export const GLOB_SRC_ALL = '**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}'
+/** Every lintable source extension; also the boundaries node-resolver extension list. */
+export const SRC_EXTENSIONS = ['js', 'jsx', 'mjs', 'cjs', 'ts', 'tsx', 'mts', 'cts']
+
+/** Every lintable source file (boundaries layer scope). */
+export const GLOB_SRC_ALL = `**/*.{${SRC_EXTENSIONS.join(',')}}`
 
 /** TS sources (JSDoc layer scope). */
 export const GLOB_TS = '**/*.{ts,tsx}'
