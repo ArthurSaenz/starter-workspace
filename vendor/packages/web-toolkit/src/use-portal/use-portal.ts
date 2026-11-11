@@ -1,13 +1,19 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 const isBrowser = typeof window !== 'undefined'
 
 // Mount points this hook created, with how many mounted hooks use each; one found in the page is never removed.
 const createdNodeUsers = new WeakMap<Element, number>()
+// Created but not yet attached: lets same-id hooks in one render share a node before any effect appends it.
+const detachedNodes = new Map<string, Element>()
 
 export const usePortal = (id: string) => {
-  const portalRef = useRef(isBrowser ? getPortalNode(id) : null)
+  const [node] = useState(() => {
+    return isBrowser ? getPortalNode(id) : null
+  })
+
+  const portalRef = useRef(node)
 
   useEffect(() => {
     const node = portalRef.current
@@ -18,6 +24,8 @@ export const usePortal = (id: string) => {
 
     // StrictMode's replayed effect, or a remount, finds the node already removed by the last cleanup.
     if (!node.isConnected) document.body.appendChild(node)
+
+    detachedNodes.delete(node.id)
 
     return () => {
       const users = createdNodeUsers.get(node)! - 1
@@ -39,23 +47,22 @@ export const usePortal = (id: string) => {
 }
 
 /**
- * Returns or creates a DOM element to be used as a portal mount point.
+ * Returns the page's element with `id`, or a detached one that the first committed effect appends: a render that
+ * never commits leaves nothing in the page.
  *
  * @example
  *     const node = getPortalNode('modal-root')
  */
 const getPortalNode = (id: string): Element => {
-  let node = document.querySelector(`#${id}`)
+  const existing = document.getElementById(id) ?? detachedNodes.get(id)
 
-  if (!node) {
-    const element = document.createElement('div')
+  if (existing) return existing
 
-    element.setAttribute('id', id)
-    document.body.appendChild(element)
-    createdNodeUsers.set(element, 0)
+  const element = document.createElement('div')
 
-    node = element
-  }
+  element.setAttribute('id', id)
+  createdNodeUsers.set(element, 0)
+  detachedNodes.set(id, element)
 
-  return node
+  return element
 }

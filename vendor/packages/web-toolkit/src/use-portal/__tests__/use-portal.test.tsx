@@ -1,9 +1,15 @@
 /* eslint-disable react/static-components -- usePortal returns a memoized Portal, rendered as consumers do */
-import { StrictMode } from 'react'
+import { StrictMode, Suspense } from 'react'
 import { describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
 
 import { usePortal } from '..'
+
+const never = new Promise<never>(() => {})
+
+const Suspend = () => {
+  throw never
+}
 
 interface OverlayProps {
   id: string
@@ -40,6 +46,21 @@ describe('usePortal', () => {
     expect(document.getElementById('portal-shared')).toBeNull()
   })
 
+  it('shares one mount point between hooks of the same id mounted together', async () => {
+    const screen = await render(
+      <>
+        <Overlay id="portal-together" text="a" />
+        <Overlay id="portal-together" text="b" />
+      </>,
+    )
+
+    expect(document.querySelectorAll('[id="portal-together"]')).toHaveLength(1)
+    expect(document.getElementById('portal-together')!.textContent).toBe('ab')
+
+    await screen.unmount()
+    expect(document.getElementById('portal-together')).toBeNull()
+  })
+
   it('survives the StrictMode effect replay', async () => {
     const screen = await render(
       <StrictMode>
@@ -66,5 +87,27 @@ describe('usePortal', () => {
     await screen.unmount()
     expect(existing.isConnected).toBe(true)
     existing.remove()
+  })
+
+  it('accepts an id that is not a valid CSS selector', async () => {
+    const screen = await render(<Overlay id="portal:a.b" />)
+
+    expect(document.getElementById('portal:a.b')!.textContent).toBe('overlay')
+
+    await screen.unmount()
+    expect(document.getElementById('portal:a.b')).toBeNull()
+  })
+
+  it('leaves no mount point behind for a render that never commits', async () => {
+    const screen = await render(
+      <Suspense fallback="loading">
+        <Overlay id="portal-abandoned" />
+        <Suspend />
+      </Suspense>,
+    )
+
+    expect(document.getElementById('portal-abandoned')).toBeNull()
+
+    await screen.unmount()
   })
 })
