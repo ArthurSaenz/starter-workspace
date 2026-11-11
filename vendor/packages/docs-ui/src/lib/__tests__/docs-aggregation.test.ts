@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
@@ -118,5 +118,30 @@ describe('getAllDocUrls', () => {
     await writeRepoFile('packages/lib/docs/notes.md/inner.md')
 
     expect(await getAllDocUrls()).toEqual(['/docs/lib/notes.md/inner'])
+  })
+})
+
+describe('getAllDocRelPaths', () => {
+  let root: string
+
+  beforeEach(async () => {
+    root = await mkdtemp(path.join(tmpdir(), 'docs-rels-'))
+    await writeFile(path.join(root, 'pnpm-workspace.yaml'), 'packages: []\n', 'utf8')
+    await mkdir(path.join(root, 'packages/a/docs'), { recursive: true })
+  })
+
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true })
+  })
+
+  it('skips a dangling symlink instead of aborting the build', async () => {
+    const docs = path.join(root, 'packages/a/docs')
+
+    await writeFile(path.join(docs, 'real.md'), '# real\n', 'utf8')
+    await symlink(path.join(docs, 'missing.md'), path.join(docs, 'foo.md'))
+
+    const { getAllDocRelPaths } = createDocsAggregation({ appDir: root })
+
+    expect(await getAllDocRelPaths()).toEqual(['packages/a/docs/real.md'])
   })
 })

@@ -151,8 +151,15 @@ export const createDocsAggregation = (params: { appDir: string; contentRel?: str
       const rel = toPosix(entry)
 
       // fs.glob also yields directories (`notes.md/`); fumadocs-mdx globs files only, and the
-      // glob descends into the directory on its own. `stat` follows symlinks, as fumadocs does.
-      if (!isIgnoredDocPath(rel) && (await stat(path.join(repoRoot, entry))).isFile()) out.push(rel)
+      // glob descends into the directory on its own. `stat` follows symlinks, as fumadocs does;
+      // a dangling one is not a doc, and must not abort the build.
+      if (isIgnoredDocPath(rel)) continue
+
+      try {
+        if ((await stat(path.join(repoRoot, entry))).isFile()) out.push(rel)
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      }
     }
 
     return [...new Set(out)].sort()
