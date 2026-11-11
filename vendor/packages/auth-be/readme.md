@@ -72,6 +72,8 @@ Every flow takes its input object first and the host context second: `requestMag
 - `sendInviteLink` resolves `{ emailSent }`. `false` means the mailer or the template threw and the
   link is already invalidated: show the admin that the invite did not go out. `requestMagicLink`
   stays silent whatever happens, so an anonymous caller learns nothing.
+- A throwing `onError` is ignored and a throwing `corsHeaders` yields no CORS headers: neither
+  replaces the real response or error envelope.
 - The redirect target is sanitised on write and on read: only an in-app path survives. Anything else
   (off-origin, a scheme, a backslash or control character, a dot segment that resolves to `//…`,
   over 2048 chars, not a string) is ignored, not refused: the link is still sent and lands on `/`. A link to `/` carries no `redirect` parameter.
@@ -149,7 +151,7 @@ a host.
 | `http/`                  | Framework-free request helpers: `headers.ts`, `cookies.ts`, `redirect.ts`.                                                                                                             |
 | `session/`               | What a session does whichever way it was opened: `session-issuer.ts` (mint, rotate), `session-service.ts` (refresh, logout, request readers), `verify-session.ts` (for a sibling API). |
 | `magic-link/`            | The sign-in method: `config.ts`, `validation.ts`, `email.ts` (built-in template), `sender.ts` (mint + mail), `magic-link-auth.ts` (the engine that wires it to `session/`).            |
-| `lambda/`                | The API Gateway adapter: `client-ip.ts`, `routes.ts`, `handler.ts`. Nothing outside it knows about Lambda.                                                                             |
+| `lambda/`                | The API Gateway adapter: `client-ip.ts`, `cors-headers.ts`, `routes.ts`, `handler.ts`. Nothing outside it knows about Lambda.                                                          |
 | `e2e-login.ts`           | The test-only sign-in, built on `issueSession`.                                                                                                                                        |
 
 Tests sit in the `__tests__/` beside the code they cover; the in-memory stores and the sign-in round

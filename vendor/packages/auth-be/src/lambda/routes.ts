@@ -5,6 +5,7 @@ import type { AuthContext, AuthUser } from '../ports.js'
 import type { RequestMeta } from '../session/types.js'
 import type { ClientIpOptions } from './client-ip.js'
 import { createClientIpResolver, extractUserAgent } from './client-ip.js'
+import { guardCorsHeaders } from './cors-headers.js'
 import type { AuthRoute, LambdaEvent, LambdaResult } from './types.js'
 
 export interface AuthRoutesOptions {
@@ -29,7 +30,7 @@ export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthC
   auth: MagicLinkAuth<TUser, TMe, TCtx>,
   options: AuthRoutesOptions,
 ) => {
-  const { corsHeaders } = options
+  const corsHeaders = guardCorsHeaders(options.corsHeaders)
   const clientIp = createClientIpResolver<TCtx>(options.clientIp)
 
   const requestMeta = (event: LambdaEvent, ctx?: TCtx): RequestMeta => {

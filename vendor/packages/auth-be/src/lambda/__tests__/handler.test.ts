@@ -84,4 +84,40 @@ describe('createAuthHandlers', () => {
     expect(await handlers.me({})).toMatchObject({ statusCode: 418, body: '{"type":"HOST"}' })
     expect(onError).toHaveBeenCalledTimes(1)
   })
+
+  it('answers the real error when onError throws', async () => {
+    const { handlers } = setup({
+      onError: () => {
+        throw new Error('hook broke')
+      },
+    })
+
+    const me = await handlers.me({})
+
+    expect(me).toMatchObject({ statusCode: 401, headers: CORS })
+    expect(JSON.parse(me.body)).toMatchObject({ type: 'UNAUTHENTICATED' })
+  })
+
+  it('answers the real response, without CORS headers, when corsHeaders throws', async () => {
+    const onError = vi.fn()
+
+    const { fakes, handlers } = setup({
+      corsHeaders: () => {
+        throw new Error('cors broke')
+      },
+      onError,
+    })
+
+    await handlers.requestMagicLink({ body: '{"email":"ada@example.com"}' })
+
+    const verified = await handlers.verifyMagicLink({
+      queryStringParameters: { token: tokenFromEmail(fakes.sent[0]!) },
+    })
+
+    expect(verified).toMatchObject({ statusCode: 200, headers: {} })
+    expect(verified.multiValueHeaders!['Set-Cookie']).toHaveLength(2)
+    expect(await handlers.me({})).toMatchObject({ statusCode: 401, headers: {} })
+    expect(await handlers.logout({})).toMatchObject({ statusCode: 204, headers: {} })
+    expect(onError).toHaveBeenCalledTimes(1)
+  })
 })
