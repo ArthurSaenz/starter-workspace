@@ -76,8 +76,8 @@ Root barrel (`src/index.ts`, re-exporting `src/features/auth/index.ts`):
   Host callbacks are read through a ref, so an inline arrow does not re-run a container's effect (and
   re-navigate) on every render.
 
-- `safeRedirect(value?)` — the value when it is an in-app path (`/…`, not `//…`, no backslash,
-  `:` or control character, at most 2048 characters), else `'/'`. Browsers read `/\evil.com` as `//evil.com`.
+- `safeRedirect(value?)` — the value when it is a string and an in-app path (`/…`, not `//…`, no backslash,
+  `:` or control character, no dot segments that resolve to `//…`, at most 2048 characters), else `'/'`. Browsers read `/\evil.com` as `//evil.com`.
 - `AuthHttpError`, `isUnauthorized(error)` (duck-typed on `status === 401`, so a custom `AuthClient`
   only has to throw something carrying `status`), `DEFAULT_REQUEST_ERROR_TEXT`.
 - Types: `AuthClient`, `AuthClientOptions`, `AuthPaths`, `AuthStore`, `AuthStoreOptions`, `AuthState`,

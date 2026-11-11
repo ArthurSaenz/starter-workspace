@@ -28,6 +28,22 @@ describe('safeRedirect', () => {
     expect(safeRedirect(`/${'x'.repeat(2047)}`)).toBe(`/${'x'.repeat(2047)}`)
   })
 
+  it.each(['/.//evil.com', '/..//evil.com', '/a/../..//evil.com', '/%2e%2e//evil.com'])(
+    'refuses %j, whose dot segments resolve to a protocol-relative //evil.com',
+    (input) => {
+      expect(safeRedirect(input)).toBe('/')
+    },
+  )
+
+  it('keeps dot segments that stay a path, and a // inside the query', () => {
+    expect(safeRedirect('/a/./b')).toBe('/a/./b')
+    expect(safeRedirect('/trips?next=//evil.com')).toBe('/trips?next=//evil.com')
+  })
+
+  it.each([42, {}, null])('falls back to / for a non-string %j from an untyped response body', (input) => {
+    expect(safeRedirect(input)).toBe('/')
+  })
+
   it.each(['//evil.com', '/\\evil.com', '/a\u0000', 'javascript:x', 'https://e.com'])(
     'refuses %j like the backend sanitiser does',
     (input) => {

@@ -19,13 +19,15 @@ const hasUnsafeChars = (value: string): boolean => {
  *     safeRedirect('/chat/1') // '/chat/1'
  *     safeRedirect('//evil.com') // '/'
  */
-export const safeRedirect = (value?: string): string => {
+export const safeRedirect = (value?: unknown): string => {
   const isInAppPath =
-    !!value &&
+    typeof value === 'string' &&
     value.length <= MAX_REDIRECT_LENGTH &&
     value.startsWith('/') &&
     !value.startsWith('//') &&
-    !hasUnsafeChars(value)
+    !hasUnsafeChars(value) &&
+    // `/.//evil.com` resolves to the path `//evil.com`, which a router may hand on as protocol-relative.
+    !new URL(value, 'https://origin.invalid').pathname.startsWith('//')
 
   return isInAppPath ? value : '/'
 }
