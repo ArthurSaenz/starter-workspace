@@ -152,7 +152,7 @@ function contentDefault(headers: Headers, type: string): Headers {
 
 /** A string body is already encoded, so only objects are JSON-encoded under a JSON content-type. */
 function encodeBody(body: NonNullable<FetchOptions['body']>, headers: Headers) {
-  return headers.get('content-type') === 'application/json' && typeof body !== 'string' ? JSON.stringify(body) : body
+  return contentTypeIs(headers, 'application/json') && typeof body !== 'string' ? JSON.stringify(body) : body
 }
 
 function additionalConfig() {

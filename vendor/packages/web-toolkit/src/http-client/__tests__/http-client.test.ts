@@ -88,6 +88,17 @@ describe('httpClient.fetch', () => {
     expect(requestOf(fetchInstance).init.body).toBe('{"name":"a"}')
   })
 
+  it('jSON-encodes an object body when the JSON content-type carries a charset', async () => {
+    const { client, fetchInstance } = clientFor(json({}))
+
+    await client.fetch('/users', {
+      body: { name: 'a' },
+      headers: { 'content-type': 'application/json; charset=utf-8' },
+    })
+
+    expect(requestOf(fetchInstance).init.body).toBe('{"name":"a"}')
+  })
+
   it('keeps an explicit method for a request with a body', async () => {
     const { client, fetchInstance } = clientFor(json({}))
 
