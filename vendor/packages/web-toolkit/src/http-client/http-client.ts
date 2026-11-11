@@ -42,7 +42,7 @@ export class HttpClient<R extends string = string> {
     config?: HttpClientConfig,
   ): Promise<{ body: T; status: number; headers?: Record<string, string>; ok: boolean }> {
     const requestOptions: Record<string, string | undefined | Headers | Record<string, unknown> | FormData> = {
-      method: options.method || 'GET',
+      method: options.method || (options.body ? 'POST' : 'GET'),
       ...additionalConfig(),
     }
 
@@ -58,7 +58,6 @@ export class HttpClient<R extends string = string> {
     }
 
     if (options.token) {
-      // headers.set('Authorization', `Bearer ${options.token}`)
       headers.set('Authorization', options.token)
       headers.set('mv-auth', options.token)
     }
@@ -68,7 +67,6 @@ export class HttpClient<R extends string = string> {
     if (options.body) {
       requestOptions.body =
         headers.get('content-type') === 'application/json' ? JSON.stringify(options.body) : options.body
-      requestOptions.method = requestOptions.method || 'POST'
     }
 
     const url = `${this.baseUrl}${uri}`
@@ -78,16 +76,26 @@ export class HttpClient<R extends string = string> {
       options: requestOptions,
       config,
       fetchInstance: this.fetchInstance,
-    }).catch((error) => {
-      const options = { cause: error as Error }
-
-      throw new Error(`Network error: ${error.message}`, options)
+    }).catch((error: unknown) => {
+      throw new Error(`Network error: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
     })
 
     const isNeedParse =
       response.status !== 206 && contentTypeIs(response.headers, 'application/json') && options.method !== 'HEAD'
 
-    const answer = isNeedParse ? await response.json() : await response.text()
+    const text = await response.text()
+    let answer
+
+    try {
+      answer = isNeedParse && text ? JSON.parse(text) : text
+    } catch (error) {
+      // An error page from a proxy or gateway often keeps the JSON content-type; its status matters more than its body.
+      if (response.ok) {
+        throw new Error(`API Layer: invalid JSON - ${url}`, { cause: error })
+      }
+
+      answer = text
+    }
 
     const responder = {
       ok: response.ok,
@@ -104,15 +112,13 @@ export class HttpClient<R extends string = string> {
       throw new ServerError<R>({
         type: responder.body?.type || 'SERVER_ERROR',
         message: responder.body?.message || 'Server error message',
-        extraData: answer.extraData || {},
+        extraData: responder.body?.extraData || {},
         metaData: {
           res: responder,
           req: { ...requestOptions, body: options.body },
         },
       })
     }
-
-    // console.log('API Layer', url, responder)
 
     throw new Error(`API Layer: ${responder.status} - ${url}`, { cause: responder })
   }
@@ -170,22 +176,22 @@ const fetchWrap = async (args: FetchWrapArgs) => {
 
   if (!config?.retries && !config?.delay) return _fetch(url, options)
 
+  const attempts = Math.max(1, config.retries ?? 1)
   let error
 
-  for (const index of new Array(config.retries).fill(undefined)) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (attempt > 0 && config.delay) {
+      await new Promise((r) => {
+        return setTimeout(r, config.delay)
+      })
+    }
+
     try {
-      if (index > 0 && config.delay) {
-        await new Promise((r) => {
-          return setTimeout(r, config.delay)
-        })
-      }
-
-      const result = await _fetch(url, options)
-
-      return result
+      return await _fetch(url, options)
     } catch (_error) {
       error = _error
     }
   }
+
   throw error
 }
