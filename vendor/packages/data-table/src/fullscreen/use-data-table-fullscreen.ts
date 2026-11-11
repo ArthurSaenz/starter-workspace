@@ -31,7 +31,9 @@ export const useDataTableFullscreen = (): UseDataTableFullscreenResult => {
     document.body.style.overflow = 'hidden'
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      // A Radix layer (menu, select, popover) inside the overlay marks the Escape that dismisses
+      // it as handled; that press must close the layer only, not the whole fullscreen view.
+      if (event.key === 'Escape' && !event.defaultPrevented) {
         exitFullscreen()
       }
     }

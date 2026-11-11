@@ -76,6 +76,49 @@ describe('data table fullscreen', () => {
     await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument()
   })
 
+  it('keeps fullscreen open when Escape only dismisses a menu inside it', async () => {
+    const screen = await render(<DataTable config={buildConfig({ fullscreen: true })} />)
+
+    await enterFullscreen(screen)
+    await userEvent.click(screen.getByRole('button', { name: 'Columns' }))
+    await expect.element(screen.getByRole('menu')).toBeVisible()
+
+    await userEvent.keyboard('{Escape}')
+
+    await expect.element(screen.getByRole('menu')).not.toBeInTheDocument()
+    await expect.element(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('keeps fullscreen open when Escape only closes a combobox list inside it', async () => {
+    const config = buildConfig({
+      fullscreen: true,
+      filters: [
+        {
+          kind: 'multiselect',
+          id: 'tags',
+          values: [],
+          onChange: () => {},
+          options: [{ value: 'a', label: 'Alpha' }],
+        },
+      ],
+    })
+
+    const screen = await render(<DataTable config={config} />)
+
+    await enterFullscreen(screen)
+    await screen.getByRole('combobox').click()
+    await expect.element(screen.getByRole('listbox')).toBeVisible()
+
+    await userEvent.keyboard('{Escape}')
+
+    await expect.element(screen.getByRole('listbox')).not.toBeInTheDocument()
+    await expect.element(screen.getByRole('dialog')).toBeInTheDocument()
+
+    await userEvent.keyboard('{Escape}')
+
+    await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument()
+  })
+
   it('exits fullscreen when the portal close button is clicked', async () => {
     const screen = await render(<DataTable config={buildConfig({ fullscreen: true })} />)
 
