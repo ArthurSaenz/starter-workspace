@@ -65,8 +65,7 @@ export class HttpClient<R extends string = string> {
     requestOptions.headers = headers
 
     if (options.body) {
-      requestOptions.body =
-        headers.get('content-type') === 'application/json' ? JSON.stringify(options.body) : options.body
+      requestOptions.body = encodeBody(options.body, headers)
     }
 
     const url = `${this.baseUrl}${uri}`
@@ -140,6 +139,11 @@ function contentDefault(headers: Headers, type: string): Headers {
   }
 
   return headers
+}
+
+/** A string body is already encoded, so only objects are JSON-encoded under a JSON content-type. */
+function encodeBody(body: NonNullable<FetchOptions['body']>, headers: Headers) {
+  return headers.get('content-type') === 'application/json' && typeof body !== 'string' ? JSON.stringify(body) : body
 }
 
 function additionalConfig() {

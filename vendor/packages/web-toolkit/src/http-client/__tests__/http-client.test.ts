@@ -80,6 +80,14 @@ describe('httpClient.fetch', () => {
     expect(requestOf(fetchInstance).init).toMatchObject({ method: 'POST', body: '{"name":"a"}' })
   })
 
+  it('sends a string body as given under a JSON content-type', async () => {
+    const { client, fetchInstance } = clientFor(json({}))
+
+    await client.fetch('/users', { body: '{"name":"a"}' })
+
+    expect(requestOf(fetchInstance).init.body).toBe('{"name":"a"}')
+  })
+
   it('keeps an explicit method for a request with a body', async () => {
     const { client, fetchInstance } = clientFor(json({}))
 
