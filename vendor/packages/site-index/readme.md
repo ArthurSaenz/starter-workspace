@@ -30,7 +30,10 @@ CloudFront (origin_path /public) ──▶ /sitemap.xml /robots.txt /llms.txt
 }
 ```
 
-- `path` is site-relative; the host comes from `config.origin`. A trailing slash is significant.
+- `path` is site-relative; the host comes from `config.origin`. A trailing slash is significant. A
+  backslash or a `.`/`..` segment (also as `%2e`) is refused: URL parsing would resolve it to another
+  host or to a path the `disallow` check never saw.
+- `producer` names the manifest file, so it cannot carry a path separator.
 - `group` picks the llms.txt section (or leave it out and let `config.llms.groupPrefixes` assign one by path prefix); `llms: false` keeps a URL in the sitemap only.
 - Validation is strict: an unknown field, a wrong type or a bad path fails with the source, the entry
   index, its path and the expected value. `createManifest` runs it at build time, the aggregator on
@@ -43,6 +46,11 @@ The run fails before replacing any file when a manifest is invalid, the prefix i
 under `config.disallow`, two manifests share a producer, or the URL count fell more than
 `maxDropRatio` (default 30%) below the last published run. Invoke with `{ "force": true }` to publish
 an intended drop.
+
+Every failure is a `SiteIndexError` naming the S3 object or file it came from. S3 has no multi-object
+transaction: when a put fails mid-publish the error lists the stale files, the shrink baseline stays
+where it was, and a re-run repairs it. A failed CloudFront invalidation is reported as such — the
+files are already live.
 
 ## Wiring
 

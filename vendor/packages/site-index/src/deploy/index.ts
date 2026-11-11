@@ -40,6 +40,9 @@ export const publishSiteIndexManifest = async (
   try {
     const bucket = (await toolkit.ssm([bucketParameter]))[bucketParameter]
 
+    // Without this the upload would go to the literal bucket `undefined`.
+    if (!bucket) throw new Error(`SSM parameter ${bucketParameter} has no value`)
+
     await toolkit.aws([
       's3',
       'cp',

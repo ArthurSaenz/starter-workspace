@@ -47,4 +47,10 @@ describe('node helpers', () => {
 
     expect(await readFile(join(out, 'llms.txt'), 'utf8')).toBe('l')
   })
+
+  it('names the file when a manifest is not JSON', async () => {
+    await writeFile(join(dir, 'broken.json'), '{"producer": ')
+
+    await expect(readManifests(dir)).rejects.toThrow(`${join(dir, 'broken.json')} is not valid JSON`)
+  })
 })

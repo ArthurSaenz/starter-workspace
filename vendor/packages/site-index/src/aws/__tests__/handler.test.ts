@@ -2,9 +2,11 @@ import type { CloudFrontClient } from '@aws-sdk/client-cloudfront'
 import { CreateInvalidationCommand } from '@aws-sdk/client-cloudfront'
 import type { S3Client } from '@aws-sdk/client-s3'
 import { GetObjectCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3'
+import type { Mock } from 'vitest'
 import { describe, expect, it, vi } from 'vitest'
 
 import { config, manifest } from '../../core/__tests__/fixtures.js'
+import { SiteIndexError } from '../../core/errors.js'
 import { STATE_KEY, createSiteIndexHandler } from '../index.js'
 
 const BUCKET = 'hulyo-site-index-test'
@@ -21,7 +23,11 @@ const noSuchKey = () => {
 }
 
 // One page per list call when `pageSize` is set, so pagination is exercised.
-const createFakeBucket = (initial: Record<string, unknown>, pageSize = 1000): FakeBucket => {
+const createFakeBucket = (
+  initial: Record<string, unknown>,
+  pageSize = 1000,
+  failures: { putKeys?: string[]; invalidation?: Error } = {},
+): FakeBucket => {
   const objects = new Map(
     Object.entries(initial).map(([key, value]) => {
       return [key, typeof value === 'string' ? value : JSON.stringify(value)]
@@ -66,6 +72,8 @@ const createFakeBucket = (initial: Record<string, unknown>, pageSize = 1000): Fa
     }
 
     if (command instanceof PutObjectCommand) {
+      if (failures.putKeys?.includes(command.input.Key ?? '')) throw new Error('SlowDown')
+
       objects.set(command.input.Key ?? '', String(command.input.Body))
 
       return {}
@@ -76,6 +84,8 @@ const createFakeBucket = (initial: Record<string, unknown>, pageSize = 1000): Fa
 
   const cloudFrontSend = vi.fn(async (command: unknown) => {
     if (!(command instanceof CreateInvalidationCommand)) throw new TypeError('unexpected CloudFront command')
+
+    if (failures.invalidation) throw failures.invalidation
 
     invalidations.push(command.input.InvalidationBatch?.Paths?.Items ?? [])
 
@@ -189,5 +199,114 @@ describe('createSiteIndexHandler', () => {
     expect(warn).toHaveBeenCalledWith('site-index: duplicate paths dropped', [
       { path: '/', keptFrom: 'client', droppedFrom: 'seo' },
     ])
+  })
+
+  it('names the object when a manifest is not JSON, and writes nothing', async () => {
+    const bucket = createFakeBucket({
+      'manifests/client.json': manifest('client', [{ path: '/' }]),
+      'manifests/seo.json': '{"producer": "seo", "urls": [',
+      'public/sitemap.xml': 'old',
+    })
+
+    const error = await createHandler(bucket)().catch((caught: unknown) => {
+      return caught
+    })
+
+    expect(error).toBeInstanceOf(SiteIndexError)
+    expect((error as Error).message).toContain('s3://hulyo-site-index-test/manifests/seo.json is not valid JSON')
+    expect(bucket.objects.get('public/sitemap.xml')).toBe('old')
+  })
+
+  it('names the object when one has no body', async () => {
+    const bucket = createFakeBucket({ 'manifests/client.json': manifest('client', [{ path: '/' }]) })
+    const send = bucket.s3.send as unknown as Mock<(command: unknown) => Promise<unknown>>
+    const original = send.getMockImplementation()
+
+    send.mockImplementation(async (command: unknown) => {
+      return command instanceof GetObjectCommand ? {} : original?.(command)
+    })
+
+    await expect(createHandler(bucket)()).rejects.toThrow(
+      's3://hulyo-site-index-test/manifests/client.json has no body',
+    )
+  })
+
+  it('names the state object when the shrink baseline is unreadable, and still publishes with force', async () => {
+    const bucket = createFakeBucket({
+      'manifests/client.json': manifest('client', [{ path: '/' }]),
+      [STATE_KEY]: '{"urlCount": 1',
+      'public/sitemap.xml': 'old',
+    })
+
+    const handler = createHandler(bucket)
+
+    await expect(handler()).rejects.toThrow(`s3://hulyo-site-index-test/${STATE_KEY} is not valid JSON`)
+    expect(bucket.objects.get('public/sitemap.xml')).toBe('old')
+    await expect(handler({ force: true })).resolves.toMatchObject({ urlCount: 1 })
+  })
+
+  it.each(['null', '{"urlCount": "114"}'])('takes state %s as no baseline', async (state) => {
+    const bucket = createFakeBucket({
+      'manifests/client.json': manifest('client', [{ path: '/' }]),
+      [STATE_KEY]: state,
+    })
+
+    await expect(createHandler(bucket)()).resolves.toMatchObject({ urlCount: 1 })
+  })
+
+  it('rethrows a state read failure other than a missing key', async () => {
+    const bucket = createFakeBucket({ 'manifests/client.json': manifest('client', [{ path: '/' }]) })
+    const send = bucket.s3.send as unknown as Mock<(command: unknown) => Promise<unknown>>
+    const original = send.getMockImplementation()
+    const denied = Object.assign(new Error('Access Denied'), { name: 'AccessDenied' })
+
+    send.mockImplementation(async (command: unknown) => {
+      if (command instanceof GetObjectCommand && command.input.Key === STATE_KEY) throw denied
+
+      return original?.(command)
+    })
+
+    await expect(createHandler(bucket)()).rejects.toBe(denied)
+    expect(bucket.objects.has('public/sitemap.xml')).toBe(false)
+  })
+
+  it('waits for every put, names the file that failed and keeps the shrink baseline', async () => {
+    const bucket = createFakeBucket(
+      {
+        'manifests/client.json': manifest('client', [{ path: '/' }]),
+        [STATE_KEY]: { urlCount: 1, generatedAt: 'before' },
+        'public/robots.txt': 'old',
+      },
+      1000,
+      { putKeys: ['public/robots.txt'] },
+    )
+
+    const error = await createHandler(bucket)().catch((caught: unknown) => {
+      return caught
+    })
+
+    expect(error).toBeInstanceOf(SiteIndexError)
+    expect((error as SiteIndexError).message).toContain('Wrote 2 of 3 objects')
+    expect((error as SiteIndexError).issues).toEqual(['public/robots.txt: Error: SlowDown'])
+    expect(bucket.objects.get('public/sitemap.xml')).toContain('<urlset')
+    expect(bucket.objects.get('public/llms.txt')).toContain('# Hulyo')
+    expect(JSON.parse(bucket.objects.get(STATE_KEY) ?? '{}')).toMatchObject({ generatedAt: 'before' })
+  })
+
+  it('says the files are live when only the invalidation failed', async () => {
+    const throttled = new Error('TooManyInvalidationsInProgress')
+
+    const bucket = createFakeBucket({ 'manifests/client.json': manifest('client', [{ path: '/' }]) }, 1000, {
+      invalidation: throttled,
+    })
+
+    const error = await createHandler(bucket, { distributionId: 'E1' })().catch((caught: unknown) => {
+      return caught
+    })
+
+    expect(error).toBeInstanceOf(SiteIndexError)
+    expect((error as Error).message).toContain('Published, but the CloudFront invalidation of E1 failed')
+    expect((error as Error).cause).toBe(throttled)
+    expect(bucket.objects.has(STATE_KEY)).toBe(true)
   })
 })

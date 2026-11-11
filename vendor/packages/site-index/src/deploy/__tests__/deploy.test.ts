@@ -69,4 +69,18 @@ describe('publishSiteIndexManifest', () => {
       steps: [[{ functionName: OPTIONS.aggregatorFunctionName }]],
     })
   })
+
+  it('refuses before uploading when the parameter resolves to nothing', async () => {
+    const toolkit = createToolkit({
+      ssm: vi.fn(async () => {
+        return {}
+      }),
+    })
+
+    await expect(publishSiteIndexManifest(toolkit, OPTIONS)).rejects.toThrow(
+      'SSM parameter /hulyo/s3/site-index/bucket_name has no value',
+    )
+    expect(toolkit.aws).not.toHaveBeenCalled()
+    expect(toolkit.invokeLambdas).not.toHaveBeenCalled()
+  })
 })
