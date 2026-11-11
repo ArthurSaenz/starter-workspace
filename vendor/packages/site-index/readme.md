@@ -33,6 +33,8 @@ CloudFront (origin_path /public) ──▶ /sitemap.xml /robots.txt /llms.txt
 - `path` is site-relative; the host comes from `config.origin`. A trailing slash is significant. A
   backslash or a `.`/`..` segment (also as `%2e`) is refused: URL parsing would resolve it to another
   host or to a path the `disallow` check never saw.
+- llms.txt links percent-encode `(` and `)` (`%28`, `%29`) so a path with an unbalanced one stays a
+  well-formed markdown link; `sitemap.xml` writes the path as URL parsing leaves it.
 - `producer` names the manifest file, so it cannot carry a path separator.
 - `group` picks the llms.txt section (or leave it out and let `config.llms.groupPrefixes` assign one by path prefix); `llms: false` keeps a URL in the sitemap only.
 - `lastmod` must be a [W3C Datetime](https://www.w3.org/TR/NOTE-datetime) (`2026-10-22`,

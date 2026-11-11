@@ -109,6 +109,17 @@ describe('renderLlmsTxt', () => {
     )
   })
 
+  it('percent-encodes parentheses in llms.txt links so an unbalanced one cannot end the link, and leaves the sitemap as is', () => {
+    const entries = [{ path: '/deals/(summer' }, { path: '/deals/a)b', title: 'A (b)' }]
+    const text = renderLlmsTxt(entries, config)
+
+    expect(text).toContain('- [/deals/(summer](https://www.hulyo.co.il/deals/%28summer)')
+    expect(text).toContain('- [A (b)](https://www.hulyo.co.il/deals/a%29b)')
+    expect(renderSitemap(entries, config)).toContain(
+      '<loc>https://www.hulyo.co.il/deals/(summer</loc><changefreq>daily</changefreq><priority>1.0</priority></url><url><loc>https://www.hulyo.co.il/deals/a)b</loc>',
+    )
+  })
+
   it('omits empty sections', () => {
     const text = renderLlmsTxt([{ path: '/flights/one-way', group: 'flights' }], config)
 

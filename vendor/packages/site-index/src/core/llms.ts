@@ -9,8 +9,13 @@ const toLinkText = (value: string): string => {
   return value.replaceAll(/\s+/g, ' ').replaceAll(/[[\]]/g, '\\$&').trim()
 }
 
+// URL parsing keeps "(" and ")" literal, and an unbalanced one ends a markdown link destination early.
+const toLinkUrl = (origin: string, path: string): string => {
+  return toAbsoluteUrl(origin, path).replaceAll('(', '%28').replaceAll(')', '%29')
+}
+
 const renderLink = (entry: SiteIndexEntry, config: SiteIndexConfig): string => {
-  const link = `- [${toLinkText(entry.title ?? entry.path)}](${toAbsoluteUrl(config.origin, entry.path)})`
+  const link = `- [${toLinkText(entry.title ?? entry.path)}](${toLinkUrl(config.origin, entry.path)})`
 
   return entry.description ? `${link}: ${entry.description.replaceAll(/\s+/g, ' ').trim()}` : link
 }
