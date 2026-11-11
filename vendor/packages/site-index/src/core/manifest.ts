@@ -218,10 +218,21 @@ const isUnderPrefix = (path: string, prefix: string): boolean => {
   )
 }
 
+// Crawlers match robots rules on the decoded path, so `/%63heckout` is `/checkout` to them.
+const decodePath = (path: string): string => {
+  try {
+    return decodeURI(path)
+  } catch {
+    return path
+  }
+}
+
 export const findDisallowedEntries = (entries: SiteIndexEntry[], config: SiteIndexConfig): string[] => {
   return entries.flatMap((entry) => {
+    const decoded = decodePath(entry.path)
+
     const prefix = config.disallow.find((item) => {
-      return isUnderPrefix(entry.path, item)
+      return isUnderPrefix(entry.path, item) || isUnderPrefix(decoded, item)
     })
 
     return prefix ? [`${entry.path} (under disallowed ${prefix})`] : []

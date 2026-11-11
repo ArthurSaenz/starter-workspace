@@ -1,6 +1,6 @@
+import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import process from 'node:process'
 
 import { parseJson } from '../core/json.js'
 import { parseManifest } from '../core/manifest.js'
@@ -14,7 +14,8 @@ export const getManifestFileName = (producer: string): string => {
 
 // A deploy uploads these files: a crash mid-write must leave the previous file, not half of the new one.
 const writeFileAtomic = async (filePath: string, content: string): Promise<void> => {
-  const tempPath = `${filePath}.${process.pid}.tmp`
+  // Unique per call: two writes of one file in one process must not share a temp file.
+  const tempPath = `${filePath}.${randomUUID()}.tmp`
 
   try {
     await writeFile(tempPath, content)

@@ -155,4 +155,10 @@ describe('findDisallowedEntries', () => {
       '/checkout?id=1 (under disallowed /checkout)',
     ])
   })
+
+  it('matches a percent-encoded spelling of a disallowed prefix, and survives a malformed escape', () => {
+    expect(findDisallowedEntries([{ path: '/%63heckout/1' }, { path: '/%E0%A4%A/x' }], config)).toEqual([
+      '/%63heckout/1 (under disallowed /checkout)',
+    ])
+  })
 })
