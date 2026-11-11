@@ -15,9 +15,10 @@
  * Returning `{ found: false }` hands the specifier to the next resolver in the chain, which
  * is how every non-`#root` import still reaches the node resolver.
  *
- * It also claims one relative form: a NodeNext specifier (`./x.js`) whose emitted file is not on
- * disk. The node resolver looks that name up literally and misses `x.ts`, which leaves the import
- * unclassified and so unpoliced. Extensionless relative specifiers stay with the node resolver.
+ * It also claims one relative form: a NodeNext specifier (`./x.js`), mapped to its TS source
+ * (`x.ts`) or, when a file by that literal name exists, to that file. The node resolver looks the
+ * name up literally and misses `x.ts`, which leaves the import unclassified and so unpoliced.
+ * Extensionless relative specifiers stay with the node resolver.
  */
 
 const fs = require('node:fs')
