@@ -186,37 +186,96 @@ describe('data table fullscreen', () => {
   it('keeps search text typed but not yet sent when the table remounts into fullscreen', async () => {
     const onChange = vi.fn()
 
-    const Harness = () => {
-      const [search, setSearch] = useState('')
-
-      return (
-        <DataTable
-          config={buildConfig({
-            fullscreen: true,
-            filters: [
-              {
-                kind: 'search',
-                id: 'q',
-                placeholder: 'Find',
-                value: search,
-                debounceMs: 10_000,
-                onChange: (next) => {
-                  onChange(next)
-                  setSearch(next)
-                },
-              },
-            ],
-          })}
-        />
-      )
-    }
-
-    const screen = await render(<Harness />)
+    const screen = await renderSearchTable(onChange)
 
     await screen.getByRole('textbox', { name: 'Find' }).fill('ali')
     await enterFullscreen(screen)
 
     await expect.element(screen.getByRole('dialog').getByRole('textbox', { name: 'Find' })).toHaveValue('ali')
-    expect(onChange).toHaveBeenCalledExactlyOnceWith('ali')
+    expect(onChange).not.toHaveBeenCalled()
+
+    await expect
+      .poll(() => {
+        return onChange.mock.calls
+      })
+      .toEqual([['ali']])
+    await sleep(SEARCH_DEBOUNCE_MS * 2)
+    expect(onChange).toHaveBeenCalledOnce()
+  })
+
+  it('drops search text typed but not yet sent when the table unmounts', async () => {
+    const onChange = vi.fn()
+
+    const screen = await renderSearchTable(onChange)
+
+    await screen.getByRole('textbox', { name: 'Find' }).fill('ali')
+    await screen.unmount()
+    await sleep(SEARCH_DEBOUNCE_MS * 2)
+
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('drops search text typed but not yet sent when the filter leaves the table', async () => {
+    const onChange = vi.fn()
+
+    const screen = await renderSearchTable(onChange)
+
+    await screen.getByRole('textbox', { name: 'Find' }).fill('ali')
+    await screen.getByRole('button', { name: 'Hide search' }).click()
+    await screen.getByRole('button', { name: 'Show search' }).click()
+
+    await expect.element(screen.getByRole('textbox', { name: 'Find' })).toHaveValue('')
+    await sleep(SEARCH_DEBOUNCE_MS * 2)
+    expect(onChange).not.toHaveBeenCalled()
   })
 })
+
+const SEARCH_DEBOUNCE_MS = 150
+
+const sleep = (ms: number) => {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
+const renderSearchTable = (onChange: (next: string) => void) => {
+  const SearchTable = () => {
+    const [search, setSearch] = useState('')
+    const [showSearch, setShowSearch] = useState(true)
+
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => {
+            setShowSearch(!showSearch)
+          }}
+        >
+          {showSearch ? 'Hide search' : 'Show search'}
+        </button>
+        <DataTable
+          config={buildConfig({
+            fullscreen: true,
+            filters: showSearch
+              ? [
+                  {
+                    kind: 'search',
+                    id: 'q',
+                    placeholder: 'Find',
+                    value: search,
+                    debounceMs: SEARCH_DEBOUNCE_MS,
+                    onChange: (next) => {
+                      onChange(next)
+                      setSearch(next)
+                    },
+                  },
+                ]
+              : [],
+          })}
+        />
+      </>
+    )
+  }
+
+  return render(<SearchTable />)
+}

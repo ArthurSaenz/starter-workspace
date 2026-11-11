@@ -1,11 +1,13 @@
 import type { RowData } from '@tanstack/react-table'
 import { flexRender } from '@tanstack/react-table'
 import type { ComponentType, MouseEvent, ReactNode } from 'react'
-import { Fragment, useMemo } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 
 import type { CellRenderContext, FilterConfig, PaginationConfig, TableColumnConfig, TableConfig } from '../config'
 import type { FilterRegistry } from '../filters/filter-bar'
 import { FilterBar } from '../filters/filter-bar'
+import type { SearchDrafts } from '../filters/search-drafts'
+import { SearchDraftsContext } from '../filters/search-drafts'
 import { DataTableFullscreenPortal, DataTableFullscreenToggle, useDataTableFullscreen } from '../fullscreen'
 import { DataTablePagination } from '../pagination/data-table-pagination'
 import { cn } from '../primitives/cn'
@@ -34,6 +36,10 @@ export const DataTable = <TData extends RowData>(props: DataTableProps<TData>) =
   const registry = cellRegistry ?? (MINIMAL_CELL_REGISTRY as CellRegistry<TData>)
   const { table, labels } = useDataTable(config, registry)
   const { isFullscreen, toggleFullscreen, exitFullscreen } = useDataTableFullscreen()
+
+  const [searchDrafts] = useState<SearchDrafts>(() => {
+    return new Map()
+  })
 
   const columnsById = useMemo(() => {
     const map = new Map<string, TableColumnConfig<TData>>()
@@ -207,7 +213,7 @@ export const DataTable = <TData extends RowData>(props: DataTableProps<TData>) =
   const fullscreenConfig = typeof config.fullscreen === 'object' ? config.fullscreen : undefined
 
   return (
-    <>
+    <SearchDraftsContext value={searchDrafts}>
       {!isFullscreen ? content : null}
       <DataTableFullscreenPortal
         isOpen={isFullscreen}
@@ -236,7 +242,7 @@ export const DataTable = <TData extends RowData>(props: DataTableProps<TData>) =
           </div>
         </TooltipProvider>
       </DataTableFullscreenPortal>
-    </>
+    </SearchDraftsContext>
   )
 }
 

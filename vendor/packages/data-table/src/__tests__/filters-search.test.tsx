@@ -140,4 +140,19 @@ describe('searchFilter', () => {
     await expect.element(input).toHaveValue('abc')
     expect(onChange).toHaveBeenLastCalledWith('abc')
   })
+
+  it('drops text typed but not yet sent when it unmounts', async () => {
+    const onChange = vi.fn()
+
+    const screen = await render(<SearchFilter config={buildConfig({ onChange, debounceMs: 30 })} />)
+
+    await screen.getByRole('textbox').fill('kauai')
+    await screen.unmount()
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 90)
+    })
+
+    expect(onChange).not.toHaveBeenCalled()
+  })
 })

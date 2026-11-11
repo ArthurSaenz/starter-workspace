@@ -1,11 +1,12 @@
 import { Search } from 'lucide-react'
 import type { ChangeEvent } from 'react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useContext, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { SearchFilterConfig } from '../config/filter-config'
 import { cn } from '../primitives/cn'
 import { Input } from '../primitives/input'
 import { debounce } from './lib/debounce'
+import { SearchDraftsContext } from './search-drafts'
 
 export interface SearchFilterProps {
   config: SearchFilterConfig
@@ -15,9 +16,14 @@ export interface SearchFilterProps {
 export const SearchFilter = (props: SearchFilterProps) => {
   const { config } = props
 
-  const { value, onChange, placeholder, debounceMs, className, name, ariaLabel } = config
+  const { id, value, onChange, placeholder, debounceMs, className, name, ariaLabel } = config
 
-  const [localValue, setLocalValue] = useState(value)
+  const drafts = useContext(SearchDraftsContext)
+
+  const [localValue, setLocalValue] = useState(() => {
+    return drafts?.get(id)?.text ?? value
+  })
+
   const onChangeRef = useRef(onChange)
   const lastEmittedRef = useRef(value)
 
@@ -29,18 +35,38 @@ export const SearchFilter = (props: SearchFilterProps) => {
     }
 
     return debounce((nextValue: string) => {
+      drafts?.delete(id)
       lastEmittedRef.current = nextValue
       onChangeRef.current(nextValue)
     }, debounceMs)
-  }, [debounceMs])
+  }, [debounceMs, drafts, id])
 
-  // Sending rather than dropping the pending text on unmount: entering fullscreen remounts the
-  // filter, and the new instance starts from `value`.
   useEffect(() => {
-    return () => {
-      debouncedOnChange?.flush()
+    const draft = drafts?.get(id)
+
+    if (draft && debouncedOnChange) {
+      draft.claimed = true
+      debouncedOnChange(draft.text)
     }
-  }, [debouncedOnChange])
+
+    return () => {
+      debouncedOnChange?.cancel()
+
+      const pending = drafts?.get(id)
+
+      if (!pending) {
+        return
+      }
+
+      // A fullscreen remount mounts the next filter in this same commit, before the microtask runs.
+      pending.claimed = false
+      queueMicrotask(() => {
+        if (!pending.claimed && drafts?.get(id) === pending) {
+          drafts.delete(id)
+        }
+      })
+    }
+  }, [debouncedOnChange, drafts, id])
 
   useEffect(() => {
     // The echo of our own emit can land after the user typed on (a consumer that applies the
@@ -53,7 +79,8 @@ export const SearchFilter = (props: SearchFilterProps) => {
     lastEmittedRef.current = value
     setLocalValue(value)
     debouncedOnChange?.cancel()
-  }, [value, debouncedOnChange])
+    drafts?.delete(id)
+  }, [value, debouncedOnChange, drafts, id])
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextValue = event.target.value
@@ -61,6 +88,7 @@ export const SearchFilter = (props: SearchFilterProps) => {
     setLocalValue(nextValue)
 
     if (debouncedOnChange) {
+      drafts?.set(id, { text: nextValue, claimed: true })
       debouncedOnChange(nextValue)
     } else {
       lastEmittedRef.current = nextValue

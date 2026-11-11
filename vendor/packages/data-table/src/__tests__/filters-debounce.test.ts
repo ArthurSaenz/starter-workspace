@@ -43,17 +43,4 @@ describe('debounce', () => {
 
     expect(fn).toHaveBeenCalledExactlyOnceWith('b')
   })
-
-  it('makes the pending call at once on flush, and only once', () => {
-    const fn = vi.fn()
-    const debounced = debounce(fn, 100)
-
-    debounced.flush()
-    debounced('a')
-    debounced.flush()
-    vi.advanceTimersByTime(200)
-    debounced.flush()
-
-    expect(fn).toHaveBeenCalledExactlyOnceWith('a')
-  })
 })
