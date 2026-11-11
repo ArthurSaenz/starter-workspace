@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { cookieValue, expectAuthError, signIn } from '../../__tests__/helpers/engine.js'
 import { IDENTITY, REFRESH_SECRET, createFakes, invitedUser } from '../../__tests__/helpers/fakes.js'
 import { AuthError } from '../../errors.js'
-import { createMagicLinkAuth } from '../../magicLink/magicLinkAuth.js'
+import { createMagicLinkAuth } from '../../magic-link/magic-link-auth.js'
 import type { SessionStore } from '../../ports.js'
 import { signRefreshToken } from '../../tokens.js'
 

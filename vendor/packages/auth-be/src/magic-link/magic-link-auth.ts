@@ -3,8 +3,8 @@ import { defaultCreateAuthError, errorName } from '../errors.js'
 import { resolveCookieOptions } from '../http/cookies.js'
 import { sanitizeRedirectUrl } from '../http/redirect.js'
 import type { AuthContext, AuthUser } from '../ports.js'
-import { createRateGate, ipBucket, resolveRateLimits } from '../rateLimit.js'
-import { createSessionService } from '../session/sessionService.js'
+import { createRateGate, ipBucket, resolveRateLimits } from '../rate-limit.js'
+import { createSessionService } from '../session/session-service.js'
 import { DEFAULT_ACCESS_TTL_SEC, DEFAULT_REFRESH_TTL_SEC, hashToken } from '../tokens.js'
 import type {
   MagicLinkAuthConfig,

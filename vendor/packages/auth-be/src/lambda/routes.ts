@@ -1,10 +1,10 @@
 import { Buffer } from 'node:buffer'
 
-import type { MagicLinkAuth } from '../magicLink/magicLinkAuth.js'
+import type { MagicLinkAuth } from '../magic-link/magic-link-auth.js'
 import type { AuthContext, AuthUser } from '../ports.js'
 import type { RequestMeta } from '../session/types.js'
-import type { ClientIpOptions } from './clientIp.js'
-import { createClientIpResolver, extractUserAgent } from './clientIp.js'
+import type { ClientIpOptions } from './client-ip.js'
+import { createClientIpResolver, extractUserAgent } from './client-ip.js'
 import type { AuthRoute, LambdaEvent, LambdaResult } from './types.js'
 
 export interface AuthRoutesOptions {

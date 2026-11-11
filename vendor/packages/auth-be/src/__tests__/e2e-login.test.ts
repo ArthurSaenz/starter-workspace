@@ -1,8 +1,8 @@
 import jwt from 'jsonwebtoken'
 import { describe, expect, it, vi } from 'vitest'
 
-import { createE2eLogin, parseAllowedEmails, safeSecretEqual } from '../e2eLogin.js'
-import { createMagicLinkAuth } from '../magicLink/magicLinkAuth.js'
+import { createE2eLogin, parseAllowedEmails, safeSecretEqual } from '../e2e-login.js'
+import { createMagicLinkAuth } from '../magic-link/magic-link-auth.js'
 import { expectAuthError } from './helpers/engine.js'
 import { createFakes, invitedUser } from './helpers/fakes.js'
 

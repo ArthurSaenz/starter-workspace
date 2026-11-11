@@ -3,7 +3,7 @@ import { render } from '@react-email/render'
 import type { AuthContext, MagicLinkEmailKind, RenderMagicLinkEmail } from '@wl/auth-be'
 import { formatExpiry } from '@wl/auth-be'
 
-import { MagicLinkEmail } from './MagicLinkEmail.js'
+import { MagicLinkEmail } from './magic-link-email.js'
 import type { AuthEmailBrand, AuthEmailCopy } from './types.js'
 
 export const DEFAULT_AUTH_EMAIL_COPY: Record<MagicLinkEmailKind, AuthEmailCopy> = {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { ACCESS_SECRET, IDENTITY } from '../../__tests__/helpers/fakes.js'
 import { signAccessToken } from '../../tokens.js'
-import { verifySession } from '../verifySession.js'
+import { verifySession } from '../verify-session.js'
 
 const token = signAccessToken({ sub: 'u1', roles: ['user'], authMethod: 'magic' }, ACCESS_SECRET, IDENTITY).token
 const options = { ...IDENTITY, accessSecret: ACCESS_SECRET }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createAuthEmailRenderer } from '../createAuthEmailRenderer.js'
+import { createAuthEmailRenderer } from '../create-auth-email-renderer.js'
 
 const LINK = 'https://app.test/auth/verify?token=abc123&redirect=%2Ftrips'
 

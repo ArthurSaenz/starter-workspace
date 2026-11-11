@@ -1,5 +1,5 @@
-import { MagicLinkEmail } from '../src/MagicLinkEmail.js'
-import { DEFAULT_AUTH_EMAIL_COPY } from '../src/createAuthEmailRenderer.js'
+import { DEFAULT_AUTH_EMAIL_COPY } from '../src/create-auth-email-renderer.js'
+import { MagicLinkEmail } from '../src/magic-link-email.js'
 
 const InvitePreview = () => {
   return (

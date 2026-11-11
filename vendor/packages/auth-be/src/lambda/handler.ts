@@ -1,5 +1,5 @@
 import { AuthError } from '../errors.js'
-import type { MagicLinkAuth } from '../magicLink/magicLinkAuth.js'
+import type { MagicLinkAuth } from '../magic-link/magic-link-auth.js'
 import type { AuthContext, AuthUser } from '../ports.js'
 import type { AuthRoutesOptions } from './routes.js'
 import { createAuthRoutes } from './routes.js'

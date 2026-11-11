@@ -1,7 +1,7 @@
 /* eslint-disable sonarjs/no-hardcoded-ip -- fixture client IPs */
 import { describe, expect, it, vi } from 'vitest'
 
-import { createClientIpResolver, extractSourceIp, extractUserAgent } from '../clientIp.js'
+import { createClientIpResolver, extractSourceIp, extractUserAgent } from '../client-ip.js'
 
 const eventOf = (xff: string | undefined, sourceIp: string | undefined) => {
   return {

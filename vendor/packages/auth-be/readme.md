@@ -133,16 +133,16 @@ too.
 One folder per concern; `src/index.ts` is the only public entry, so files can move without touching
 a host.
 
-| Path                     | Owns                                                                                                                                                                                |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ports.ts`               | What the host implements: user / token / session stores, rate limiter, mailer, logger.                                                                                              |
-| `errors.ts`, `tokens.ts` | `AuthError` and its codes; JWT signing and verifying, raw link tokens.                                                                                                              |
-| `rateLimit.ts`           | Budgets, their defaults, and the gate every flow counts against.                                                                                                                    |
-| `http/`                  | Framework-free request helpers: `headers.ts`, `cookies.ts`, `redirect.ts`.                                                                                                          |
-| `session/`               | What a session does whichever way it was opened: `sessionIssuer.ts` (mint, rotate), `sessionService.ts` (refresh, logout, request readers), `verifySession.ts` (for a sibling API). |
-| `magicLink/`             | The sign-in method: `config.ts`, `validation.ts`, `email.ts` (built-in template), `sender.ts` (mint + mail), `magicLinkAuth.ts` (the engine that wires it to `session/`).           |
-| `lambda/`                | The API Gateway adapter: `clientIp.ts`, `routes.ts`, `handler.ts`. Nothing outside it knows about Lambda.                                                                           |
-| `e2eLogin.ts`            | The test-only sign-in, built on `issueSession`.                                                                                                                                     |
+| Path                     | Owns                                                                                                                                                                                   |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ports.ts`               | What the host implements: user / token / session stores, rate limiter, mailer, logger.                                                                                                 |
+| `errors.ts`, `tokens.ts` | `AuthError` and its codes; JWT signing and verifying, raw link tokens.                                                                                                                 |
+| `rate-limit.ts`          | Budgets, their defaults, and the gate every flow counts against.                                                                                                                       |
+| `http/`                  | Framework-free request helpers: `headers.ts`, `cookies.ts`, `redirect.ts`.                                                                                                             |
+| `session/`               | What a session does whichever way it was opened: `session-issuer.ts` (mint, rotate), `session-service.ts` (refresh, logout, request readers), `verify-session.ts` (for a sibling API). |
+| `magic-link/`            | The sign-in method: `config.ts`, `validation.ts`, `email.ts` (built-in template), `sender.ts` (mint + mail), `magic-link-auth.ts` (the engine that wires it to `session/`).            |
+| `lambda/`                | The API Gateway adapter: `client-ip.ts`, `routes.ts`, `handler.ts`. Nothing outside it knows about Lambda.                                                                             |
+| `e2e-login.ts`           | The test-only sign-in, built on `issueSession`.                                                                                                                                        |
 
 Tests sit in the `__tests__/` beside the code they cover; the in-memory stores and the sign-in round
 trip they share are in `src/__tests__/helpers/`. `pnpm run test-report` enforces 100% coverage.
@@ -153,6 +153,6 @@ trip they share are in `src/__tests__/helpers/`. `pnpm run test-report` enforces
 - Another transport (Express, Fastify, API Gateway v2): call the engine's methods directly, the way
   `lambda/routes.ts` does. Only `lambda/` reads a Lambda event.
 - Another way to sign in: resolve the user your own way, then call `auth.issueSession(user, meta, ctx)`
-  for the same cookies and session row. `e2eLogin.ts` is the worked example.
+  for the same cookies and session row. `e2e-login.ts` is the worked example.
 - Host-specific behaviour goes through config (`isAllowed`, `rolesOf`, `onSignIn`, `validate`,
   `renderEmail`, `createError`), never through a fork of the engine.

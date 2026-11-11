@@ -3,7 +3,7 @@ import { Buffer } from 'node:buffer'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createFakes, invitedUser, tokenFromEmail } from '../../__tests__/helpers/fakes.js'
-import { createMagicLinkAuth } from '../../magicLink/magicLinkAuth.js'
+import { createMagicLinkAuth } from '../../magic-link/magic-link-auth.js'
 import { toLambdaHandler } from '../handler.js'
 import { createAuthRoutes } from '../routes.js'
 

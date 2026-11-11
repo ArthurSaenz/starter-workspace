@@ -8,8 +8,8 @@ import { ACCESS_SECRET, IDENTITY, createFakes, invitedUser, tokenFromEmail } fro
 import type { RefreshSessionInput, TokenPair } from '../../session/types.js'
 import { hashToken } from '../../tokens.js'
 import type { RenderMagicLinkEmail } from '../email.js'
-import type { MagicLinkAuth } from '../magicLinkAuth.js'
-import { createMagicLinkAuth } from '../magicLinkAuth.js'
+import type { MagicLinkAuth } from '../magic-link-auth.js'
+import { createMagicLinkAuth } from '../magic-link-auth.js'
 
 const withRenderEmail = (
   fakes: ReturnType<typeof createFakes>,

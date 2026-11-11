@@ -1,7 +1,7 @@
 import type { CreateAuthError } from '../errors.js'
 import type { CookieOptions } from '../http/cookies.js'
 import type { AuthContext, AuthUser, MagicTokenStore, Mailer, RateLimiter, SessionStore, UserStore } from '../ports.js'
-import type { RateLimitConfig } from '../rateLimit.js'
+import type { RateLimitConfig } from '../rate-limit.js'
 import type { RequestMeta, TokenPair } from '../session/types.js'
 import type { JwtIdentity } from '../tokens.js'
 import { assertSecret } from '../tokens.js'
