@@ -49,6 +49,11 @@ export interface MagicTokenStore<TCtx extends AuthContext = AuthContext> {
   create: (data: NewMagicToken, ctx?: TCtx) => Promise<unknown>
   /** Single use: returns the row and marks it spent in one step, or `null` if absent, spent or expired. */
   consumeByHash: (tokenHash: string, ctx?: TCtx) => Promise<StoredMagicToken | null>
+  /**
+   * Undo `consumeByHash` after the sign-in failed on a store or host error, so the next click works.
+   * `record` is what `consumeByHash` returned, for a store that deleted the row and must re-insert it.
+   */
+  release: (tokenHash: string, record: StoredMagicToken, ctx?: TCtx) => Promise<void>
   invalidateByEmail: (email: string, ctx?: TCtx) => Promise<void>
 }
 

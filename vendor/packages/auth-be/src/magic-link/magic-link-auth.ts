@@ -172,14 +172,35 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
       throw fail('Too many requests', 'RATE_LIMITED', 429)
     }
 
-    const record = await magicTokens.consumeByHash(hashToken(input.rawToken), ctx)
+    const tokenHash = hashToken(input.rawToken)
+    const record = await magicTokens.consumeByHash(tokenHash, ctx)
 
     if (!record || !isTokenRecordLive(record, maxTokenAgeMs)) {
       throw fail('Invalid or expired token', 'INVALID_OR_EXPIRED_TOKEN', 401)
     }
 
+    // Consume-then-release keeps the link single-use under concurrency (the store settles who
+    // consumed it) while an outage after the consume does not burn the user's only link.
+    const releaseOnFailure = async <T>(step: () => Promise<T>): Promise<T> => {
+      try {
+        return await step()
+      } catch (error) {
+        try {
+          await magicTokens.release(tokenHash, record, ctx)
+        } catch (releaseError) {
+          ctx?.logger?.error('Failed to release the magic token after a failed sign-in', {
+            data: { name: errorName(releaseError) },
+          })
+        }
+
+        throw error
+      }
+    }
+
     // The allowlist may have been revoked between request and verify.
-    const user = await users.findByEmail(record.email, ctx)
+    const user = await releaseOnFailure(() => {
+      return users.findByEmail(record.email, ctx)
+    })
 
     if (!user || !isAllowed(user)) {
       ctx?.logger?.warn('Magic link verify rejected: address may not sign in', {
@@ -188,9 +209,11 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
       throw fail(notInvitedMessage, 'NOT_INVITED', 403)
     }
 
-    await config.onSignIn?.(user, ctx)
+    const pair = await releaseOnFailure(async () => {
+      await config.onSignIn?.(user, ctx)
 
-    const pair = await session.issueSession(user, input, ctx)
+      return session.issueSession(user, input, ctx)
+    })
 
     return { ...pair, redirectUrl: sanitizeRedirectUrl(record.redirectUrl) }
   }

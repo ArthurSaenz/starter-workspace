@@ -534,6 +534,66 @@ describe('verifyMagicLink', () => {
   })
 
   it.each([
+    ['session store', 'sessions'],
+    ['user store', 'users'],
+    ['onSignIn hook', 'onSignIn'],
+  ])('hands the link back when the %s fails after the token was consumed', async (_label, failing) => {
+    const fakes = createFakes([invitedUser()])
+    const outage = new Error('db down')
+
+    if (failing === 'sessions') fakes.sessionStore.create.mockRejectedValueOnce(outage)
+
+    if (failing === 'onSignIn') fakes.config.onSignIn = vi.fn().mockRejectedValueOnce(outage)
+
+    const auth = createMagicLinkAuth(fakes.config)
+
+    await auth.requestMagicLink({ email: 'ada@example.com', redirectUrl: '/trips' })
+
+    const rawToken = tokenFromEmail(fakes.sent[0]!)
+
+    if (failing === 'users') fakes.userStore.findByEmail.mockRejectedValueOnce(outage)
+
+    await expect(auth.verifyMagicLink({ rawToken })).rejects.toBe(outage)
+    await expect(auth.verifyMagicLink({ rawToken })).resolves.toMatchObject({ redirectUrl: '/trips' })
+    await expectAuthError(auth.verifyMagicLink({ rawToken }), 'INVALID_OR_EXPIRED_TOKEN', 401)
+  })
+
+  it('lets only one of two concurrent verifies of one link sign in', async () => {
+    const fakes = createFakes([invitedUser()])
+    const auth = createMagicLinkAuth(fakes.config)
+
+    await auth.requestMagicLink({ email: 'ada@example.com' })
+
+    const rawToken = tokenFromEmail(fakes.sent[0]!)
+    const outcomes = await Promise.allSettled([auth.verifyMagicLink({ rawToken }), auth.verifyMagicLink({ rawToken })])
+
+    expect(
+      outcomes.map((outcome) => {
+        return outcome.status
+      }),
+    ).toEqual(['fulfilled', 'rejected'])
+    expect(fakes.sessions).toHaveLength(1)
+  })
+
+  it('throws the original failure, and logs, when handing the link back fails too', async () => {
+    const fakes = createFakes([invitedUser()])
+    const outage = new Error('db down')
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+
+    fakes.sessionStore.create.mockRejectedValueOnce(outage)
+    fakes.magicTokens.release.mockRejectedValueOnce(new TypeError('release failed'))
+
+    const auth = createMagicLinkAuth(fakes.config)
+
+    await auth.requestMagicLink({ email: 'ada@example.com' })
+
+    await expect(auth.verifyMagicLink({ rawToken: tokenFromEmail(fakes.sent[0]!) }, { logger })).rejects.toBe(outage)
+    expect(logger.error).toHaveBeenCalledWith('Failed to release the magic token after a failed sign-in', {
+      data: { name: 'TypeError' },
+    })
+  })
+
+  it.each([
     ['past', new Date(Date.now() - 1000)],
     ['unparseable', 'not a date'],
   ])('refuses a token whose expiry is %s', async (_label, expiresAt) => {
@@ -602,6 +662,7 @@ describe('verifyMagicLink', () => {
 
     await expectAuthError(auth.verifyMagicLink({ rawToken: tokenFromEmail(fakes.sent[0]!) }), 'NOT_INVITED', 403)
     expect(fakes.sessions).toHaveLength(0)
+    expect(fakes.magicTokens.release).not.toHaveBeenCalled()
   })
 
   it('refuses a non-hex token before touching the store', async () => {
