@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-import { requestIdleCallback } from './request-idle-callback'
+import { cancelIdleCallback, requestIdleCallback } from './request-idle-callback'
 
 type ScriptProps = React.ScriptHTMLAttributes<HTMLScriptElement> & {
   strategy?: 'afterInteractive' | 'lazyOnload'
@@ -22,30 +22,7 @@ type ScriptProps = React.ScriptHTMLAttributes<HTMLScriptElement> & {
 export const Script = (props: ScriptProps): React.ReactElement | null => {
   const { id, src = '', onReady = null, strategy = 'afterInteractive', shouldUnMountScript, onUnMount } = props
 
-  // - First mount:
-  //   1. The useEffect for onReady executes
-  //   2. hasOnReadyEffectCalled.current is false, but the script hasn't loaded yet (not in LoadCache)
-  //      onReady is skipped, set hasOnReadyEffectCalled.current to true
-  //   3. The useEffect for loadScript executes
-  //   4. hasLoadScriptEffectCalled.current is false, loadScript executes
-  //      Once the script is loaded, the onLoad and onReady will be called by then
-  //   [If strict mode is enabled / is wrapped in <OffScreen /> component]
-  //   5. The useEffect for onReady executes again
-  //   6. hasOnReadyEffectCalled.current is true, so entire effect is skipped
-  //   7. The useEffect for loadScript executes again
-  //   8. hasLoadScriptEffectCalled.current is true, so entire effect is skipped
-  //
-  // - Second mount:
-  //   1. The useEffect for onReady executes
-  //   2. hasOnReadyEffectCalled.current is false, but the script has already loaded (found in LoadCache)
-  //      onReady is called, set hasOnReadyEffectCalled.current to true
-  //   3. The useEffect for loadScript executes
-  //   4. The script is already loaded, loadScript bails out
-  //   [If strict mode is enabled / is wrapped in <OffScreen /> component]
-  //   5. The useEffect for onReady executes again
-  //   6. hasOnReadyEffectCalled.current is true, so entire effect is skipped
-  //   7. The useEffect for loadScript executes again
-  //   8. hasLoadScriptEffectCalled.current is true, so entire effect is skipped
+  // Survives StrictMode's effect replay, so onReady for an already-loaded script fires once per mount.
   const hasOnReadyEffectCalled = useRef(false)
 
   useEffect(() => {
@@ -66,12 +43,11 @@ export const Script = (props: ScriptProps): React.ReactElement | null => {
       loadScript(props)
     }
 
-    if (strategy === 'lazyOnload') {
-      loadLazyScript(props)
-    }
+    const cancelLazyLoad = strategy === 'lazyOnload' ? loadLazyScript(props) : undefined
 
     if (shouldUnMountScript) {
       return () => {
+        cancelLazyLoad?.()
         removeScript(props)
         onUnMount?.()
       }
@@ -83,8 +59,8 @@ export const Script = (props: ScriptProps): React.ReactElement | null => {
 
 Object.defineProperty(Script, '__customScript', { value: true })
 
-const ScriptCache = new Map()
-const LoadCache = new Set()
+const ScriptCache = new Map<string | undefined, Promise<void>>()
+const LoadCache = new Set<string | undefined>()
 
 const DOMAttributeNames: Record<string, string> = {
   acceptCharset: 'accept-charset',
@@ -122,11 +98,20 @@ const loadScript = (props: ScriptProps): void => {
   }
 
   // Contents of this script are already loading/loaded
-  if (ScriptCache.has(src)) {
-    LoadCache.add(cacheKey)
-    // It is possible that multiple `next/script` components all have same "src", but has different "onLoad"
-    // This is to make sure the same remote script will only load once, but "onLoad" are executed in order
-    ScriptCache.get(src).then(onLoad, onError)
+  const pendingLoad = ScriptCache.get(src)
+
+  if (pendingLoad) {
+    // Same remote script for several components: it loads once, every component still gets its own callbacks.
+    pendingLoad.then(
+      () => {
+        LoadCache.add(cacheKey)
+        onLoad(undefined)
+        onReady?.()
+      },
+      (error: unknown) => {
+        onError?.(error)
+      },
+    )
 
     return
   }
@@ -138,16 +123,16 @@ const loadScript = (props: ScriptProps): void => {
    *     afterLoad()
    */
   const afterLoad = () => {
-    // Run onReady for the first time after load event
     if (onReady) {
       onReady()
     }
-    // add cacheKey to LoadCache when load successfully
+
     LoadCache.add(cacheKey)
   }
 
   const element = document.createElement('script')
 
+  // Kept rejecting on error, so components that share this load see the failure too.
   const loadPromise = new Promise<void>((resolve, reject) => {
     element.addEventListener('load', function (e) {
       resolve()
@@ -160,10 +145,10 @@ const loadScript = (props: ScriptProps): void => {
     element.addEventListener('error', (e) => {
       reject(e)
     })
-  }).catch((error) => {
-    if (onError) {
-      onError(error)
-    }
+  })
+
+  loadPromise.catch((error: unknown) => {
+    onError?.(error)
   })
 
   if (dangerouslySetInnerHTML) {
@@ -196,41 +181,42 @@ const loadScript = (props: ScriptProps): void => {
   document.body.appendChild(element)
 }
 
-function loadLazyScript(props: ScriptProps) {
-  if (document.readyState === 'complete') {
-    requestIdleCallback(() => {
-      return loadScript(props)
-    })
-  } else {
-    window.addEventListener('load', () => {
-      requestIdleCallback(() => {
-        return loadScript(props)
-      })
+function loadLazyScript(props: ScriptProps): () => void {
+  let idleCallbackId: number | undefined
+
+  const scheduleLoad = () => {
+    idleCallbackId = requestIdleCallback(() => {
+      loadScript(props)
     })
   }
+
+  if (document.readyState === 'complete') {
+    scheduleLoad()
+  } else {
+    window.addEventListener('load', scheduleLoad, { once: true })
+  }
+
+  return () => {
+    window.removeEventListener('load', scheduleLoad)
+
+    if (idleCallbackId !== undefined) {
+      cancelIdleCallback(idleCallbackId)
+    }
+  }
 }
-
-// export function handleClientScriptLoad(props: ScriptProps) {
-//   const { strategy = 'afterInteractive' } = props
-//   if (strategy === 'lazyOnload') {
-//     window.addEventListener('load', () => {
-//       requestIdleCallback(() => loadScript(props))
-//     })
-//   } else {
-//     loadScript(props)
-//   }
-// }
-
-// export function initScriptLoader(scriptLoaderItems: ScriptProps[]) {
-//   scriptLoaderItems.forEach(handleClientScriptLoad)
-// }
 
 function removeScript(props: ScriptProps) {
   const { src, id } = props
 
   const cacheKey = id || src
 
-  document.querySelector(`#${props.id}`)?.remove()
+  const element = id
+    ? document.getElementById(id)
+    : [...document.scripts].find((script) => {
+        return script.getAttribute('src') === src
+      })
+
+  element?.remove()
 
   ScriptCache.delete(src)
   LoadCache.delete(cacheKey)
