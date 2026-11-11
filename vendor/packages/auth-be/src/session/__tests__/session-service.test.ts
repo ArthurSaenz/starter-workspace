@@ -1,8 +1,16 @@
 /* eslint-disable sonarjs/no-hardcoded-ip, sonarjs/assertions-in-tests -- fixture client IPs; `expectAuthError` asserts, and the rule does not follow helpers */
+import jwt from 'jsonwebtoken'
 import { describe, expect, it, vi } from 'vitest'
 
 import { cookieValue, expectAuthError, signIn } from '../../__tests__/helpers/engine.js'
-import { IDENTITY, REFRESH_SECRET, createFakes, invitedUser } from '../../__tests__/helpers/fakes.js'
+import {
+  ACCESS_SECRET,
+  IDENTITY,
+  REFRESH_SECRET,
+  createFakes,
+  invitedUser,
+  tokenFromEmail,
+} from '../../__tests__/helpers/fakes.js'
 import { AuthError } from '../../errors.js'
 import { createMagicLinkAuth } from '../../magic-link/magic-link-auth.js'
 import type { SessionStore } from '../../ports.js'
@@ -16,8 +24,116 @@ describe('refreshSession', () => {
     const next = await auth.refreshSession({ refreshToken: result.refreshToken, ipAddress: '1.1.1.1' })
 
     expect(next.refreshToken).not.toBe(result.refreshToken)
-    expect(cookieValue(next.refreshCookie)).toBe(next.refreshToken)
+    expect(cookieValue(next.refreshCookie!)).toBe(next.refreshToken)
     expect(fakes.sessions).toHaveLength(2)
+  })
+
+  it('answers both of two concurrent refreshes with one cookie: the loser gets access to the winner session', async () => {
+    const fakes = createFakes([invitedUser()])
+    const { auth, result } = await signIn(fakes)
+
+    const [first, second] = await Promise.all([
+      auth.refreshSession({ refreshToken: result.refreshToken }),
+      auth.refreshSession({ refreshToken: result.refreshToken }),
+    ])
+
+    expect(first.refreshCookie).toBeDefined()
+    expect(second).toEqual({ accessToken: expect.any(String), accessCookie: expect.stringMatching(/^access_token=/) })
+    expect(jwt.verify(second.accessToken, ACCESS_SECRET, IDENTITY)).toMatchObject({ sub: 'u1' })
+    expect(fakes.sessionStore.revokeAllForUser).not.toHaveBeenCalled()
+    expect(
+      fakes.sessions.filter((session) => {
+        return !session.revokedAt
+      }),
+    ).toHaveLength(1)
+  })
+
+  it('answers a refresh that arrives just after its token was rotated with access to the successor', async () => {
+    const fakes = createFakes([invitedUser()])
+    const { auth, result } = await signIn(fakes)
+    const next = await auth.refreshSession({ refreshToken: result.refreshToken })
+
+    const late = await auth.refreshSession({ refreshToken: result.refreshToken })
+
+    expect(late.refreshCookie).toBeUndefined()
+    expect(late.accessCookie).toMatch(/^access_token=/)
+    expect(fakes.sessionStore.revokeAllForUser).not.toHaveBeenCalled()
+    await expect(auth.refreshSession({ refreshToken: next.refreshToken! })).resolves.toHaveProperty('refreshCookie')
+  })
+
+  it.each<[string, (fakes: ReturnType<typeof createFakes>) => void]>([
+    [
+      'the successor was logged out',
+      (fakes) => {
+        fakes.sessions[1]!.revokedAt = new Date()
+      },
+    ],
+    [
+      'the successor expired',
+      (fakes) => {
+        fakes.sessions[1]!.expiresAt = new Date(Date.now() - 1000)
+      },
+    ],
+    [
+      'the successor is gone',
+      (fakes) => {
+        fakes.sessions.splice(1, 1)
+      },
+    ],
+    [
+      'the user was deleted',
+      (fakes) => {
+        fakes.users.delete('u1')
+      },
+    ],
+    [
+      'the invite was revoked',
+      (fakes) => {
+        fakes.users.get('u1')!.invited = false
+      },
+    ],
+    [
+      'the rotation is past the grace window',
+      (fakes) => {
+        fakes.sessions[0]!.revokedAt = new Date(Date.now() - 31_000)
+      },
+    ],
+    [
+      'the rotation time does not parse',
+      (fakes) => {
+        fakes.sessions[0]!.revokedAt = 'not a date'
+      },
+    ],
+  ])('treats a replay as theft when %s', async (_label, arrange) => {
+    const fakes = createFakes([invitedUser()])
+    const { auth, result } = await signIn(fakes)
+
+    await auth.refreshSession({ refreshToken: result.refreshToken })
+    arrange(fakes)
+
+    await expect(auth.refreshSession({ refreshToken: result.refreshToken })).rejects.toBeInstanceOf(AuthError)
+    expect(fakes.sessionStore.revokeAllForUser).toHaveBeenCalledWith('u1', undefined)
+  })
+
+  it('has no grace window when refreshGraceSec is 0', async () => {
+    const fakes = createFakes([invitedUser()])
+    const auth = createMagicLinkAuth({ ...fakes.config, jwt: { ...fakes.config.jwt, refreshGraceSec: 0 } })
+
+    await auth.requestMagicLink({ email: 'ada@example.com' })
+
+    const { refreshToken } = await auth.verifyMagicLink({ rawToken: tokenFromEmail(fakes.sent[0]!) })
+
+    const outcomes = await Promise.allSettled([
+      auth.refreshSession({ refreshToken }),
+      auth.refreshSession({ refreshToken }),
+    ])
+
+    expect(
+      outcomes.map((outcome) => {
+        return outcome.status
+      }),
+    ).toEqual(['fulfilled', 'rejected'])
+    expect(fakes.sessionStore.findSuccessor).not.toHaveBeenCalled()
   })
 
   it('treats a replayed refresh token as theft and revokes every session of the user', async () => {
@@ -25,8 +141,10 @@ describe('refreshSession', () => {
     const { auth, result } = await signIn(fakes)
     const next = await auth.refreshSession({ refreshToken: result.refreshToken })
 
+    fakes.sessions[0]!.revokedAt = new Date(Date.now() - 31_000)
+
     await expectAuthError(auth.refreshSession({ refreshToken: result.refreshToken }), 'INVALID_REFRESH_TOKEN', 401)
-    await expectAuthError(auth.refreshSession({ refreshToken: next.refreshToken }), 'INVALID_REFRESH_TOKEN', 401)
+    await expectAuthError(auth.refreshSession({ refreshToken: next.refreshToken! }), 'INVALID_REFRESH_TOKEN', 401)
     expect(fakes.sessionStore.revokeAllForUser).toHaveBeenCalledWith('u1', undefined)
   })
 

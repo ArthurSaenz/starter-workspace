@@ -32,7 +32,18 @@ export interface MagicLinkAuthConfig<TUser extends AuthUser, TMe, TCtx extends A
   sessions: SessionStore<TCtx>
   rateLimiter: RateLimiter<TCtx>
   mailer: Mailer<TCtx>
-  jwt: JwtIdentity & { accessSecret: string; refreshSecret: string; accessTtlSec?: number; refreshTtlSec?: number }
+  /**
+   * `refreshGraceSec` (default 30, 0 disables): how long a just-rotated refresh token still earns an
+   * access token for its successor instead of tripping reuse detection, so a second tab's refresh
+   * does not log the user out. A thief replaying inside it gets one access token, not a session.
+   */
+  jwt: JwtIdentity & {
+    accessSecret: string
+    refreshSecret: string
+    accessTtlSec?: number
+    refreshTtlSec?: number
+    refreshGraceSec?: number
+  }
   /** `baseUrl` is the SPA origin; the emailed link is `${baseUrl}${verifyPath}?token=…`. */
   magicLink: { baseUrl: string; verifyPath?: string; ttlMin?: number; inviteTtlMin?: number }
   /** Exactly one of `email` (the built-in plain template's copy) and `renderEmail` is required. */
@@ -106,6 +117,12 @@ export const assertMagicLinkConfig = <TUser extends AuthUser, TMe, TCtx extends 
     if (ttl !== undefined && !(Number.isInteger(ttl) && ttl > 0)) {
       throw new Error(`auth: ${name} must be a positive integer`)
     }
+  }
+
+  const grace = config.jwt.refreshGraceSec
+
+  if (grace !== undefined && !(Number.isInteger(grace) && grace >= 0)) {
+    throw new Error('auth: jwt.refreshGraceSec must be a non-negative integer')
   }
 
   if (config.minResponseMs !== undefined && !(Number.isFinite(config.minResponseMs) && config.minResponseMs >= 0)) {

@@ -38,10 +38,10 @@ honour the same cookie.
 | ----------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `users`                                                                 | yes      | `{ findByEmail, findById }` → a row with `id`, `email`, `invited?`, `roles?`. The engine never creates users.                                                                                                                                                             |
 | `magicTokens`                                                           | yes      | `{ create, consumeByHash, release, invalidateByEmail }`. `consumeByHash` must be single-use (return and spend atomically); `release(tokenHash, record)` makes a consumed row redeemable again (re-insert `record` if consume deleted it). Only SHA-256 hashes are stored. |
-| `sessions`                                                              | yes      | `{ create, findByTokenHash, rotate, revokeByTokenHash, revokeAllForUser }`. `rotate` must return `null` to the loser of a concurrent rotation.                                                                                                                            |
+| `sessions`                                                              | yes      | `{ create, findByTokenHash, rotate, findSuccessor, revokeByTokenHash, revokeAllForUser }`. `rotate` must return `null` to the loser of a concurrent rotation; `findSuccessor(id)` returns the row `rotate(id, …)` inserted (e.g. via a `replaced_by` column), or `null`.  |
 | `rateLimiter`                                                           | yes      | `{ incrementAndCheck(key, limit, windowSec) }` → `{ allowed }`.                                                                                                                                                                                                           |
 | `mailer`                                                                | yes      | `{ send({ to, subject, text, html }) }`. A throw invalidates the undelivered token.                                                                                                                                                                                       |
-| `jwt`                                                                   | yes      | `{ accessSecret, refreshSecret, issuer, audience, accessTtlSec?, refreshTtlSec? }`. Secrets ≥ 32 chars and different from each other, or construction throws.                                                                                                             |
+| `jwt`                                                                   | yes      | `{ accessSecret, refreshSecret, issuer, audience, accessTtlSec?, refreshTtlSec?, refreshGraceSec = 30 }`. Secrets ≥ 32 chars and different from each other, or construction throws.                                                                                       |
 | `magicLink`                                                             | yes      | `{ baseUrl, verifyPath = '/auth/verify', ttlMin = 15, inviteTtlMin = 4320 }`.                                                                                                                                                                                             |
 | `email`                                                                 | one of   | `{ subject, intro, linkLabel, expiryPrefix?, warning? }`: the copy for the built-in plain HTML email, HTML-escaped in its html part.                                                                                                                                      |
 | `renderEmail`                                                           | one of   | `({ to, link, expMin, kind: 'sign-in' \| 'invite' }, ctx) => { to, subject, text, html }`, sync or async: host-owned templates (e.g. `@wl/auth-emails`).                                                                                                                  |
@@ -61,8 +61,13 @@ Every flow takes its input object first and the host context second: `requestMag
 
 - No user row is ever created by auth; the allowlist is re-asked at request, verify **and** refresh,
   and a refresh by a no-longer-allowed user revokes all their sessions.
-- A replayed (already rotated) refresh token revokes every session of its user.
-- Losing a concurrent rotation fails only that request.
+- A replayed (already rotated) refresh token revokes every session of its user, unless it arrives
+  within `jwt.refreshGraceSec` of its rotation while the successor session is still live: that is
+  a second tab, and it gets an access token for the successor and no refresh cookie
+  (`refreshSession` resolves `RefreshResult`: a `TokenPair`, or an `AccessOnlyPair` whose
+  `refreshToken` / `refreshCookie` are `undefined`). The loser of a concurrent rotation is answered
+  the same way, and fails alone (401) when there is no live successor. A thief replaying inside the
+  window gets one access token, never a refresh token.
 - A verify that fails on a store or `onSignIn` error after consuming the link releases it, so the user can click again; an expired link or a refused address stays spent.
 - `sendInviteLink` resolves `{ emailSent }`. `false` means the mailer or the template threw and the
   link is already invalidated: show the admin that the invite did not go out. `requestMagicLink`

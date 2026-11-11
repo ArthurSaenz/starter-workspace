@@ -145,12 +145,20 @@ describe('auth routes', () => {
   })
 
   it('refresh rotates the cookies, and clears them on a 401', async () => {
-    const { routes, wrap, cookie } = await signedIn()
+    const { routes, wrap, cookie, fakes } = await signedIn()
 
     const refreshed = await wrap(routes.refresh)({ headers: { cookie } })
 
     expect(refreshed.statusCode).toBe(200)
     expect(refreshed.multiValueHeaders!['Set-Cookie']).toHaveLength(2)
+
+    // A second tab inside the grace window: access only, the winner's refresh cookie left alone.
+    const late = await wrap(routes.refresh)({ headers: { cookie } })
+
+    expect(late.statusCode).toBe(200)
+    expect(late.multiValueHeaders!['Set-Cookie']).toEqual([expect.stringMatching(/^access_token=/)])
+
+    fakes.sessions[0]!.revokedAt = new Date(Date.now() - 31_000)
 
     const replay = await wrap(routes.refresh)({ headers: { cookie } })
 

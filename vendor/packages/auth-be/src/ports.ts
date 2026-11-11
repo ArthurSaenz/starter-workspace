@@ -80,10 +80,12 @@ export interface SessionStore<TCtx extends AuthContext = AuthContext> {
   findByTokenHash: (tokenHash: string, ctx?: TCtx) => Promise<StoredSession | null>
   /**
    * Revoke `oldId` and insert its successor atomically, resolving the new row. Must resolve `null`
-   * when a concurrent caller already rotated `oldId`: the engine then fails the request instead of
-   * handing out a refresh token whose session row was never written.
+   * when a concurrent caller already rotated `oldId`, never hand out a refresh token whose session
+   * row was not written: the engine then answers from `findSuccessor` inside the grace window.
    */
   rotate: (oldId: string, next: NewSession, ctx?: TCtx) => Promise<StoredSession | null>
+  /** The row `rotate(id, …)` inserted, whatever its state now; `null` if `id` was never rotated. */
+  findSuccessor: (id: string, ctx?: TCtx) => Promise<StoredSession | null>
   revokeByTokenHash: (tokenHash: string, ctx?: TCtx) => Promise<void>
   revokeAllForUser: (userId: string, ctx?: TCtx) => Promise<void>
 }

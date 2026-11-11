@@ -1,12 +1,11 @@
 import crypto from 'node:crypto'
 
-import type { CreateAuthError } from '../errors.js'
 import type { ResolvedCookieOptions } from '../http/cookies.js'
 import { buildAccessCookie, buildRefreshCookie } from '../http/cookies.js'
 import type { AuthContext, AuthUser, NewSession, SessionStore, StoredSession } from '../ports.js'
 import type { JwtIdentity, SignedToken } from '../tokens.js'
 import { hashToken, signAccessToken, signRefreshToken } from '../tokens.js'
-import type { RequestMeta, TokenPair } from './types.js'
+import type { AccessOnlyPair, RequestMeta, TokenPair } from './types.js'
 import { withMeta } from './types.js'
 
 export interface SessionIssuerDeps<TUser extends AuthUser, TCtx extends AuthContext> {
@@ -18,10 +17,9 @@ export interface SessionIssuerDeps<TUser extends AuthUser, TCtx extends AuthCont
   sessions: SessionStore<TCtx>
   cookies: ResolvedCookieOptions
   rolesOf: (user: TUser) => string[]
-  createError: CreateAuthError
 }
 
-/** Mints access + refresh pairs and persists their sessions; `issue` and `rotate` never read `this`. */
+/** Mints access + refresh pairs and persists their sessions; no method reads `this`. */
 export const createSessionIssuer = <TUser extends AuthUser, TCtx extends AuthContext>(
   deps: SessionIssuerDeps<TUser, TCtx>,
 ) => {
@@ -36,16 +34,19 @@ export const createSessionIssuer = <TUser extends AuthUser, TCtx extends AuthCon
     }
   }
 
-  const mintPair = (user: TUser, meta: Parameters<typeof withMeta>[0]) => {
-    const userId = String(user.id)
-    const jti = crypto.randomUUID()
-
-    const access = signAccessToken(
-      { sub: userId, roles: deps.rolesOf(user), authMethod: 'magic' },
+  const signAccess = (user: TUser): SignedToken => {
+    return signAccessToken(
+      { sub: String(user.id), roles: deps.rolesOf(user), authMethod: 'magic' },
       deps.accessSecret,
       identity,
       deps.accessTtlSec,
     )
+  }
+
+  const mintPair = (user: TUser, meta: Parameters<typeof withMeta>[0]) => {
+    const userId = String(user.id)
+    const jti = crypto.randomUUID()
+    const access = signAccess(user)
 
     const refresh = signRefreshToken({ sub: userId, jti }, deps.refreshSecret, identity, deps.refreshTtlSec)
 
@@ -69,23 +70,19 @@ export const createSessionIssuer = <TUser extends AuthUser, TCtx extends AuthCon
     return toPair(access, refresh)
   }
 
-  const rotate = async (current: StoredSession, user: TUser, ctx?: TCtx): Promise<TokenPair> => {
+  /** `null` when a concurrent caller won the rotation: nothing minted here may be handed out. */
+  const rotate = async (current: StoredSession, user: TUser, ctx?: TCtx): Promise<TokenPair | null> => {
     const { access, refresh, session } = mintPair(user, current)
     const rotated = await sessions.rotate(String(current.id), session, ctx)
 
-    // The `revokedAt` read in refresh happens outside the rotation transaction, so two refreshes
-    // presenting the same live token (a parallel tab, not an attack) both pass it; `rotate` settles
-    // the race under its row lock. Fail only the loser: the winner's session stays valid.
-    if (!rotated) {
-      ctx?.logger?.warn('Concurrent refresh lost the rotation race; failing this request only', {
-        data: { userId: session.userId },
-      })
-
-      throw deps.createError({ message: 'Invalid session', code: 'INVALID_REFRESH_TOKEN', status: 401 })
-    }
-
-    return toPair(access, refresh)
+    return rotated ? toPair(access, refresh) : null
   }
 
-  return { issue, rotate }
+  const grantAccess = (user: TUser): AccessOnlyPair => {
+    const access = signAccess(user)
+
+    return { accessToken: access.token, accessCookie: buildAccessCookie(cookies, access.token, access.ttlSec) }
+  }
+
+  return { issue, rotate, grantAccess }
 }

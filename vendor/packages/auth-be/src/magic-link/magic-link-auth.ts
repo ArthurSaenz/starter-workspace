@@ -5,7 +5,7 @@ import { sanitizeRedirectUrl } from '../http/redirect.js'
 import type { AuthContext, AuthUser } from '../ports.js'
 import { createRateGate, ipBucket, resolveRateLimits } from '../rate-limit.js'
 import { createSessionService } from '../session/session-service.js'
-import { DEFAULT_ACCESS_TTL_SEC, DEFAULT_REFRESH_TTL_SEC, hashToken } from '../tokens.js'
+import { DEFAULT_ACCESS_TTL_SEC, DEFAULT_REFRESH_GRACE_SEC, DEFAULT_REFRESH_TTL_SEC, hashToken } from '../tokens.js'
 import type {
   MagicLinkAuthConfig,
   RequestMagicLinkInput,
@@ -88,6 +88,7 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
     identity,
     accessTtlSec: config.jwt.accessTtlSec ?? DEFAULT_ACCESS_TTL_SEC,
     refreshTtlSec: config.jwt.refreshTtlSec ?? DEFAULT_REFRESH_TTL_SEC,
+    refreshGraceSec: config.jwt.refreshGraceSec ?? DEFAULT_REFRESH_GRACE_SEC,
     cookies,
     isAllowed,
     rolesOf: config.rolesOf ?? defaultRolesOf,

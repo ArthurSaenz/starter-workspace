@@ -111,7 +111,10 @@ export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthC
         ctx,
       )
 
-      return withCookies({ ok: true }, [pair.accessCookie, pair.refreshCookie])
+      return withCookies(
+        { ok: true },
+        pair.refreshCookie ? [pair.accessCookie, pair.refreshCookie] : [pair.accessCookie],
+      )
     },
     clearCookiesOn401: true,
   }

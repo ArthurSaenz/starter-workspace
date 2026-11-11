@@ -3,14 +3,14 @@ import { errorName } from '../errors.js'
 import type { ResolvedCookieOptions } from '../http/cookies.js'
 import { buildClearCookies, extractAccessToken, extractRefreshToken } from '../http/cookies.js'
 import type { HeaderBag } from '../http/headers.js'
-import type { AuthContext, AuthUser, SessionStore, UserStore } from '../ports.js'
+import type { AuthContext, AuthUser, SessionStore, StoredSession, UserStore } from '../ports.js'
 import type { RateGate } from '../rate-limit.js'
 import { ipBucket } from '../rate-limit.js'
 import { toMs } from '../time.js'
 import type { AccessTokenPayload, JwtIdentity } from '../tokens.js'
 import { hashToken, verifyAccessToken, verifyRefreshToken } from '../tokens.js'
 import { createSessionIssuer } from './session-issuer.js'
-import type { RefreshSessionInput, TokenPair } from './types.js'
+import type { AccessOnlyPair, RefreshResult, RefreshSessionInput } from './types.js'
 
 export interface SessionServiceDeps<TUser extends AuthUser, TMe, TCtx extends AuthContext> {
   users: UserStore<TUser, TCtx>
@@ -20,6 +20,7 @@ export interface SessionServiceDeps<TUser extends AuthUser, TMe, TCtx extends Au
   identity: JwtIdentity
   accessTtlSec: number
   refreshTtlSec: number
+  refreshGraceSec: number
   cookies: ResolvedCookieOptions
   isAllowed: (user: TUser) => boolean
   rolesOf: (user: TUser) => string[]
@@ -57,6 +58,34 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
     return user
   }
 
+  // An unparseable timestamp is expired, never "no expiry".
+  const isExpired = (expiresAt: StoredSession['expiresAt']): boolean => {
+    const expiresAtMs = toMs(expiresAt)
+
+    return !Number.isFinite(expiresAtMs) || expiresAtMs < Date.now()
+  }
+
+  // Two tabs refreshing with one cookie: the later one presents a token the first rotated moments
+  // ago. That is not theft, so inside the grace window it gets access to the successor session.
+  const graceAccess = async (
+    rotatedId: string,
+    rotatedAt: Date | string,
+    ctx?: TCtx,
+  ): Promise<AccessOnlyPair | null> => {
+    // Written so an unparseable `rotatedAt` (NaN) lands outside the window.
+    const withinGrace = Date.now() - toMs(rotatedAt) < deps.refreshGraceSec * 1000
+
+    if (!withinGrace) return null
+
+    const successor = await sessions.findSuccessor(rotatedId, ctx)
+
+    if (!successor || successor.revokedAt || isExpired(successor.expiresAt)) return null
+
+    const user = await users.findById(successor.userId, ctx)
+
+    return user && deps.isAllowed(user) ? issuer.grantAccess(user) : null
+  }
+
   const requireUser = (headers: HeaderBag): AccessTokenPayload => {
     const token = extractAccessToken(headers, cookies.accessName)
 
@@ -65,7 +94,7 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
     return verifyAccessToken(token, deps.accessSecret, identity, createError)
   }
 
-  const refreshSession = async (input: RefreshSessionInput, ctx?: TCtx): Promise<TokenPair> => {
+  const refreshSession = async (input: RefreshSessionInput, ctx?: TCtx): Promise<RefreshResult> => {
     const { refreshToken, ipAddress } = input
 
     if (!refreshToken) throw invalidSession('UNAUTHENTICATED')
@@ -81,6 +110,10 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
     if (!session) throw invalidSession()
 
     if (session.revokedAt) {
+      const grace = await graceAccess(String(session.id), session.revokedAt, ctx)
+
+      if (grace) return grace
+
       ctx?.logger?.warn('Refresh token reuse detected; revoking every session of the user', {
         data: { userId: session.userId },
       })
@@ -89,10 +122,7 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
       throw invalidSession()
     }
 
-    const expiresAtMs = toMs(session.expiresAt)
-
-    // An unparseable timestamp is expired, never "no expiry".
-    if (!Number.isFinite(expiresAtMs) || expiresAtMs < Date.now()) throw invalidSession()
+    if (isExpired(session.expiresAt)) throw invalidSession()
 
     const user = await users.findById(payload.sub, ctx)
 
@@ -109,7 +139,21 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
       throw fail(deps.notInvitedMessage, 'NOT_INVITED', 403)
     }
 
-    return issuer.rotate(session, user, ctx)
+    const rotated = await issuer.rotate(session, user, ctx)
+
+    if (rotated) return rotated
+
+    // The `revokedAt` read above happens outside the rotation transaction, so two refreshes with one
+    // live token both pass it and `rotate` settles the race under its row lock.
+    const grace = await graceAccess(String(session.id), new Date(), ctx)
+
+    if (grace) return grace
+
+    ctx?.logger?.warn('Concurrent refresh lost the rotation race; failing this request only', {
+      data: { userId: session.userId },
+    })
+
+    throw invalidSession()
   }
 
   /** Never throws: the browser's session ends whatever the store managed to revoke. */

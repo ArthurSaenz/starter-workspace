@@ -55,11 +55,12 @@ export type {
   UserStore,
 } from './ports.js'
 export type { RateLimitConfig } from './rate-limit.js'
-export type { RefreshSessionInput, RequestMeta, TokenPair } from './session/types.js'
+export type { AccessOnlyPair, RefreshResult, RefreshSessionInput, RequestMeta, TokenPair } from './session/types.js'
 export { verifySession } from './session/verify-session.js'
 export type { VerifySessionOptions } from './session/verify-session.js'
 export {
   DEFAULT_ACCESS_TTL_SEC,
+  DEFAULT_REFRESH_GRACE_SEC,
   DEFAULT_REFRESH_TTL_SEC,
   generateRawToken,
   hashToken,

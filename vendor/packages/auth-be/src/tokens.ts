@@ -9,6 +9,7 @@ const JWT_ALGORITHM = 'HS256'
 export const MIN_SECRET_LENGTH = 32
 export const DEFAULT_ACCESS_TTL_SEC = 15 * 60
 export const DEFAULT_REFRESH_TTL_SEC = 7 * 24 * 60 * 60
+export const DEFAULT_REFRESH_GRACE_SEC = 30
 
 export interface AccessTokenPayload {
   sub: string

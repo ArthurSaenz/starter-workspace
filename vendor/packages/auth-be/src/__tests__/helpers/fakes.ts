@@ -31,7 +31,7 @@ export const createFakes = (seed: TestUser[] = []) => {
   )
 
   const tokens: (NewMagicToken & { spent: boolean })[] = []
-  const sessions: (NewSession & StoredSession & { id: string })[] = []
+  const sessions: (NewSession & StoredSession & { id: string; replacedBy?: string })[] = []
   const sent: MagicLinkEmail[] = []
   const counters = new Map<string, number>()
   let nextSessionId = 1
@@ -94,7 +94,22 @@ export const createFakes = (seed: TestUser[] = []) => {
 
       old.revokedAt = new Date()
 
-      return sessionStore.create(next)
+      const successor = await sessionStore.create(next)
+
+      old.replacedBy = successor.id
+
+      return successor
+    }),
+    findSuccessor: vi.fn(async (id: string): Promise<StoredSession | null> => {
+      const replacedBy = sessions.find((session) => {
+        return session.id === id
+      })?.replacedBy
+
+      return (
+        sessions.find((session) => {
+          return session.id === replacedBy
+        }) ?? null
+      )
     }),
     revokeByTokenHash: vi.fn(async (tokenHash: string) => {
       for (const session of sessions) if (session.tokenHash === tokenHash) session.revokedAt = new Date()

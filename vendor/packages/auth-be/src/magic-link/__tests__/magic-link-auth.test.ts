@@ -5,7 +5,7 @@ import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { expectAuthError, signIn } from '../../__tests__/helpers/engine.js'
 import type { TestUser } from '../../__tests__/helpers/fakes.js'
 import { ACCESS_SECRET, IDENTITY, createFakes, invitedUser, tokenFromEmail } from '../../__tests__/helpers/fakes.js'
-import type { RefreshSessionInput, TokenPair } from '../../session/types.js'
+import type { RefreshResult, RefreshSessionInput, TokenPair } from '../../session/types.js'
 import { hashToken } from '../../tokens.js'
 import type { RenderMagicLinkEmail } from '../email.js'
 import type { MagicLinkAuth } from '../magic-link-auth.js'
@@ -79,6 +79,14 @@ describe('createMagicLinkAuth config guards', () => {
         magicLink: { ...config.magicLink, ...magicLink },
       })
     }).toThrow(`auth: ${name} must be a positive integer`)
+  })
+
+  it.each([-1, 1.5, Number.NaN])('refuses jwt.refreshGraceSec %s', (refreshGraceSec) => {
+    const { config } = createFakes()
+
+    expect(() => {
+      return createMagicLinkAuth({ ...config, jwt: { ...config.jwt, refreshGraceSec } })
+    }).toThrow('auth: jwt.refreshGraceSec must be a non-negative integer')
   })
 
   it('refuses neither of email and renderEmail', () => {
@@ -480,7 +488,7 @@ describe('engine shape', () => {
     expect(Object.keys(auth).sort()).toEqual(Object.keys(keys).sort())
     expectTypeOf(auth.sendInviteLink).returns.resolves.toEqualTypeOf<{ emailSent: boolean }>()
     expectTypeOf(auth.issueSession).returns.resolves.toEqualTypeOf<TokenPair>()
-    expectTypeOf(auth.refreshSession).returns.resolves.toEqualTypeOf<TokenPair>()
+    expectTypeOf(auth.refreshSession).returns.resolves.toEqualTypeOf<RefreshResult>()
     expectTypeOf(auth.refreshSession).parameter(0).toEqualTypeOf<RefreshSessionInput>()
   })
 
