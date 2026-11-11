@@ -4,6 +4,7 @@ import type { ComponentType, MouseEvent, ReactNode } from 'react'
 import { Fragment, useMemo } from 'react'
 
 import type { CellRenderContext, FilterConfig, PaginationConfig, TableColumnConfig, TableConfig } from '../config'
+import type { FilterRegistry } from '../filters/filter-bar'
 import { FilterBar } from '../filters/filter-bar'
 import { DataTableFullscreenPortal, DataTableFullscreenToggle, useDataTableFullscreen } from '../fullscreen'
 import { DataTablePagination } from '../pagination/data-table-pagination'
@@ -11,7 +12,7 @@ import { cn } from '../primitives/cn'
 import { Skeleton } from '../primitives/skeleton'
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '../primitives/table'
 import { TooltipProvider } from '../primitives/tooltip'
-import type { CellRegistry, FilterRegistry } from './cell-renderer-types'
+import type { CellRegistry } from './cell-renderer-types'
 import { DataTableRowCount } from './data-table-row-count'
 import { DataTableToolbar } from './data-table-toolbar'
 import { DataTableViewOptions } from './data-table-view-options'
@@ -23,7 +24,7 @@ import { useDataTable } from './use-data-table'
 export interface DataTableProps<TData extends RowData> {
   config: TableConfig<TData>
   cellRegistry?: CellRegistry<TData>
-  filterRegistry?: FilterRegistry
+  filterRegistry?: Partial<FilterRegistry>
   components?: DataTableComponents<TData>
 }
 
@@ -241,7 +242,7 @@ export const DataTable = <TData extends RowData>(props: DataTableProps<TData>) =
 
 export interface DataTableFilterBarProps {
   filters: FilterConfig[]
-  registry?: FilterRegistry
+  registry?: Partial<FilterRegistry>
 }
 
 export interface DataTablePaginationProps<TData extends RowData> {

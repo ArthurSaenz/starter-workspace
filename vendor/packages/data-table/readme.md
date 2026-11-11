@@ -241,7 +241,7 @@ Rebuilding the config every render is safe by design: column identity is derived
 ## FAQ
 
 **Can I add my own cell/filter kind?**
-Not as a new `kind` string — the kind unions are closed so configs stay fully typed. Use `{ kind: 'custom', render }` instead; it covers anything. (You _can_ swap the renderer behind an existing kind: `createCellRegistry({ text: MyTextCell })`.)
+Not as a new `kind` string — the kind unions are closed so configs stay fully typed. Use `{ kind: 'custom', render }` instead; it covers anything. (You _can_ swap the renderer behind an existing kind: `createCellRegistry({ text: MyTextCell })`, or `<DataTable filterRegistry={{ search: MySearch }} />` — typed `Partial<FilterRegistry>`. `custom` has no filter-registry entry: it always renders `config.render()`, so `filterRegistry={{ custom: … }}` is a compile error.)
 
 **Styles didn't update after I changed the package?**
 Styles update instantly (Tailwind scans `src`). **Code** changes need `pnpm run build` in this package before the app's type-check sees them.

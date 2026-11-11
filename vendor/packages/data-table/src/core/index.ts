@@ -8,9 +8,6 @@ export type {
   CellRenderer,
   CellRendererProps,
   FilterConfigOfKind,
-  FilterRegistry,
-  FilterRenderer,
-  FilterRendererProps,
 } from './cell-renderer-types'
 export { DataTable } from './data-table'
 export type {

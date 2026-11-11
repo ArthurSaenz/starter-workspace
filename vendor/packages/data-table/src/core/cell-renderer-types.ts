@@ -33,17 +33,5 @@ export type CellRegistry<TData> = {
   [TKind in CellKind]?: CellRenderer<TData, CellConfigOfKind<TData, TKind>>
 }
 
-/** What every filter renderer receives. Filters own no row, so they get their config alone. */
-export interface FilterRendererProps<TConfig> {
-  config: TConfig
-}
-
-export type FilterRenderer<TConfig = FilterConfig> = ComponentType<FilterRendererProps<TConfig>>
-
 /** Narrows the filter union to the single member a given `kind` discriminant selects. */
 export type FilterConfigOfKind<TKind extends FilterKind> = Extract<FilterConfig, { kind: TKind }>
-
-/** kind → renderer, the filter-bar counterpart of {@link CellRegistry}. */
-export type FilterRegistry = {
-  [TKind in FilterKind]?: FilterRenderer<FilterConfigOfKind<TKind>>
-}
