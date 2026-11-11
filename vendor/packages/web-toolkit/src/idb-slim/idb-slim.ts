@@ -60,7 +60,7 @@ export const get = async <T = unknown>(key: IDBValidKey): Promise<T | null> => {
       return data
     }
     // Key has expired => delete it and return null;
-    remove(key)
+    remove(key).catch(console.error)
 
     return null
   } catch (error) {
@@ -70,15 +70,16 @@ export const get = async <T = unknown>(key: IDBValidKey): Promise<T | null> => {
   }
 }
 
-/** Deletes a key together with its expiry entry; either one may be passed. */
-export const remove = (key: IDBValidKey) => {
+/** Deletes a key together with its expiry entry; either one may be passed. Rejects when IndexedDB fails. */
+export const remove = (key: IDBValidKey): Promise<void> => {
   const pair = isInternalExpiryTimestampKey(key) ? [key, key.slice(EXPIRY_PREFIX.length)] : [key, expiryKeyOf(key)]
 
-  idb.delMany(pair).catch(console.error)
+  return idb.delMany(pair)
 }
 
-export const flush = () => {
-  idb.clear().catch(console.error)
+/** Deletes everything in the store. Rejects when IndexedDB fails. */
+export const flush = (): Promise<void> => {
+  return idb.clear()
 }
 
 const all = () => {
@@ -125,7 +126,7 @@ export const removeExpiredKeys = async () => {
 
   const p = keys.map(async (thisKey: IDBValidKey) => {
     return get(thisKey).then((value) => {
-      return Date.now() > (value as number) ? remove(thisKey) : null
+      return Date.now() > (value as number) ? remove(thisKey).catch(console.error) : null
     })
   })
 

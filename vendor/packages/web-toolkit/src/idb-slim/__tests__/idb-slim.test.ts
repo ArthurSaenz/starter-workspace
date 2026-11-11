@@ -45,14 +45,10 @@ describe('idb', () => {
     await idb.set('a', 1, 60)
     await idb.set('b', 1, 60)
 
-    idb.remove('a')
-    idb.remove(`${EXPIRY}b`)
+    await idb.remove('a')
+    await idb.remove(`${EXPIRY}b`)
 
-    await expect
-      .poll(() => {
-        return keyval.keys()
-      })
-      .toEqual([])
+    expect(await keyval.keys()).toEqual([])
   })
 
   it('leaves the stored entry untouched when the new value cannot be stored', async () => {
@@ -87,13 +83,9 @@ describe('idb', () => {
   it('flushes everything', async () => {
     await idb.set('a', 1, 60)
 
-    idb.flush()
+    await idb.flush()
 
-    await expect
-      .poll(() => {
-        return keyval.keys()
-      })
-      .toEqual([])
+    expect(await keyval.keys()).toEqual([])
   })
 })
 
@@ -106,6 +98,54 @@ describe('idb when IndexedDB fails', () => {
     })
 
     expect(await idb.get('a')).toBeNull()
+    expect(error).toHaveBeenCalledOnce()
+  })
+
+  it('rejects remove and flush so the caller can handle the failure', async () => {
+    const broken = new DOMException('broken', 'UnknownError')
+
+    vi.spyOn(IDBObjectStore.prototype, 'delete').mockImplementation(() => {
+      throw broken
+    })
+    vi.spyOn(IDBObjectStore.prototype, 'clear').mockImplementation(() => {
+      throw broken
+    })
+
+    await expect(idb.remove('a')).rejects.toBe(broken)
+    await expect(idb.flush()).rejects.toBe(broken)
+  })
+
+  it('logs a failed removal of an expired key and still answers null', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await keyval.setMany([
+      ['old', 1],
+      [`${EXPIRY}old`, Date.now() - 1],
+    ])
+    vi.spyOn(IDBObjectStore.prototype, 'delete').mockImplementation(() => {
+      throw new DOMException('broken', 'UnknownError')
+    })
+
+    expect(await idb.get('old')).toBeNull()
+    await expect
+      .poll(() => {
+        return error.mock.calls.length
+      })
+      .toBe(1)
+  })
+
+  it('never rejects the expiry sweep when an expired key cannot be removed', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await keyval.setMany([
+      ['old', 1],
+      [`${EXPIRY}old`, Date.now() - 1],
+    ])
+    vi.spyOn(IDBObjectStore.prototype, 'delete').mockImplementation(() => {
+      throw new DOMException('broken', 'UnknownError')
+    })
+
+    await expect(idb.removeExpiredKeys()).resolves.toBeUndefined()
     expect(error).toHaveBeenCalledOnce()
   })
 
