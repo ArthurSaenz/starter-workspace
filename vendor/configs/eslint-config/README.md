@@ -172,7 +172,8 @@ imports are checked exactly like extensionless ones. Everything else goes to the
 
 A package whose `package.json` declares `@playwright/test` (the same signal `@wl/package-structure`
 uses) gets its own element set in place of `feature`/`service`/`shared`, so `pages`, `lib` and
-`config` there never collide with the app-code meaning of those folder names:
+`config` there never collide with the app-code meaning of those folder names. A `package.json` that is
+not valid JSON stops the lint run with an error naming it, instead of being guessed as either kind.
 
 ```
 tests/<domain> | visual/<domain> | setup → fixtures → pages → components → mocks → lib → config

@@ -204,3 +204,18 @@ describe('e2e boundaries: scope', () => {
     )
   })
 })
+
+// The detector runs as a `files` matcher, where it cannot report a lint message: a bare
+// `JSON.parse` SyntaxError would abort the run without saying which manifest is broken.
+describe('e2e boundaries: malformed package.json', () => {
+  it('fails the lint run with an error naming the manifest', async () => {
+    const manifest = path.join(root, 'broken/package.json')
+    const file = path.join(root, 'broken/src/lib/x.ts')
+
+    mkdirSync(path.dirname(file), { recursive: true })
+    writeFileSync(manifest, '{ "name": "broken", }\n')
+    writeFileSync(file, 'export const x = 1\n')
+
+    await expect(eslint.lintText('export const x = 1\n', { filePath: file })).rejects.toThrow(manifest)
+  })
+})
