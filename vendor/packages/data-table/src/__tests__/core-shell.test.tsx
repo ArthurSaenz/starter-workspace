@@ -200,6 +200,31 @@ describe('data table shell', () => {
     expect(rows[2]?.className).toContain('bg-neutral-100')
   })
 
+  it('alternates stripes by on-screen position once the rows are sorted', async () => {
+    const config = buildConfig({
+      rowClassName: { striped: true },
+      sorting: { initial: [{ id: 'name', desc: false }] },
+    })
+
+    const screen = await render(<DataTable config={config} />)
+
+    const rows = [...screen.container.querySelectorAll('tbody tr')]
+
+    expect(readBodyRowNames(screen.container)).toEqual(['Alice', 'Bob', 'Charlie'])
+    expect(
+      rows.map((row) => {
+        return row.className.includes('bg-neutral-100') ? 'even' : 'odd'
+      }),
+    ).toEqual(['even', 'odd', 'even'])
+  })
+
+  it('starts with the initialHidden columns hidden', async () => {
+    const screen = await render(<DataTable config={buildConfig({ columnVisibility: { initialHidden: ['amount'] } })} />)
+
+    await expect.element(screen.getByText('Name')).toBeInTheDocument()
+    await expect.element(screen.getByText('Amount')).not.toBeInTheDocument()
+  })
+
   it('renders the sub-row panel only while a row is expanded', async () => {
     const config = buildConfig({
       expandable: {

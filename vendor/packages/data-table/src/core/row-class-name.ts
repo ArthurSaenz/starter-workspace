@@ -31,6 +31,7 @@ export const resolveRowClassName = <TData>(
   config: RowClassNameConfig<TData> | undefined,
   row: TData,
   rowIndex: number,
+  displayIndex: number = rowIndex,
 ): string | undefined => {
   if (!config) {
     return undefined
@@ -43,7 +44,9 @@ export const resolveRowClassName = <TData>(
   if (striped) {
     const pair = striped === true ? DATA_TABLE_STRIPED_ROW_CLASSES : striped
 
-    layers.push(rowIndex % 2 === 0 ? pair.even : pair.odd)
+    // `rowIndex` is the position in `data`, which sorting and paging reorder; striping on it would
+    // put same-coloured rows side by side, so the stripe follows the on-screen position.
+    layers.push(displayIndex % 2 === 0 ? pair.even : pair.odd)
   }
 
   for (const rule of rules ?? []) {

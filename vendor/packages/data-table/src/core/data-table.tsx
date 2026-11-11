@@ -96,8 +96,8 @@ export const DataTable = <TData extends RowData>(props: DataTableProps<TData>) =
       )
     }
 
-    return table.getRowModel().rows.map((row) => {
-      const resolvedRowClassName = resolveRowClassName(rowClassName, row.original, row.index)
+    return table.getRowModel().rows.map((row, displayIndex) => {
+      const resolvedRowClassName = resolveRowClassName(rowClassName, row.original, row.index, displayIndex)
       const isExpanded = row.getIsExpanded()
 
       return (
