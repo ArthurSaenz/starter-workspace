@@ -195,7 +195,8 @@ export const createDocsAggregation = (params: { appDir: string; contentRel?: str
   }
 
   /**
-   * Every doc URL (`/docs/...`) for prerender seeding.
+   * Every doc URL (`/docs/...`) for prerender seeding. Throws when two docs resolve to the same
+   * URL — one would silently shadow the other.
    *
    * @example
    *     const urls = await getAllDocUrls()
@@ -212,7 +213,21 @@ export const createDocsAggregation = (params: { appDir: string; contentRel?: str
       }),
     )
 
-    return [...new Set(urls)].sort()
+    const owners = new Map<string, string>()
+    const collisions: string[] = []
+
+    for (const [index, url] of urls.entries()) {
+      const owner = owners.get(url)
+
+      if (owner === undefined) owners.set(url, rels[index])
+      else collisions.push(`${url} is claimed by both ${owner} and ${rels[index]}`)
+    }
+
+    if (collisions.length > 0) {
+      throw new Error(`[@wl/docs-ui] Two docs resolve to the same URL:\n  - ${collisions.join('\n  - ')}`)
+    }
+
+    return urls.sort()
   }
 
   return {
