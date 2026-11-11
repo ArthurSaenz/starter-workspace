@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { useState } from 'react'
+import { describe, expect, it, vi } from 'vitest'
 import type { RenderResult } from 'vitest-browser-react'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
@@ -180,5 +181,42 @@ describe('data table fullscreen', () => {
 
     await expect.element(screen.getByText('Custom actions')).toBeInTheDocument()
     await expect.element(screen.getByRole('button', { name: 'Enter fullscreen' })).not.toBeInTheDocument()
+  })
+
+  it('keeps search text typed but not yet sent when the table remounts into fullscreen', async () => {
+    const onChange = vi.fn()
+
+    const Harness = () => {
+      const [search, setSearch] = useState('')
+
+      return (
+        <DataTable
+          config={buildConfig({
+            fullscreen: true,
+            filters: [
+              {
+                kind: 'search',
+                id: 'q',
+                placeholder: 'Find',
+                value: search,
+                debounceMs: 10_000,
+                onChange: (next) => {
+                  onChange(next)
+                  setSearch(next)
+                },
+              },
+            ],
+          })}
+        />
+      )
+    }
+
+    const screen = await render(<Harness />)
+
+    await screen.getByRole('textbox', { name: 'Find' }).fill('ali')
+    await enterFullscreen(screen)
+
+    await expect.element(screen.getByRole('dialog').getByRole('textbox', { name: 'Find' })).toHaveValue('ali')
+    expect(onChange).toHaveBeenCalledExactlyOnceWith('ali')
   })
 })

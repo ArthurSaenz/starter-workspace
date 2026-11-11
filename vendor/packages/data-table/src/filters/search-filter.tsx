@@ -34,9 +34,11 @@ export const SearchFilter = (props: SearchFilterProps) => {
     }, debounceMs)
   }, [debounceMs])
 
+  // Sending rather than dropping the pending text on unmount: entering fullscreen remounts the
+  // filter, and the new instance starts from `value`.
   useEffect(() => {
     return () => {
-      debouncedOnChange?.cancel()
+      debouncedOnChange?.flush()
     }
   }, [debouncedOnChange])
 

@@ -163,6 +163,8 @@ Set via `config.filters`. Every filter is controlled: you pass `value`, it calls
 | `clear-all`    | "clear filters" button             | `onClear`                      |
 | `custom`       | anything                           | `render()`                     |
 
+A `search` filter with `debounceMs` sends any still-pending text when it unmounts (entering or leaving fullscreen remounts the filter bar) instead of dropping it, so `onChange` can fire on unmount.
+
 ## Pagination
 
 Two modes:
