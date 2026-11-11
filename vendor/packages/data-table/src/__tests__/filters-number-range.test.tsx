@@ -1,9 +1,46 @@
+import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
 
-import type { NumberRangeFilterConfig } from '../config/filter-config'
+import type { NumberRangeFilterConfig, NumberRangeValue } from '../config/filter-config'
 import { NumberRangeFilter } from '../filters/number-range-filter'
+
+interface ControlledRangeProps {
+  onChange: (value: NumberRangeValue) => void
+}
+
+const ControlledRange = (props: ControlledRangeProps) => {
+  const { onChange } = props
+
+  const [value, setValue] = useState<NumberRangeValue>({ min: 100, max: 500 })
+
+  return (
+    <>
+      <NumberRangeFilter
+        config={buildConfig({
+          value,
+          onChange: (next) => {
+            setValue(next)
+            onChange(next)
+          },
+        })}
+      />
+      <button
+        type="button"
+        onMouseDown={(event) => {
+          // Keeps focus in the input, so the reset is what clears the draft rather than a blur.
+          event.preventDefault()
+        }}
+        onClick={() => {
+          setValue({ min: 0, max: 1000 })
+        }}
+      >
+        reset
+      </button>
+    </>
+  )
+}
 
 const buildConfig = (overrides: Partial<NumberRangeFilterConfig> = {}): NumberRangeFilterConfig => {
   return {
@@ -71,5 +108,54 @@ describe('numberRangeFilter', () => {
     await screen.getByRole('spinbutton', { name: 'Minimum' }).fill('9999')
 
     expect(onChange).toHaveBeenCalledWith({ min: 500, max: 500 })
+  })
+
+  it('commits nothing when an input is emptied', async () => {
+    const onChange = vi.fn()
+
+    const screen = await render(<NumberRangeFilter config={buildConfig({ onChange })} />)
+
+    await screen.getByRole('spinbutton', { name: 'Maximum' }).fill('')
+    await screen.getByRole('spinbutton', { name: 'Minimum' }).fill('')
+
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('lets a multi-digit maximum be typed whose leading digits fall below the minimum', async () => {
+    const onChange = vi.fn()
+    const screen = await render(<ControlledRange onChange={onChange} />)
+    const max = screen.getByRole('spinbutton', { name: 'Maximum' })
+
+    await max.fill('')
+    await userEvent.type(max, '200')
+
+    await expect.element(max).toHaveValue(200)
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenLastCalledWith({ min: 100, max: 200 })
+  })
+
+  it('commits a crossing entry on blur, ordered and clamped', async () => {
+    const onChange = vi.fn()
+    const screen = await render(<ControlledRange onChange={onChange} />)
+    const max = screen.getByRole('spinbutton', { name: 'Maximum' })
+
+    await max.fill('50')
+    expect(onChange).not.toHaveBeenCalled()
+
+    await userEvent.keyboard('{Tab}')
+
+    expect(onChange).toHaveBeenLastCalledWith({ min: 50, max: 100 })
+    await expect.element(screen.getByRole('spinbutton', { name: 'Minimum' })).toHaveValue(50)
+    await expect.element(max).toHaveValue(100)
+  })
+
+  it('drops a held draft once the value changes from outside', async () => {
+    const screen = await render(<ControlledRange onChange={vi.fn()} />)
+    const max = screen.getByRole('spinbutton', { name: 'Maximum' })
+
+    await max.fill('5')
+    await screen.getByRole('button', { name: 'reset' }).click()
+
+    await expect.element(max).toHaveValue(1000)
   })
 })

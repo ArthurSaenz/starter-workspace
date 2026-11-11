@@ -42,24 +42,14 @@ export const NumberRangeFilter = (props: NumberRangeFilterProps) => {
     commit({ min, max })
   }
 
-  const handleMinInputChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const parsed = Number(event.target.value)
-
-    if (Number.isNaN(parsed)) {
-      return
-    }
-
-    commit({ min: parsed, max: value.max })
+  // An entry that would cross the other handle is held as a draft until blur: committing it per
+  // keystroke would swap the ends mid-typing (the "2" of "200" lands below the minimum).
+  const canCommitMin = (min: number) => {
+    return clampEdge(min, bounds) <= value.max
   }
 
-  const handleMaxInputChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const parsed = Number(event.target.value)
-
-    if (Number.isNaN(parsed)) {
-      return
-    }
-
-    commit({ min: value.min, max: parsed })
+  const canCommitMax = (max: number) => {
+    return clampEdge(max, bounds) >= value.min
   }
 
   return (
@@ -85,7 +75,10 @@ export const NumberRangeFilter = (props: NumberRangeFilterProps) => {
           step={step}
           unitSymbol={unitSymbol}
           ariaLabel={T.minLabel}
-          onChange={handleMinInputChange}
+          canCommitLive={canCommitMin}
+          onCommit={(min) => {
+            commit({ min, max: value.max })
+          }}
         />
         <span className="text-muted-foreground text-xs">{T.to}</span>
         <NumberRangeInput
@@ -95,7 +88,10 @@ export const NumberRangeFilter = (props: NumberRangeFilterProps) => {
           step={step}
           unitSymbol={unitSymbol}
           ariaLabel={T.maxLabel}
-          onChange={handleMaxInputChange}
+          canCommitLive={canCommitMax}
+          onCommit={(max) => {
+            commit({ min: value.min, max })
+          }}
         />
       </div>
     </div>
@@ -109,11 +105,48 @@ interface NumberRangeInputProps {
   step: number
   unitSymbol?: string
   ariaLabel: string
-  onChange: (event: ChangeEvent<HTMLInputElement>) => void
+  canCommitLive: (next: number) => boolean
+  onCommit: (next: number) => void
 }
 
 const NumberRangeInput = (props: NumberRangeInputProps) => {
-  const { value, min, max, step, unitSymbol, ariaLabel, onChange } = props
+  const { value, min, max, step, unitSymbol, ariaLabel, canCommitLive, onCommit } = props
+
+  const [draft, setDraft] = useState<string | null>(null)
+  const [draftBase, setDraftBase] = useState(value)
+
+  if (draftBase !== value) {
+    setDraftBase(value)
+    setDraft(null)
+  }
+
+  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const raw = event.target.value
+    const parsed = parseNumberInput(raw)
+
+    if (parsed !== undefined && canCommitLive(parsed)) {
+      setDraft(null)
+      onCommit(parsed)
+
+      return
+    }
+
+    setDraft(raw)
+  }
+
+  const handleBlur = () => {
+    if (draft === null) {
+      return
+    }
+
+    const parsed = parseNumberInput(draft)
+
+    setDraft(null)
+
+    if (parsed !== undefined) {
+      onCommit(parsed)
+    }
+  }
 
   return (
     <div className="relative flex-1">
@@ -124,11 +157,12 @@ const NumberRangeInput = (props: NumberRangeInputProps) => {
       ) : null}
       <Input
         type="number"
-        value={value}
+        value={draft ?? value}
         min={min}
         max={max}
         step={step}
-        onChange={onChange}
+        onChange={handleChange}
+        onBlur={handleBlur}
         aria-label={ariaLabel}
         className={cn('h-9', unitSymbol && 'pl-6')}
       />
@@ -136,9 +170,24 @@ const NumberRangeInput = (props: NumberRangeInputProps) => {
   )
 }
 
+/** `Number('')` is 0, so an emptied field would otherwise commit the value 0. */
+const parseNumberInput = (raw: string): number | undefined => {
+  if (raw.trim() === '') {
+    return undefined
+  }
+
+  const parsed = Number(raw)
+
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+const clampEdge = (edge: number, bounds: NumberRangeValue): number => {
+  return Math.min(Math.max(edge, bounds.min), bounds.max)
+}
+
 const clampRange = (next: NumberRangeValue, bounds: NumberRangeValue): NumberRangeValue => {
-  const min = Math.min(Math.max(next.min, bounds.min), bounds.max)
-  const max = Math.max(Math.min(next.max, bounds.max), bounds.min)
+  const min = clampEdge(next.min, bounds)
+  const max = clampEdge(next.max, bounds)
 
   return min <= max ? { min, max } : { min: max, max: min }
 }
