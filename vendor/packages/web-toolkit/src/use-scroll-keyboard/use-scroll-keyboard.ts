@@ -3,7 +3,7 @@ import type { RefObject } from 'react'
 import { useEffect } from 'react'
 
 interface UseStickyProps {
-  scrollRef?: RefObject<HTMLDivElement>
+  scrollRef?: RefObject<HTMLElement | null>
 }
 
 /**
@@ -14,25 +14,30 @@ interface UseStickyProps {
  */
 export const useScrollKeyboard = ({ scrollRef }: UseStickyProps) => {
   useEffect(() => {
-    if (scrollRef?.current) {
+    // Captured now: React has already cleared the ref by the time an unmount cleanup runs.
+    const scrollElement = scrollRef?.current
+
+    if (scrollElement) {
       const inputElement = document.querySelector<HTMLInputElement>('[data-mobile-input="true"]')
+      let frameId: number | undefined
 
       const handleScroll = () => {
-        requestAnimationFrame(() => {
-          if (document.activeElement === inputElement) {
-            inputElement?.blur()
+        frameId = requestAnimationFrame(() => {
+          if (inputElement && document.activeElement === inputElement) {
+            inputElement.blur()
           }
         })
       }
 
       const throttledFn = throttle(handleScroll, 50)
 
-      scrollRef.current.addEventListener('scroll', throttledFn)
+      scrollElement.addEventListener('scroll', throttledFn)
 
       return () => {
-        if (scrollRef.current) {
-          scrollRef.current.removeEventListener('scroll', throttledFn)
-        }
+        scrollElement.removeEventListener('scroll', throttledFn)
+        throttledFn.cancel()
+
+        if (frameId !== undefined) cancelAnimationFrame(frameId)
       }
     }
   }, [])
