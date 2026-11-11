@@ -6,6 +6,7 @@ import { buildSiteIndex, getShrinkRefusal } from '../core/build.js'
 import { SiteIndexError } from '../core/errors.js'
 import { parseManifest } from '../core/manifest.js'
 import type { SiteIndexConfig, SiteIndexFileName, SiteIndexFiles } from '../core/types.js'
+import type { PutObjectsOutcome } from './s3.js'
 import { isNoSuchKey, listJsonKeys, putObject, putObjects, readJson } from './s3.js'
 
 export const MANIFESTS_PREFIX = 'manifests/'
@@ -62,28 +63,48 @@ const getFileNames = (files: SiteIndexFiles) => {
 const invalidate = async (
   cloudFront: CloudFrontClient,
   distributionId: string,
-  files: SiteIndexFiles,
+  paths: string[],
   callerReference: string,
 ): Promise<string | undefined> => {
-  const paths = getFileNames(files).map((name) => {
-    return `/${name}`
-  })
+  const invalidation = await cloudFront.send(
+    new CreateInvalidationCommand({
+      DistributionId: distributionId,
+      InvalidationBatch: { CallerReference: callerReference, Paths: { Items: paths, Quantity: paths.length } },
+    }),
+  )
+
+  return invalidation.Invalidation?.Id
+}
+
+const toPublicPath = (key: string): string => {
+  return `/${key.slice(PUBLIC_PREFIX.length)}`
+}
+
+/**
+ * The files that did get written are live at the origin; without an invalidation the CDN would serve
+ * a stale mix of old and new until someone re-runs. The put failure stays the error either way.
+ */
+const toPartialPublishError = async (
+  outcome: PutObjectsOutcome,
+  total: number,
+  bucket: string,
+  cloudFront: CloudFrontClient,
+  distributionId: string | undefined,
+): Promise<SiteIndexError> => {
+  const { writtenKeys, failures, cause } = outcome
+  const message = `Wrote ${writtenKeys.length} of ${total} objects to s3://${bucket}; re-run to repair`
+  const paths = writtenKeys.map(toPublicPath)
+
+  if (!distributionId || paths.length === 0) return new SiteIndexError(message, failures, { cause })
 
   try {
-    const invalidation = await cloudFront.send(
-      new CreateInvalidationCommand({
-        DistributionId: distributionId,
-        InvalidationBatch: { CallerReference: callerReference, Paths: { Items: paths, Quantity: paths.length } },
-      }),
-    )
+    const invalidationId = await invalidate(cloudFront, distributionId, paths, new Date().toISOString())
 
-    return invalidation.Invalidation?.Id
+    return new SiteIndexError(`${message}; invalidated ${paths.join(', ')} (${invalidationId})`, failures, { cause })
   } catch (error) {
-    throw new SiteIndexError(
-      `Published, but the CloudFront invalidation of ${distributionId} failed; re-run to retry`,
-      [String(error)],
-      { cause: error },
-    )
+    const invalidationFailure = `CloudFront invalidation of ${distributionId} for ${paths.join(', ')} failed: ${String(error)}`
+
+    return new SiteIndexError(message, [...failures, invalidationFailure], { cause })
   }
 }
 
@@ -118,13 +139,15 @@ export const createSiteIndexHandler = (options: SiteIndexHandlerOptions) => {
     if (refusal) throw new SiteIndexError(refusal)
     if (stats.duplicates.length > 0) warn('site-index: duplicate paths dropped', stats.duplicates)
 
-    await putObjects(
-      s3,
-      bucket,
-      getFileNames(files).map((name) => {
-        return { key: `${PUBLIC_PREFIX}${name}`, body: files[name], contentType: CONTENT_TYPES[name] }
-      }),
-    )
+    const objects = getFileNames(files).map((name) => {
+      return { key: `${PUBLIC_PREFIX}${name}`, body: files[name], contentType: CONTENT_TYPES[name] }
+    })
+
+    const outcome = await putObjects(s3, bucket, objects)
+
+    if (outcome.failures.length > 0) {
+      throw await toPartialPublishError(outcome, objects.length, bucket, cloudFront, distributionId)
+    }
 
     const state: SiteIndexRunState = { ...stats, generatedAt: new Date().toISOString() }
 
@@ -138,9 +161,21 @@ export const createSiteIndexHandler = (options: SiteIndexHandlerOptions) => {
     const result: SiteIndexRunResult = { ...state }
 
     if (distributionId) {
-      const invalidationId = await invalidate(cloudFront, distributionId, files, state.generatedAt)
+      const paths = objects.map((object) => {
+        return toPublicPath(object.key)
+      })
 
-      if (invalidationId) result.invalidationId = invalidationId
+      try {
+        const invalidationId = await invalidate(cloudFront, distributionId, paths, state.generatedAt)
+
+        if (invalidationId) result.invalidationId = invalidationId
+      } catch (error) {
+        throw new SiteIndexError(
+          `Published, but the CloudFront invalidation of ${distributionId} failed; re-run to retry`,
+          [String(error)],
+          { cause: error },
+        )
+      }
     }
 
     return result

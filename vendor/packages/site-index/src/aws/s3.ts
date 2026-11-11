@@ -49,30 +49,36 @@ export const putObject = async (s3: S3Client, bucket: string, object: BucketObje
   )
 }
 
+export interface PutObjectsOutcome {
+  writtenKeys: string[]
+  /** `<key>: <reason>` per failed put; empty when every put succeeded. */
+  failures: string[]
+  cause?: unknown
+}
+
 /**
  * S3 has no multi-object transaction, so a failed put can leave the rest replaced. Every put is
- * awaited before failing: the error names what is stale, and no request outlives the invocation.
+ * awaited before returning, so the outcome names what is stale and no request outlives the invocation.
  */
-export const putObjects = async (s3: S3Client, bucket: string, objects: BucketObject[]): Promise<void> => {
+export const putObjects = async (s3: S3Client, bucket: string, objects: BucketObject[]): Promise<PutObjectsOutcome> => {
   const results = await Promise.allSettled(
     objects.map((object) => {
       return putObject(s3, bucket, object)
     }),
   )
 
-  const failures = results.flatMap((result, index) => {
-    return result.status === 'rejected' ? [`${objects[index]?.key}: ${String(result.reason)}`] : []
-  })
+  const outcome: PutObjectsOutcome = { writtenKeys: [], failures: [] }
 
-  if (failures.length === 0) return
+  for (const [index, result] of results.entries()) {
+    const key = objects[index]?.key ?? ''
 
-  const cause = results.find((result) => {
-    return result.status === 'rejected'
-  })?.reason
+    if (result.status === 'fulfilled') {
+      outcome.writtenKeys.push(key)
+    } else {
+      outcome.failures.push(`${key}: ${String(result.reason)}`)
+      outcome.cause ??= result.reason
+    }
+  }
 
-  throw new SiteIndexError(
-    `Wrote ${objects.length - failures.length} of ${objects.length} objects to s3://${bucket}; re-run to repair`,
-    failures,
-    { cause },
-  )
+  return outcome
 }

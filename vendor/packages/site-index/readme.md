@@ -53,9 +53,11 @@ under `config.disallow`, two manifests share a producer, or the URL count fell m
 an intended drop.
 
 Every failure is a `SiteIndexError` naming the S3 object or file it came from. S3 has no multi-object
-transaction: when a put fails mid-publish the error lists the stale files, the shrink baseline stays
-where it was, and a re-run repairs it. A failed CloudFront invalidation is reported as such — the
-files are already live.
+transaction: when a put fails mid-publish the files that did get written are invalidated in
+CloudFront (so the CDN does not serve a stale mix), then the run still fails with the error listing
+the stale files; the shrink baseline stays where it was, and a re-run repairs it. If that
+invalidation fails too, it is added to the same error rather than replacing it. After a full publish,
+a failed CloudFront invalidation is reported as such — the files are already live.
 
 ## Wiring
 

@@ -293,6 +293,52 @@ describe('createSiteIndexHandler', () => {
     expect(JSON.parse(bucket.objects.get(STATE_KEY) ?? '{}')).toMatchObject({ generatedAt: 'before' })
   })
 
+  it('invalidates the files a partial publish did write, then still fails naming the stale one', async () => {
+    const bucket = createFakeBucket({ 'manifests/client.json': manifest('client', [{ path: '/' }]) }, 1000, {
+      putKeys: ['public/robots.txt'],
+    })
+
+    const error = await createHandler(bucket, { distributionId: 'E1' })().catch((caught: unknown) => {
+      return caught
+    })
+
+    expect(bucket.invalidations).toEqual([['/sitemap.xml', '/llms.txt']])
+    expect(error).toBeInstanceOf(SiteIndexError)
+    expect((error as SiteIndexError).message).toContain('Wrote 2 of 3 objects')
+    expect((error as SiteIndexError).message).toContain('invalidated /sitemap.xml, /llms.txt (I123)')
+    expect((error as SiteIndexError).issues).toEqual(['public/robots.txt: Error: SlowDown'])
+  })
+
+  it('keeps the put failure as the error when the invalidation after a partial publish fails too', async () => {
+    const throttled = new Error('TooManyInvalidationsInProgress')
+
+    const bucket = createFakeBucket({ 'manifests/client.json': manifest('client', [{ path: '/' }]) }, 1000, {
+      putKeys: ['public/robots.txt'],
+      invalidation: throttled,
+    })
+
+    const error = await createHandler(bucket, { distributionId: 'E1' })().catch((caught: unknown) => {
+      return caught
+    })
+
+    expect(error).toBeInstanceOf(SiteIndexError)
+    expect((error as SiteIndexError).message).toContain('Wrote 2 of 3 objects')
+    expect((error as SiteIndexError).issues).toEqual([
+      'public/robots.txt: Error: SlowDown',
+      'CloudFront invalidation of E1 for /sitemap.xml, /llms.txt failed: Error: TooManyInvalidationsInProgress',
+    ])
+    expect(((error as Error).cause as Error).message).toBe('SlowDown')
+  })
+
+  it('invalidates nothing when every put failed', async () => {
+    const bucket = createFakeBucket({ 'manifests/client.json': manifest('client', [{ path: '/' }]) }, 1000, {
+      putKeys: ['public/robots.txt', 'public/sitemap.xml', 'public/llms.txt'],
+    })
+
+    await expect(createHandler(bucket, { distributionId: 'E1' })()).rejects.toThrow('Wrote 0 of 3 objects')
+    expect(bucket.invalidations).toEqual([])
+  })
+
   it('says the files are live when only the invalidation failed', async () => {
     const throttled = new Error('TooManyInvalidationsInProgress')
 
