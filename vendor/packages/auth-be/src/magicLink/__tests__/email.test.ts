@@ -36,6 +36,13 @@ describe('renderMagicLinkEmail', () => {
     expect(email.text).toContain('<b>x</b>')
   })
 
+  it('escapes the link in the href attribute only', () => {
+    const email = renderMagicLinkEmail('ada@example.com', 'https://app.test/v?token=abc&redirect=%2Fx', 15, TEXT)
+
+    expect(email.html).toContain('href="https://app.test/v?token=abc&amp;redirect=%2Fx"')
+    expect(email.text).toContain('https://app.test/v?token=abc&redirect=%2Fx')
+  })
+
   it("escapes the default warning's apostrophe in html and keeps it in text", () => {
     const email = renderMagicLinkEmail('ada@example.com', 'https://app.test/v?token=abc', 15, TEXT)
 

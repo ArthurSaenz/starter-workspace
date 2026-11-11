@@ -1,4 +1,5 @@
 /* eslint-disable sonarjs/no-hardcoded-ip -- fixture client IPs */
+import { Buffer } from 'node:buffer'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createFakes, invitedUser, tokenFromEmail } from '../../__tests__/helpers/fakes.js'
@@ -101,6 +102,14 @@ describe('auth routes', () => {
       expect(fakes.mailer.send).toHaveBeenCalledTimes(1)
     },
   )
+
+  it('requestMagicLink reads a base64-encoded body', async () => {
+    const { routes, wrap, fakes } = setup()
+    const body = Buffer.from('{"email":"ada@example.com"}').toString('base64')
+
+    expect((await wrap(routes.requestMagicLink)({ body, isBase64Encoded: true })).statusCode).toBe(200)
+    expect(fakes.mailer.send).toHaveBeenCalledTimes(1)
+  })
 
   it('requestMagicLink surfaces NOT_INVITED on a `reject` host', async () => {
     const { routes, wrap } = setup('reject')

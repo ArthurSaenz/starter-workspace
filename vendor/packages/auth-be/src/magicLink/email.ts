@@ -72,7 +72,7 @@ export const renderMagicLinkEmail = (
     text: `${text.intro}\n\n${link}\n\n${expiryLine}\n\n${warning}`,
     html:
       `<p>${escapeHtml(text.intro)}</p>` +
-      `<p><a href="${link}">${escapeHtml(text.linkLabel)}</a></p>` +
+      `<p><a href="${escapeHtml(link)}">${escapeHtml(text.linkLabel)}</a></p>` +
       `<p>${escapeHtml(expiryLine)}</p>` +
       `<p>${escapeHtml(warning)}</p>`,
   }

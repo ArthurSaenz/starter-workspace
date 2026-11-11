@@ -5,6 +5,8 @@ export interface LambdaEvent {
   headers?: HeaderBag
   queryStringParameters?: Record<string, string | undefined> | null
   body?: string | null
+  /** Set by API Gateway when the body matched one of the API's binary media types. */
+  isBase64Encoded?: boolean | null
   requestContext?: { identity?: { sourceIp?: string | null } }
 }
 

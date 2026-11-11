@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer'
+
 import type { MagicLinkAuth } from '../magicLink/magicLinkAuth.js'
 import type { AuthContext, AuthUser } from '../ports.js'
 import type { RequestMeta } from '../session/types.js'
@@ -63,7 +65,8 @@ export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthC
 
       if (event.body) {
         try {
-          parsed = JSON.parse(event.body)
+          // An API with `*/*` among its binary media types hands even a JSON body over base64-encoded.
+          parsed = JSON.parse(event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf8') : event.body)
         } catch {
           return genericOk()
         }
