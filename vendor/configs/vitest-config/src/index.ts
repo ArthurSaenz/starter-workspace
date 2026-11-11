@@ -53,8 +53,8 @@ export const defineNodeConfig = (dirname: string, overrides: ViteUserConfig = {}
  * Browser-mode tests without a framework plugin. Use this only for non-React packages
  * (they supply their own plugin via `overrides`); React packages want `defineReactBrowserConfig`.
  */
-export const defineBrowserConfig = (dirname: string, overrides: ViteUserConfig = {}): ViteUserConfig =>
-  mergeConfig(
+export const defineBrowserConfig = (dirname: string, overrides: ViteUserConfig = {}): ViteUserConfig => {
+  const merged = mergeConfig(
     {
       resolve: {
         alias: rootAliasFor(dirname),
@@ -72,20 +72,32 @@ export const defineBrowserConfig = (dirname: string, overrides: ViteUserConfig =
     },
     overrides,
   )
+  const instances = overrides.test?.browser?.instances
+
+  // mergeConfig concatenates arrays, so a consumer asking for firefox would also get chromium.
+  if (instances && merged.test?.browser) {
+    merged.test.browser.instances = instances
+  }
+
+  return merged
+}
 
 /** Browser-mode tests for React packages, rendered through `vitest-browser-react`. */
 export const defineReactBrowserConfig = (dirname: string, overrides: ViteUserConfig = {}): ViteUserConfig =>
-  mergeConfig(
-    defineBrowserConfig(dirname, {
-      // The plugin's own Vite version can differ from the workspace one, which makes the
-      // structurally identical Plugin types incompatible.
-      plugins: [react() as never],
-      resolve: {
-        // Without this, Vite pre-bundles `radix-ui` and `vitest-browser-react` into separate dep
-        // chunks that each resolve their own React, so any test rendering a Radix primitive dies
-        // on `Cannot read properties of null (reading 'useRef')`.
-        dedupe: ['react', 'react-dom'],
+  defineBrowserConfig(
+    dirname,
+    mergeConfig(
+      {
+        // The plugin's own Vite version can differ from the workspace one, which makes the
+        // structurally identical Plugin types incompatible.
+        plugins: [react() as never],
+        resolve: {
+          // Without this, Vite pre-bundles `radix-ui` and `vitest-browser-react` into separate dep
+          // chunks that each resolve their own React, so any test rendering a Radix primitive dies
+          // on `Cannot read properties of null (reading 'useRef')`.
+          dedupe: ['react', 'react-dom'],
+        },
       },
-    }),
-    overrides,
+      overrides,
+    ),
   )
