@@ -62,8 +62,17 @@ export const createFakes = (seed: TestUser[] = []) => {
 
       return { email: row.email, redirectUrl: row.redirectUrl ?? null, expiresAt: row.expiresAt ?? new Date(0) }
     }),
-    release: vi.fn(async (tokenHash: string, _record: StoredMagicToken) => {
-      for (const token of tokens) if (token.tokenHash === tokenHash) token.spent = false
+    // Models the delete-based store: re-arm only while no newer token exists for the email.
+    release: vi.fn(async (tokenHash: string, record: StoredMagicToken) => {
+      const index = tokens.findIndex((token) => {
+        return token.tokenHash === tokenHash
+      })
+
+      const superseded = tokens.slice(index + 1).some((token) => {
+        return token.email === record.email
+      })
+
+      if (index !== -1 && !superseded) tokens[index]!.spent = false
     }),
     invalidateByEmail: vi.fn(async (email: string) => {
       for (const token of tokens) if (token.email === email) token.spent = true

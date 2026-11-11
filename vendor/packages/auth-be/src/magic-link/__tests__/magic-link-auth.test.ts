@@ -619,6 +619,37 @@ describe('verifyMagicLink', () => {
     expect(fakes.sessions).toHaveLength(1)
   })
 
+  it('does not hand back a link that a newer request invalidated while the sign-in was failing', async () => {
+    const fakes = createFakes([invitedUser()])
+    const outage = new Error('db down')
+    let failSignIn: (error: Error) => void = () => {}
+
+    fakes.config.onSignIn = vi.fn().mockImplementationOnce(async () => {
+      await new Promise<void>((_resolve, reject) => {
+        failSignIn = reject
+      })
+    })
+
+    const auth = createMagicLinkAuth(fakes.config)
+
+    await auth.requestMagicLink({ email: 'ada@example.com' })
+
+    const oldToken = tokenFromEmail(fakes.sent[0]!)
+    const slowVerify = auth.verifyMagicLink({ rawToken: oldToken })
+
+    await vi.waitFor(() => {
+      expect(fakes.config.onSignIn).toHaveBeenCalledOnce()
+    })
+    await auth.requestMagicLink({ email: 'ada@example.com' })
+    failSignIn(outage)
+
+    await expect(slowVerify).rejects.toBe(outage)
+    await expectAuthError(auth.verifyMagicLink({ rawToken: oldToken }), 'INVALID_OR_EXPIRED_TOKEN', 401)
+    await expect(auth.verifyMagicLink({ rawToken: tokenFromEmail(fakes.sent[1]!) })).resolves.toMatchObject({
+      redirectUrl: '/',
+    })
+  })
+
   it('throws the original failure, and logs, when handing the link back fails too', async () => {
     const fakes = createFakes([invitedUser()])
     const outage = new Error('db down')

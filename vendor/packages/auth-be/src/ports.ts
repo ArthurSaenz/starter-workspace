@@ -51,7 +51,10 @@ export interface MagicTokenStore<TCtx extends AuthContext = AuthContext> {
   consumeByHash: (tokenHash: string, ctx?: TCtx) => Promise<StoredMagicToken | null>
   /**
    * Undo `consumeByHash` after the sign-in failed on a store or host error, so the next click works.
-   * `record` is what `consumeByHash` returned, for a store that deleted the row and must re-insert it.
+   * It undoes a consume only, never an invalidation: a link superseded by `invalidateByEmail` while
+   * the sign-in ran must stay dead. `record` is what `consumeByHash` returned; a store that deleted
+   * the row on consume re-inserts it only when no newer token exists for `record.email`, checked
+   * and inserted in one atomic step.
    */
   release: (tokenHash: string, record: StoredMagicToken, ctx?: TCtx) => Promise<void>
   invalidateByEmail: (email: string, ctx?: TCtx) => Promise<void>
