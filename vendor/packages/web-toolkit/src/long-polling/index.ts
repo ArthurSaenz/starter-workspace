@@ -4,6 +4,8 @@ export interface PollArgs<T> {
   intervalMs: number
   maxAttempts?: number
   firstDelayMs?: number
+  /** Stops polling: the returned promise rejects with `signal.reason` at the next wait or attempt. */
+  signal?: AbortSignal
 }
 
 /**
@@ -15,22 +17,23 @@ export interface PollArgs<T> {
  *         condition: (res) => res.status === 'pending',
  *         intervalMs: 2000,
  *         maxAttempts: 10,
+ *         signal: controller.signal,
  *     })
  */
 export const poll = async <T>(args: PollArgs<T>): Promise<T> => {
-  const { fn, condition, intervalMs, maxAttempts = 10, firstDelayMs = 0 } = args
+  const { fn, condition, intervalMs, maxAttempts = 10, firstDelayMs = 0, signal } = args
 
   if (firstDelayMs > 0) {
-    await new Promise((r) => {
-      return setTimeout(r, firstDelayMs)
-    })
+    await wait(firstDelayMs, signal)
   }
+
+  signal?.throwIfAborted()
 
   let result = await fn()
   let attempts = 0
 
   while (condition(result) && attempts < maxAttempts) {
-    await wait(intervalMs)
+    await wait(intervalMs, signal)
     attempts++
     result = await fn()
   }
@@ -38,8 +41,21 @@ export const poll = async <T>(args: PollArgs<T>): Promise<T> => {
   return result
 }
 
-const wait = async (ms: number): Promise<void> => {
-  await new Promise((r) => {
-    return setTimeout(r, ms)
+/** Resolves after `ms`, or rejects with `signal.reason` as soon as the signal aborts. */
+export const wait = (ms: number, signal?: AbortSignal): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    signal?.throwIfAborted()
+
+    const onAbort = () => {
+      clearTimeout(timer)
+      reject(signal?.reason)
+    }
+
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+
+    signal?.addEventListener('abort', onAbort, { once: true })
   })
 }

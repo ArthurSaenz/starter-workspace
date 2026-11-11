@@ -218,6 +218,62 @@ describe('httpClient.fetch', () => {
     expect(fetchInstance).not.toHaveBeenCalled()
   })
 
+  describe('cancellation', () => {
+    const abortableFetch = () => {
+      return vi.fn<typeof fetch>((_url, init) => {
+        return new Promise((_resolve, reject) => {
+          init!.signal!.addEventListener('abort', () => {
+            reject(init!.signal!.reason)
+          })
+        })
+      })
+    }
+
+    it('rejects an aborted request with the platform AbortError, unwrapped', async () => {
+      const fetchInstance = abortableFetch()
+      const controller = new AbortController()
+      const pending = new HttpClient('https://api.test', fetchInstance).fetch('/a', { signal: controller.signal })
+
+      controller.abort()
+
+      const error = await rejectionOf<DOMException>(pending)
+
+      expect(error).toBe(controller.signal.reason)
+      expect(error.name).toBe('AbortError')
+      expect(requestOf(fetchInstance).init.signal).toBe(controller.signal)
+    })
+
+    it('makes no further attempt once a retried request is aborted', async () => {
+      const fetchInstance = abortableFetch()
+      const controller = new AbortController()
+
+      const pending = new HttpClient('https://api.test', fetchInstance).fetch(
+        '/a',
+        { signal: controller.signal },
+        { retries: 3 },
+      )
+
+      controller.abort()
+
+      await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+      expect(fetchInstance).toHaveBeenCalledOnce()
+    })
+
+    it('stops waiting between retries as soon as it is aborted', async () => {
+      vi.useFakeTimers()
+
+      const { client, fetchInstance } = clientFor(new Error('down'))
+      const controller = new AbortController()
+      const pending = client.fetch('/a', { signal: controller.signal }, { retries: 3, delay: 1000 })
+
+      await vi.advanceTimersByTimeAsync(500)
+      controller.abort()
+
+      await expect(pending).rejects.toBe(controller.signal.reason)
+      expect(fetchInstance).toHaveBeenCalledOnce()
+    })
+  })
+
   describe('retries', () => {
     it('waits `delay` between attempts', async () => {
       vi.useFakeTimers()

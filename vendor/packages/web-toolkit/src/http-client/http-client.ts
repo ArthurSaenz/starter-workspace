@@ -1,3 +1,4 @@
+import { wait } from '../long-polling'
 import { ServerError } from './errors/server-error'
 
 declare global {
@@ -13,6 +14,8 @@ interface FetchOptions {
   token?: string
   headers?: Record<string, string>
   body?: Record<string, unknown> | string | FormData
+  /** Aborting rejects the request with the signal's reason (an `AbortError` by default), unwrapped, and stops retries. */
+  signal?: AbortSignal
 }
 
 interface HttpClientConfig {
@@ -41,8 +44,12 @@ export class HttpClient<R extends string = string> {
     options: FetchOptions = {},
     config?: HttpClientConfig,
   ): Promise<{ body: T; status: number; headers?: Record<string, string>; ok: boolean }> {
-    const requestOptions: Record<string, string | undefined | Headers | Record<string, unknown> | FormData> = {
+    const requestOptions: Record<
+      string,
+      string | undefined | Headers | Record<string, unknown> | FormData | AbortSignal
+    > = {
       method: options.method || (options.body ? 'POST' : 'GET'),
+      signal: options.signal,
       ...additionalConfig(),
     }
 
@@ -76,6 +83,8 @@ export class HttpClient<R extends string = string> {
       config,
       fetchInstance: this.fetchInstance,
     }).catch((error: unknown) => {
+      if (options.signal?.aborted) throw error
+
       throw new Error(`Network error: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
     })
 
@@ -185,14 +194,14 @@ const fetchWrap = async (args: FetchWrapArgs) => {
 
   for (let attempt = 0; attempt < attempts; attempt++) {
     if (attempt > 0 && config.delay) {
-      await new Promise((r) => {
-        return setTimeout(r, config.delay)
-      })
+      await wait(config.delay, options.signal ?? undefined)
     }
 
     try {
       return await _fetch(url, options)
     } catch (_error) {
+      if (options.signal?.aborted) throw _error
+
       error = _error
     }
   }
