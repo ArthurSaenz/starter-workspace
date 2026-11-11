@@ -169,8 +169,12 @@ export const createDocsAggregation = (params: { appDir: string; contentRel?: str
 
     try {
       raw = (await readFile(absPath, 'utf8')).replace(/\r\n/g, '\n')
-    } catch {
-      return null
+    } catch (error) {
+      // Only a vanished file falls back to the path slug; an unreadable one would otherwise be
+      // prerendered at a URL its frontmatter does not ask for.
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+
+      throw error
     }
 
     const block = raw.match(/^---\n([\s\S]*?)\n---/)

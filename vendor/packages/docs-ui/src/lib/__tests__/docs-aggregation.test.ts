@@ -59,4 +59,8 @@ describe('readDocSlugOverride', () => {
   it('returns null for a missing file', async () => {
     expect(await readDocSlugOverride(path.join(dir, 'does-not-exist.md'))).toBeNull()
   })
+
+  it('fails on a file it cannot read instead of falling back to the path slug', async () => {
+    await expect(readDocSlugOverride(dir)).rejects.toThrow(/EISDIR/)
+  })
 })
