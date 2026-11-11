@@ -102,6 +102,32 @@ describe('script', () => {
     expect(onLoad).not.toHaveBeenCalled()
   })
 
+  it('retries a failed load on the next mount of the same src', async () => {
+    const src = brokenSrc()
+    const firstError = vi.fn()
+    const retryError = vi.fn()
+
+    const screen = await render(<Script src={src} onError={firstError} />)
+
+    await expect
+      .poll(() => {
+        return firstError.mock.calls.length
+      })
+      .toBe(1)
+    expect(scriptsWith(src)).toHaveLength(0)
+
+    await screen.unmount()
+    await render(<Script src={src} onError={retryError} />)
+
+    expect(scriptsWith(src)).toHaveLength(1)
+    await expect
+      .poll(() => {
+        return retryError.mock.calls.length
+      })
+      .toBe(1)
+    expect(scriptsWith(src)).toHaveLength(0)
+  })
+
   it('runs an inline script and calls onReady again on a later mount', async () => {
     const onReady = vi.fn()
 

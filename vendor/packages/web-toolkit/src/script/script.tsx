@@ -143,6 +143,9 @@ const loadScript = (props: ScriptProps): void => {
     })
 
     element.addEventListener('error', (e) => {
+      // Forget the failure so the next mount of this src injects a fresh element instead of replaying the rejection.
+      ScriptCache.delete(src)
+      element.remove()
       reject(e)
     })
   })
