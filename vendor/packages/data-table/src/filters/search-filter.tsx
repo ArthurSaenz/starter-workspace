@@ -19,6 +19,7 @@ export const SearchFilter = (props: SearchFilterProps) => {
 
   const [localValue, setLocalValue] = useState(value)
   const onChangeRef = useRef(onChange)
+  const lastEmittedRef = useRef(value)
 
   onChangeRef.current = onChange
 
@@ -28,6 +29,7 @@ export const SearchFilter = (props: SearchFilterProps) => {
     }
 
     return debounce((nextValue: string) => {
+      lastEmittedRef.current = nextValue
       onChangeRef.current(nextValue)
     }, debounceMs)
   }, [debounceMs])
@@ -39,6 +41,14 @@ export const SearchFilter = (props: SearchFilterProps) => {
   }, [debouncedOnChange])
 
   useEffect(() => {
+    // The echo of our own emit can land after the user typed on (a consumer that applies the
+    // filter in a transition). Resyncing to it would erase those keystrokes and cancel their
+    // pending emit, so only a value set from outside replaces the field.
+    if (value === lastEmittedRef.current) {
+      return
+    }
+
+    lastEmittedRef.current = value
     setLocalValue(value)
     debouncedOnChange?.cancel()
   }, [value, debouncedOnChange])
@@ -51,6 +61,7 @@ export const SearchFilter = (props: SearchFilterProps) => {
     if (debouncedOnChange) {
       debouncedOnChange(nextValue)
     } else {
+      lastEmittedRef.current = nextValue
       onChange(nextValue)
     }
   }

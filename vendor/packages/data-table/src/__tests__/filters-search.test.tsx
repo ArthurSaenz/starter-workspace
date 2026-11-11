@@ -97,4 +97,47 @@ describe('searchFilter', () => {
     await screen.getByRole('button', { name: 'reset' }).click()
     await expect.element(screen.getByRole('textbox')).toHaveValue('reset')
   })
+
+  it('keeps typing that lands before the debounced value echoes back', async () => {
+    const onChange = vi.fn()
+
+    // Applies each change late, as a consumer filtering inside a transition would.
+    const LaggingHarness = () => {
+      const [value, setValue] = useState('')
+
+      return (
+        <SearchFilter
+          config={buildConfig({
+            value,
+            debounceMs: 100,
+            onChange: (next) => {
+              onChange(next)
+              setTimeout(() => {
+                setValue(next)
+              }, 60)
+            },
+          })}
+        />
+      )
+    }
+
+    const screen = await render(<LaggingHarness />)
+    const input = screen.getByRole('textbox')
+
+    await input.fill('ab')
+    await expect
+      .poll(() => {
+        return onChange.mock.calls.length
+      })
+      .toBe(1)
+
+    await input.fill('abc')
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 350)
+    })
+
+    await expect.element(input).toHaveValue('abc')
+    expect(onChange).toHaveBeenLastCalledWith('abc')
+  })
 })
