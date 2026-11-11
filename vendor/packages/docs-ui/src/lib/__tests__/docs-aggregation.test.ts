@@ -113,4 +113,10 @@ describe('getAllDocUrls', () => {
       '/docs/billing/changelog is claimed by both packages/api/docs/release-notes.md and packages/billing/docs/changelog.md',
     )
   })
+
+  it('skips a directory whose name ends in .md and still lists the docs inside it', async () => {
+    await writeRepoFile('packages/lib/docs/notes.md/inner.md')
+
+    expect(await getAllDocUrls()).toEqual(['/docs/lib/notes.md/inner'])
+  })
 })

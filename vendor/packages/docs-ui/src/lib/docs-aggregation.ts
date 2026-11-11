@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { glob, readFile } from 'node:fs/promises'
+import { glob, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 
 import { makeDeriveTitle, makePathToSlugs, toPosix } from './slugs.ts'
@@ -150,7 +150,9 @@ export const createDocsAggregation = (params: { appDir: string; contentRel?: str
     for await (const entry of glob(includeGlobs, { cwd: repoRoot })) {
       const rel = toPosix(entry)
 
-      if (!isIgnoredDocPath(rel)) out.push(rel)
+      // fs.glob also yields directories (`notes.md/`); fumadocs-mdx globs files only, and the
+      // glob descends into the directory on its own. `stat` follows symlinks, as fumadocs does.
+      if (!isIgnoredDocPath(rel) && (await stat(path.join(repoRoot, entry))).isFile()) out.push(rel)
     }
 
     return [...new Set(out)].sort()

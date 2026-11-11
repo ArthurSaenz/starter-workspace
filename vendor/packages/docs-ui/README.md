@@ -21,7 +21,7 @@ synced from the template.
 
 `src/lib/docs-aggregation.ts` is the single source of truth (node-only; build/server config) for:
 
-- **What is published** — any `.md`/`.mdx` under a `docs/` directory in an app or package, plus
+- **What is published** — any `.md`/`.mdx` file (a directory named `*.md` is walked, not published) under a `docs/` directory in an app or package, plus
   the repo-root `content/`.
 - **URLs** — file paths are mapped to clean, package-grouped slugs
   (e.g. `apps/ai/agent/docs/draft.md` → `/docs/ai-agent/draft`).
