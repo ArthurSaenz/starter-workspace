@@ -4,6 +4,12 @@ import * as idb from 'idb-keyval'
  * https://github.com/sach2211/idbcache
  */
 
+const EXPIRY_PREFIX = '__ExpiryTimeStamp__'
+
+const expiryKeyOf = (key: IDBValidKey) => {
+  return `${EXPIRY_PREFIX}${String(key)}`
+}
+
 /**
  * Stores a value in IndexedDB with a time-to-live expiry.
  *
@@ -17,7 +23,11 @@ export const set = async <T>(key: string, value: T, ttl: number) => {
   try {
     const timeToExpire = Date.now() + ttl * 1000
 
-    await Promise.all([idb.set(key, value), idb.set(`__ExpiryTimeStamp__${key}`, timeToExpire)])
+    // One transaction, value first: a value that cannot be stored must not leave a fresh expiry behind.
+    await idb.setMany([
+      [key, value],
+      [expiryKeyOf(key), timeToExpire],
+    ])
 
     // Once the keys are set, remove any expired keys.
     removeExpiredKeys()
@@ -42,7 +52,7 @@ export const get = async <T = unknown>(key: IDBValidKey): Promise<T | null> => {
       return payload
     }
 
-    const timeStamp = await idb.get(`__ExpiryTimeStamp__${key}`)
+    const timeStamp = await idb.get(expiryKeyOf(key))
 
     if (timeStamp > Date.now()) {
       const data = await idb.get(key)
@@ -60,30 +70,23 @@ export const get = async <T = unknown>(key: IDBValidKey): Promise<T | null> => {
   }
 }
 
+/** Deletes a key together with its expiry entry; either one may be passed. */
 export const remove = (key: IDBValidKey) => {
-  // Delete a specific key and its timestamp key.
-  if (isInternalExpiryTimestampKey(key)) {
-    // if trying to delete the expiryTimeStamp key, delete the original key as well.
-    idb.del(key)
-    idb.del((key as string).slice('__ExpiryTimeStamp__'.length))
-  } else {
-    // if trying to delete the original key, delete the expiryTimeStamp key as well.
-    idb.del(key)
-    idb.del(`__${key}ExpiryTimeStamp`)
-  }
+  const pair = isInternalExpiryTimestampKey(key) ? [key, key.slice(EXPIRY_PREFIX.length)] : [key, expiryKeyOf(key)]
+
+  idb.delMany(pair).catch(console.error)
 }
 
 export const flush = () => {
-  idb.clear()
+  idb.clear().catch(console.error)
 }
 
 const all = () => {
   return idb.keys()
 }
 
-const isInternalExpiryTimestampKey = (key: IDBValidKey) => {
-  // timestamp keys have following format : '__<key>ExpiryTimeStamp'
-  return (key as string).match(/__ExpiryTimeStamp__\w*/g)
+const isInternalExpiryTimestampKey = (key: IDBValidKey): key is string => {
+  return typeof key === 'string' && key.startsWith(EXPIRY_PREFIX)
 }
 
 /**
@@ -97,7 +100,7 @@ const getAllInternalTimestampKeys = async (): Promise<IDBValidKey[] | null> => {
     const keys = await all()
 
     const internalKeys = keys.filter((thisKey: IDBValidKey) => {
-      return isInternalExpiryTimestampKey(thisKey as string) ? thisKey : false
+      return isInternalExpiryTimestampKey(thisKey)
     })
 
     return internalKeys
@@ -115,19 +118,16 @@ const getAllInternalTimestampKeys = async (): Promise<IDBValidKey[] | null> => {
  *     await removeExpiredKeys()
  */
 export const removeExpiredKeys = async () => {
-  try {
-    const keys = await getAllInternalTimestampKeys()
+  // Every step below catches its own IndexedDB failure, so this never rejects.
+  const keys = await getAllInternalTimestampKeys()
 
-    if (!keys) return
+  if (!keys) return
 
-    const p = keys.map(async (thisKey: IDBValidKey) => {
-      return get(thisKey).then((value) => {
-        return Date.now() > (value as number) ? remove(thisKey) : null
-      })
+  const p = keys.map(async (thisKey: IDBValidKey) => {
+    return get(thisKey).then((value) => {
+      return Date.now() > (value as number) ? remove(thisKey) : null
     })
+  })
 
-    await Promise.all(p)
-  } catch (error) {
-    console.error(error)
-  }
+  await Promise.all(p)
 }

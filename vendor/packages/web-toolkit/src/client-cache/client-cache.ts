@@ -6,7 +6,16 @@ const fakeLs = {
   removeItem: noop,
 }
 
-const _localStorage = typeof window === 'undefined' ? fakeLs : window.localStorage
+// Reading `window.localStorage` throws when site data is blocked; this runs at import time, so it must not.
+const getLocalStorage = () => {
+  try {
+    return window.localStorage
+  } catch {
+    return fakeLs
+  }
+}
+
+const _localStorage = typeof window === 'undefined' ? fakeLs : getLocalStorage()
 
 const namespace = 'v1'
 
@@ -55,6 +64,8 @@ export const saveSync = (name: string, value: unknown, updatedAt?: string | unde
   if (value === undefined) {
     _localStorage.removeItem(getKey(name))
     _localStorage.removeItem(updatedAtKey(name))
+
+    return
   }
 
   _localStorage.setItem(getKey(name), JSON.stringify(value))

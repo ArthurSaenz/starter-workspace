@@ -23,8 +23,7 @@ const supportsLS = (): boolean => {
     if (!localStorage || typeof localStorage.getItem !== 'function') {
       hasLS = false
     }
-    // eslint-disable-next-line unused-imports/no-unused-vars -- the error itself is irrelevant; a throw means no storage
-  } catch (error) {
+  } catch {
     // some browsers throw an error if you try to access local storage (e.g. brave browser)
     // and some like Safari do not allow access to LS in incognito mode
     hasLS = false
@@ -81,9 +80,12 @@ export const get = <T = unknown>(key: string): T | null => {
     return null
   }
 
-  const data = parseData<T>(key, string)
-
-  return data
+  try {
+    return parseData<T>(key, string)
+  } catch {
+    // Not written by `set` (another script, a manual edit): unreadable, so treated as absent.
+    return null
+  }
 }
 
 /**
@@ -128,8 +130,7 @@ export const flush = (force = false): false | void => {
 
     try {
       item = JSON.parse(string)
-      // eslint-disable-next-line unused-imports/no-unused-vars -- a parse failure means the raw string is returned
-    } catch (error) {
+    } catch {
       // Some packages write strings to localStorage that are not converted by JSON.stringify(), so we need to ignore it
       continue
     }
