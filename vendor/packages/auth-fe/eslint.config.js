@@ -5,9 +5,8 @@ export default config({
     {
       files: ['src/**'],
       rules: {
-        // This override replaces the base @wl/eslint-config rule wholesale, so the base barrel-only
-        // patterns are repeated here — and they are the only barrel guard in this package:
-        // `boundaries/dependencies` never resolves the `.js`-suffixed relative imports tsc needs.
+        // Replaces the base @wl/eslint-config rule wholesale to add the self-import ban, so the base
+        // barrel-only patterns are repeated here.
         'no-restricted-imports': [
           'error',
           {
