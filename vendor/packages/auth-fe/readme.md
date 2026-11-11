@@ -78,7 +78,7 @@ Root barrel (`src/index.ts`, re-exporting `src/features/auth/index.ts`):
   re-navigate) on every render.
 
 - `safeRedirect(value?)` — the value when it is a string and an in-app path (`/…`, not `//…`, no backslash,
-  `:` or control character, no dot segments that resolve to `//…`, at most 2048 characters), else `'/'`. Browsers read `/\evil.com` as `//evil.com`.
+  `:` or control character, no dot segments that resolve to `//…`, no percent-decoded path that starts with `//` or holds a backslash or fails to decode, at most 2048 characters), else `'/'`. Browsers read `/\evil.com` as `//evil.com`.
 - `AuthHttpError`, `isUnauthorized(error)` (duck-typed on `status === 401`, so a custom `AuthClient`
   only has to throw something carrying `status`), `DEFAULT_REQUEST_ERROR_TEXT`.
 - Types: `AuthClient`, `AuthClientOptions`, `AuthPaths`, `AuthStore`, `AuthStoreOptions`, `AuthState`,

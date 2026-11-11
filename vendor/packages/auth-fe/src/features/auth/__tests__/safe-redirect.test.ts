@@ -35,6 +35,18 @@ describe('safeRedirect', () => {
     },
   )
 
+  it.each(['/%2f%2fevil.com', '/%2F/evil.com', '/%5cevil.com', '/a/%5Cb', '/%E0%A4%A'])(
+    'refuses %j, whose percent-decoded path is protocol-relative, has a backslash or does not decode',
+    (input) => {
+      expect(safeRedirect(input)).toBe('/')
+    },
+  )
+
+  it('keeps an encoded slash pair that is not at the start of the path, and one in the query', () => {
+    expect(safeRedirect('/a/%2f%2fb')).toBe('/a/%2f%2fb')
+    expect(safeRedirect('/trips?next=%2f%2fevil.com')).toBe('/trips?next=%2f%2fevil.com')
+  })
+
   it('keeps dot segments that stay a path, and a // inside the query', () => {
     expect(safeRedirect('/a/./b')).toBe('/a/./b')
     expect(safeRedirect('/trips?next=//evil.com')).toBe('/trips?next=//evil.com')
