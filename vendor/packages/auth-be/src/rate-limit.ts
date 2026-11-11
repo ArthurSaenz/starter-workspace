@@ -31,17 +31,20 @@ export const resolveRateLimits = (overrides: Partial<RateLimitConfig> = {}): Rat
   }
 }
 
-/** Checked at construction like the TTLs: a NaN or 0 budget would refuse every request, as if rate-limited. */
+/**
+ * Checked at construction like the TTLs: a NaN or 0 budget would refuse every request, as if rate-limited.
+ * `null` passes, as `resolveRateLimits` reads it as "use the default".
+ */
 export const assertRateLimits = (overrides: Partial<RateLimitConfig> = {}): void => {
   const { keyPrefix, ...budgets } = overrides
 
   for (const [name, value] of Object.entries(budgets)) {
-    if (value !== undefined && !(Number.isInteger(value) && value > 0)) {
+    if (value != null && !(Number.isInteger(value) && value > 0)) {
       throw new Error(`auth: rateLimits.${name} must be a positive integer`)
     }
   }
 
-  if (keyPrefix !== undefined && !(typeof keyPrefix === 'string' && keyPrefix)) {
+  if (keyPrefix != null && !(typeof keyPrefix === 'string' && keyPrefix)) {
     throw new Error('auth: rateLimits.keyPrefix must be a non-empty string')
   }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { resolveRateLimits } from '../rate-limit.js'
+import { assertRateLimits, resolveRateLimits } from '../rate-limit.js'
 
 const DEFAULTS = { perEmail: 5, perIp: 20, perIpVerify: 30, perIpRefresh: 60, windowSec: 3600, keyPrefix: 'magic' }
 
@@ -17,5 +17,16 @@ describe('resolveRateLimits', () => {
 
   it('keeps the default for an explicit undefined', () => {
     expect(resolveRateLimits({ windowSec: undefined } as unknown as { windowSec: number }).windowSec).toBe(3600)
+  })
+})
+
+describe('assertRateLimits', () => {
+  it.each(['perEmail', 'windowSec', 'keyPrefix'])('accepts a null %s, which resolves to the default', (name) => {
+    const overrides = { [name]: null } as unknown as Record<string, number>
+
+    expect(() => {
+      assertRateLimits(overrides)
+    }).not.toThrow()
+    expect(resolveRateLimits(overrides)).toEqual(DEFAULTS)
   })
 })
