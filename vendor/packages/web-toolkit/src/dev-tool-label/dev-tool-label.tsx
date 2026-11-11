@@ -1,5 +1,7 @@
 import { Fragment, useState } from 'react'
 
+import { isSSR } from '../ssr'
+
 interface DevToolLabelProps {
   release?: string
 }
@@ -91,5 +93,3 @@ declare global {
     DevToolService?: any
   }
 }
-
-const isSSR = typeof window === 'undefined'

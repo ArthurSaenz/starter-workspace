@@ -170,6 +170,10 @@ const getManifestConfigFile = ({ httpClient, isEnabledDebug }: { httpClient: Htt
     }
 
     try {
+      if (!url) {
+        throw new Error(`Manifest config file URL of ${key} is undefined`)
+      }
+
       const cacheKey = `${key}.cacheData`
 
       const cachedData = await idb.get<{ etag: string; data: T }>(cacheKey)
@@ -189,10 +193,6 @@ const getManifestConfigFile = ({ httpClient, isEnabledDebug }: { httpClient: Htt
           key,
           url,
         })
-      }
-
-      if (!url) {
-        throw new Error(`Manifest config file URL of ${key} is undefined`)
       }
 
       const isValidateCache = cachedData?.etag && cachedData?.data

@@ -178,11 +178,14 @@ export const defineExperiments = <const T extends ExperimentsConfig>(config: T) 
       if (isSSR) return
 
       if (isEnabledDebug) {
-        // eslint-disable-next-line react/web-api-no-leaked-timeout -- one-shot debug log; nothing to clear on unmount
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           attachImplementedExperiments()
           setOptimizeAtom(getDevDebugExperimentsValues())
         }, 1500)
+
+        return () => {
+          clearTimeout(timeoutId)
+        }
       } else {
         window.VWO.push(['onVariationApplied', onReadyVwo])
         window.VWO.push([
