@@ -30,6 +30,23 @@ describe('dataTablePagination server mode', () => {
     await expect.element(screen.getByText('Rows per page')).toBeInTheDocument()
   })
 
+  it('labels the last page when the page index is past it', async () => {
+    const screen = await render(
+      <DataTablePagination
+        config={{
+          mode: 'server',
+          page: 5,
+          pageSize: 10,
+          totalCount: 15,
+          onPageChange: vi.fn(),
+          onPageSizeChange: vi.fn(),
+        }}
+      />,
+    )
+
+    await expect.element(screen.getByText('11–15 of 15 items')).toBeInTheDocument()
+  })
+
   it('calls onPageChange when next is clicked', async () => {
     const onPageChange = vi.fn()
 
