@@ -77,6 +77,41 @@ const parseEntry = (raw: unknown, at: string, issues: string[]): SiteIndexEntry 
   return parseOptionalFields(path, raw, `${at} (${path})`, issues)
 }
 
+// The sitemap protocol takes only W3C Datetime (https://www.w3.org/TR/NOTE-datetime): a time needs a zone.
+const W3C_DATE = /^\d{4}(?:-\d{2}(?:-\d{2})?)?$/
+const W3C_TIME = /^(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/
+const W3C_ZONE = /^[+-](?:[01]\d|2[0-3]):[0-5]\d$/
+
+const isW3cDate = (value: string): boolean => {
+  if (!W3C_DATE.test(value)) return false
+
+  const [year = 0, month = 1, day = 1] = value.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+
+  return date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+}
+
+const isW3cTime = (value: string): boolean => {
+  const match = W3C_TIME.exec(value)
+
+  if (!match) return false
+
+  const [, hour, minute, second = '0', zone = ''] = match
+
+  return Number(hour) < 24 && Number(minute) < 60 && Number(second) < 60 && (zone === 'Z' || W3C_ZONE.test(zone))
+}
+
+const isW3cDatetime = (value: unknown): boolean => {
+  if (typeof value !== 'string') return false
+
+  const [date = '', time, ...rest] = value.split('T')
+
+  if (rest.length > 0 || !isW3cDate(date)) return false
+
+  // A time is only defined on a full date (YYYY-MM-DDThh:mm...).
+  return time === undefined || (date.length === 10 && isW3cTime(time))
+}
+
 interface FieldRule {
   isValid: (value: unknown) => boolean
   expected: string
@@ -92,10 +127,8 @@ const OPTIONAL_FIELD_RULES: Record<Exclude<keyof SiteIndexEntry, 'path'>, FieldR
   title: { isValid: isString, expected: 'a string' },
   description: { isValid: isString, expected: 'a string' },
   lastmod: {
-    isValid: (value) => {
-      return isString(value) && !Number.isNaN(Date.parse(value as string))
-    },
-    expected: 'an ISO date such as "2026-10-22"',
+    isValid: isW3cDatetime,
+    expected: 'a W3C Datetime such as "2026-10-22" or "2026-10-22T09:11:00Z"',
   },
   llms: {
     isValid: (value) => {

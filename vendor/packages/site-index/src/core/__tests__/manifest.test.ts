@@ -46,8 +46,38 @@ describe('parseManifest', () => {
       'urls[1] (/ok).changefreq: got "sometimes", expected one of always, hourly, daily, weekly, monthly, yearly, never',
       'urls[2] (/ok2).priority: got 2, expected a number in 0..1',
       'urls[2] (/ok2).title: got 5, expected a string',
-      'urls[2] (/ok2).lastmod: got "yesterday", expected an ISO date such as "2026-10-22"',
+      'urls[2] (/ok2).lastmod: got "yesterday", expected a W3C Datetime such as "2026-10-22" or "2026-10-22T09:11:00Z"',
     ])
+  })
+
+  it.each([
+    '2026',
+    '2026-10',
+    '2026-10-22',
+    '2026-10-22T09:11Z',
+    '2026-10-22T09:11:00+03:00',
+    '2026-10-22T09:11:00.5Z',
+  ])('passes W3C Datetime lastmod %s through unchanged', (lastmod) => {
+    expect(createManifest('special', [{ path: '/x', lastmod }]).urls).toEqual([{ path: '/x', lastmod }])
+  })
+
+  it.each([
+    'March 5, 2026',
+    '2026/10/22',
+    '10/22/2026',
+    '2026-10-22 09:11:00',
+    '2026-10-22T09:11:00',
+    '2026-02-30',
+    '2026-10-22T24:00Z',
+    '2026-10-22T09:60Z',
+    '2026-10-22T09:11:60Z',
+    '2026-10-22T09:11+24:00',
+    '2026-10T09:11Z',
+    '2026-10-22T09:11ZT00:00Z',
+  ])('refuses lastmod %s, naming the producer and the path', (lastmod) => {
+    expect(() => {
+      return createManifest('special', [{ path: '/christmas-markets', lastmod }])
+    }).toThrow(/Manifest special is invalid[\s\S]*urls\[0\] \(\/christmas-markets\)\.lastmod: got/)
   })
 
   it('rejects unknown fields so a typo cannot vanish silently', () => {
@@ -116,6 +146,13 @@ describe('parseManifest', () => {
   it('rejects an empty or non-string producer', () => {
     expect(getError(manifest('', [])).issues).toEqual(['producer: not a non-empty string'])
     expect(getError({ ...manifest('seo', []), producer: 7 }).issues).toEqual(['producer: not a non-empty string'])
+  })
+
+  it('reports a non-object entry and a non-string lastmod', () => {
+    expect(getError({ ...manifest('seo', []), urls: ['/x', { path: '/y', lastmod: 20_261_022 }] }).issues).toEqual([
+      'urls[0]: not an object',
+      'urls[1] (/y).lastmod: got 20261022, expected a W3C Datetime such as "2026-10-22" or "2026-10-22T09:11:00Z"',
+    ])
   })
 })
 

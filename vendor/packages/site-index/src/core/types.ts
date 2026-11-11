@@ -13,7 +13,7 @@ export interface SiteIndexEntry {
   description?: string
   changefreq?: Changefreq
   priority?: number
-  /** ISO date of the last content change. */
+  /** Last content change as a W3C Datetime (`2026-10-22`, `2026-10-22T09:11:00Z`); anything else is refused. */
   lastmod?: string
   /** `false` keeps the URL in sitemap.xml but out of llms.txt. */
   llms?: boolean
