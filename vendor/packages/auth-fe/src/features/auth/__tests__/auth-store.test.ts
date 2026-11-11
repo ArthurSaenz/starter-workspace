@@ -182,6 +182,31 @@ describe('verify', () => {
     expect(store.getState()).toMatchObject({ status: 'authenticated', user: USER })
   })
 
+  it('shares one request between concurrent verifies of the same token, and spends a new one after', async () => {
+    const verified = Promise.withResolvers<{ ok: boolean }>()
+
+    const client = fakeClient({
+      verifyMagicLink: vi.fn(() => {
+        return verified.promise
+      }),
+    })
+
+    const store = createAuthStore(client)
+    const first = store.verify('t')
+    const second = store.verify('t')
+    const other = store.verify('u')
+
+    verified.resolve({ ok: true })
+
+    expect(await first).toEqual({ ok: true })
+    expect(await second).toEqual({ ok: true })
+    await other
+    expect(client.verifyMagicLink).toHaveBeenCalledTimes(2)
+
+    await store.verify('t')
+    expect(client.verifyMagicLink).toHaveBeenCalledTimes(3)
+  })
+
   it('authenticates against a mock that answers every URL with the verify body', async () => {
     vi.stubGlobal(
       'fetch',

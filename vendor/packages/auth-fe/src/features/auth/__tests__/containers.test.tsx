@@ -1,3 +1,4 @@
+import { StrictMode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 
@@ -208,6 +209,41 @@ describe('authVerifyContainer', () => {
     await vi.waitFor(() => {
       expect(onVerified).toHaveBeenCalledWith('/fallback')
     })
+  })
+
+  it('spends the single-use token once under StrictMode', async () => {
+    const onVerified = vi.fn()
+    let spent = false
+
+    const client = fakeClient({
+      verifyMagicLink: vi.fn(async () => {
+        if (spent) return { ok: false, errorCode: 'INVALID_OR_EXPIRED_TOKEN' }
+
+        spent = true
+
+        return { ok: true, redirect: '/chat' }
+      }),
+    })
+
+    const screen = await render(
+      <StrictMode>
+        <AuthProvider store={storeWith({}, client)}>
+          <AuthVerifyContainer
+            token="good"
+            onVerified={onVerified}
+            render={(state) => {
+              return <div data-testid="verify">{state}</div>
+            }}
+          />
+        </AuthProvider>
+      </StrictMode>,
+    )
+
+    await vi.waitFor(() => {
+      expect(onVerified).toHaveBeenCalledWith('/chat')
+    })
+    expect(client.verifyMagicLink).toHaveBeenCalledOnce()
+    await expect.element(screen.getByTestId('verify')).not.toHaveTextContent('error')
   })
 
   it('loads /me exactly once per verify', async () => {

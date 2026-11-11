@@ -1,4 +1,12 @@
-import type { AuthClient, AuthState, AuthStore, AuthStoreOptions, MagicLinkRequest, MagicLinkResult } from '../types.js'
+import type {
+  AuthClient,
+  AuthState,
+  AuthStore,
+  AuthStoreOptions,
+  MagicLinkRequest,
+  MagicLinkResult,
+  VerifyMagicLinkResult,
+} from '../types.js'
 import { isUnauthorized } from './api.js'
 
 export const DEFAULT_REQUEST_ERROR_TEXT = 'We could not send your sign-in link. Please try again.'
@@ -40,6 +48,10 @@ export const createAuthStore = <TUser>(
   // collapse onto one /me call. Two concurrent 401 → refresh paths would otherwise present the same
   // refresh token twice, which a backend with reuse detection answers by revoking every session.
   let inFlightFetchMe: Promise<TUser | null> | null = null
+
+  // A magic-link token is single-use: StrictMode's double effect (or two mounts of the verify page)
+  // calling verify twice would spend it on the first request and fail the second.
+  let inFlightVerify: { token: string; result: Promise<VerifyMagicLinkResult> } | null = null
 
   // Bumped by logout, so a /me sent before it can never publish over the cleared session.
   let sessionEpoch = 0
@@ -88,6 +100,20 @@ export const createAuthStore = <TUser>(
     return request
   }
 
+  const verifyAndLoad = async (token: string): Promise<VerifyMagicLinkResult> => {
+    const epoch = sessionEpoch
+    const result = await client.verifyMagicLink(token)
+
+    if (result.ok && epoch === sessionEpoch) {
+      // An in-flight /me used the pre-verify cookies, so wait it out and load again.
+      await inFlightFetchMe
+
+      if (epoch === sessionEpoch) await fetchMe()
+    }
+
+    return result
+  }
+
   return {
     getState: () => {
       return state
@@ -119,16 +145,14 @@ export const createAuthStore = <TUser>(
       setState({ sentToEmail: null })
     },
     fetchMe,
-    verify: async (token: string) => {
-      const epoch = sessionEpoch
-      const result = await client.verifyMagicLink(token)
+    verify: (token: string) => {
+      if (inFlightVerify?.token === token) return inFlightVerify.result
 
-      if (result.ok && epoch === sessionEpoch) {
-        // An in-flight /me used the pre-verify cookies, so wait it out and load again.
-        await inFlightFetchMe
+      const result = verifyAndLoad(token).finally(() => {
+        if (inFlightVerify?.result === result) inFlightVerify = null
+      })
 
-        if (epoch === sessionEpoch) await fetchMe()
-      }
+      inFlightVerify = { token, result }
 
       return result
     },

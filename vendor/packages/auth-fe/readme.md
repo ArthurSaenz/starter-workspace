@@ -45,7 +45,8 @@ Root barrel (`src/index.ts`, re-exporting `src/features/auth/index.ts`):
     - `null`; `isSessionLoading` is true while it runs.
   - `verify(token)` — on success loads the user through `fetchMe` before resolving (a `/me` already
     in flight is awaited, then repeated with the new cookies; a `logout` meanwhile skips the load), so
-    `authenticated` is never published without a user; returns the client's result.
+    `authenticated` is never published without a user; returns the client's result. Concurrent calls
+    with the same token share one request, so StrictMode's double effect does not spend the link twice.
   - `logout()` — always ends `unauthenticated` + `null`, even when the request fails; a `/me` sent
     before it never publishes.
   - `refresh()` — the client's refresh.

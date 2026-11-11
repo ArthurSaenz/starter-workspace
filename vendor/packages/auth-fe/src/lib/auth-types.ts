@@ -41,6 +41,7 @@ export interface AuthStore<TUser> {
   /**
    * Exchanges the token for the session cookies, then loads the user before resolving, so
    * `authenticated` never appears without a user. A logout during `verify` skips the load.
+   * Concurrent calls with the same token share one request: the token is single-use.
    */
   verify: (token: string) => Promise<VerifyMagicLinkResult>
   /** Clears the local session even when the request fails; a `/me` still in flight is discarded. */
