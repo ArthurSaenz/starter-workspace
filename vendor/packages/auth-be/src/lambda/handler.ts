@@ -12,7 +12,8 @@ export interface ToLambdaHandlerOptions<TCtx> {
   context?: (event: LambdaEvent) => TCtx
   /** Maps any thrown error to a status + body; the default understands {@link AuthError}. */
   toErrorResponse?: (error: unknown) => { statusCode: number; body: unknown }
-  onError?: (error: unknown) => void
+  /** Awaited before the response, so an async logger flushes before the Lambda freezes. */
+  onError?: (error: unknown) => void | Promise<void>
 }
 
 const defaultErrorResponse = (error: unknown): { statusCode: number; body: unknown } => {
@@ -32,7 +33,7 @@ export const toLambdaHandler = <TCtx>(route: AuthRoute<TCtx>, options: ToLambdaH
       return await route.handle(event, options.context?.(event))
     } catch (error) {
       try {
-        options.onError?.(error)
+        await options.onError?.(error)
       } catch {
         // A broken error hook must not replace the error it was told about.
       }

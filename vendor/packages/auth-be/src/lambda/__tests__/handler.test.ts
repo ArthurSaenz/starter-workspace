@@ -98,6 +98,31 @@ describe('createAuthHandlers', () => {
     expect(JSON.parse(me.body)).toMatchObject({ type: 'UNAUTHENTICATED' })
   })
 
+  it('answers the real error, with no unhandled rejection, when an async onError rejects', async () => {
+    const unhandled = vi.fn()
+
+    process.on('unhandledRejection', unhandled)
+
+    try {
+      const { handlers } = setup({
+        onError: async () => {
+          throw new Error('hook broke')
+        },
+      })
+
+      const me = await handlers.me({})
+
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0)
+      })
+
+      expect(me).toMatchObject({ statusCode: 401, headers: CORS })
+      expect(unhandled).not.toHaveBeenCalled()
+    } finally {
+      process.off('unhandledRejection', unhandled)
+    }
+  })
+
   it('answers the real response, without CORS headers, when corsHeaders throws', async () => {
     const onError = vi.fn()
 

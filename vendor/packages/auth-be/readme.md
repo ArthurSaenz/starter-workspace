@@ -79,7 +79,7 @@ Every flow takes its input object first and the host context second: `requestMag
 - `sendInviteLink` resolves `{ emailSent }`. `false` means the mailer or the template threw and the
   link is already invalidated: show the admin that the invite did not go out. `requestMagicLink`
   stays silent whatever happens, so an anonymous caller learns nothing.
-- A throwing `onError` is ignored and a throwing `corsHeaders` yields no CORS headers: neither
+- A throwing or rejecting `onError` is ignored (it is awaited first) and a throwing `corsHeaders` yields no CORS headers: neither
   replaces the real response or error envelope.
 - The redirect target is sanitised on write and on read: only an in-app path survives. Anything else
   (off-origin, a scheme, a backslash or control character, a dot segment that resolves to `//…`,
