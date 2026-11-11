@@ -2,6 +2,7 @@ import type { CreateAuthError } from '../errors.js'
 import type { CookieOptions } from '../http/cookies.js'
 import type { AuthContext, AuthUser, MagicTokenStore, Mailer, RateLimiter, SessionStore, UserStore } from '../ports.js'
 import type { RateLimitConfig } from '../rate-limit.js'
+import { assertRateLimits } from '../rate-limit.js'
 import type { RequestMeta, TokenPair } from '../session/types.js'
 import type { JwtIdentity } from '../tokens.js'
 import { assertSecret } from '../tokens.js'
@@ -124,6 +125,8 @@ export const assertMagicLinkConfig = <TUser extends AuthUser, TMe, TCtx extends 
   if (grace !== undefined && !(Number.isInteger(grace) && grace >= 0)) {
     throw new Error('auth: jwt.refreshGraceSec must be a non-negative integer')
   }
+
+  assertRateLimits(config.rateLimits)
 
   if (config.minResponseMs !== undefined && !(Number.isFinite(config.minResponseMs) && config.minResponseMs >= 0)) {
     throw new Error('auth: minResponseMs must be a non-negative number')

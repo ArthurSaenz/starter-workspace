@@ -89,6 +89,28 @@ describe('createMagicLinkAuth config guards', () => {
     }).toThrow('auth: jwt.refreshGraceSec must be a non-negative integer')
   })
 
+  it.each([
+    ['perEmail', 0],
+    ['perIp', -1],
+    ['perIpVerify', 2.5],
+    ['perIpRefresh', Number.NaN],
+    ['windowSec', Number.POSITIVE_INFINITY],
+  ])('refuses a rateLimits.%s of %s', (name, value) => {
+    const { config } = createFakes()
+
+    expect(() => {
+      return createMagicLinkAuth({ ...config, rateLimits: { [name]: value } })
+    }).toThrow(`auth: rateLimits.${name} must be a positive integer`)
+  })
+
+  it.each(['', 3 as unknown as string])('refuses a rateLimits.keyPrefix of %j', (keyPrefix) => {
+    const { config } = createFakes()
+
+    expect(() => {
+      return createMagicLinkAuth({ ...config, rateLimits: { keyPrefix } })
+    }).toThrow('auth: rateLimits.keyPrefix must be a non-empty string')
+  })
+
   it('refuses neither of email and renderEmail', () => {
     const config = withRenderEmail(createFakes(), undefined)
 

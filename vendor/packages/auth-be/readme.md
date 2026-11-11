@@ -53,6 +53,8 @@ honour the same cookie.
 
 `magicLink.baseUrl` must be an absolute http(s) URL and every TTL (`jwt.*TtlSec`, `magicLink.*TtlMin`) a
 positive integer, or construction throws: a bad TTL would otherwise fail only after verify spent the link.
+The same goes for every `rateLimits` budget and `windowSec` (positive integers), `keyPrefix` (a non-empty
+string) and `jwt.refreshGraceSec` (a non-negative integer): a NaN or 0 budget would refuse every request.
 
 Every flow takes its input object first and the host context second: `requestMagicLink(input, ctx)`,
 `verifyMagicLink({ rawToken, ...meta }, ctx)`, `refreshSession({ refreshToken, ...meta }, ctx)`.
