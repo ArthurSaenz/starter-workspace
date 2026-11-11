@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { SiteIndexError, createManifest, findDisallowedEntries, mergeManifests, parseManifest } from '../manifest.js'
+import { SiteIndexError } from '../errors.js'
+import { createManifest, findDisallowedEntries, mergeManifests, parseManifest } from '../manifest.js'
 import { config, manifest } from './fixtures.js'
 
 const getError = (raw: unknown, source = 's3://bucket/manifests/seo.json'): SiteIndexError => {
@@ -77,6 +78,44 @@ describe('parseManifest', () => {
     expect(() => {
       return createManifest('client', [{ path: '/faq#top' }])
     }).toThrow(/fragment/)
+  })
+
+  it('rejects a backslash, which URL parsing would read as the start of another host', () => {
+    expect(new URL('/\\evil.com/x', 'https://www.hulyo.co.il').host).toBe('evil.com')
+    expect(() => {
+      return createManifest('client', [{ path: '/\\evil.com/x' }])
+    }).toThrow(/backslash/)
+  })
+
+  it.each(['/a/../checkout/1', '/a/%2e%2e/checkout/1', '/a/.%2E/checkout', '/./checkout', '/checkout/..'])(
+    'rejects the dot segment in %s, which would resolve past the disallow guard',
+    (path) => {
+      expect(() => {
+        return createManifest('client', [{ path }])
+      }).toThrow(/"\." or "\.\." segments/)
+    },
+  )
+
+  it('keeps dots that are not a whole segment, and dot segments inside a query', () => {
+    const paths = ['/.well-known/x', '/a..b', '/v1.2/x', '/search?next=/a/../b']
+
+    expect(
+      createManifest(
+        'client',
+        paths.map((path) => {
+          return { path }
+        }),
+      ).urls,
+    ).toHaveLength(paths.length)
+  })
+
+  it.each(['../seo', 'a/b', 'a\\b', '..', '.'])('rejects producer %s, which names the manifest file', (producer) => {
+    expect(getError(manifest(producer, [])).issues).toEqual([`producer "${producer}": not usable as a file name`])
+  })
+
+  it('rejects an empty or non-string producer', () => {
+    expect(getError(manifest('', [])).issues).toEqual(['producer: not a non-empty string'])
+    expect(getError({ ...manifest('seo', []), producer: 7 }).issues).toEqual(['producer: not a non-empty string'])
   })
 })
 

@@ -3,7 +3,8 @@ import { GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } fr
 
 import type { SiteIndexStats } from '../core/build.js'
 import { buildSiteIndex, getShrinkRefusal } from '../core/build.js'
-import { SiteIndexError, parseManifest } from '../core/manifest.js'
+import { SiteIndexError } from '../core/errors.js'
+import { parseManifest } from '../core/manifest.js'
 import type { SiteIndexConfig, SiteIndexFileName, SiteIndexManifest } from '../core/types.js'
 
 export const MANIFESTS_PREFIX = 'manifests/'

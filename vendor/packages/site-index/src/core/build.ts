@@ -1,6 +1,7 @@
+import { SiteIndexError } from './errors.js'
 import { renderLlmsTxt } from './llms.js'
 import type { DuplicateEntry } from './manifest.js'
-import { SiteIndexError, findDisallowedEntries, mergeManifests } from './manifest.js'
+import { findDisallowedEntries, mergeManifests } from './manifest.js'
 import { renderRobots } from './robots.js'
 import { renderSitemap } from './sitemap.js'
 import type { SiteIndexConfig, SiteIndexEntry, SiteIndexFiles, SiteIndexManifest } from './types.js'

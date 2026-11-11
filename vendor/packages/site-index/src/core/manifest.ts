@@ -1,15 +1,6 @@
+import { SiteIndexError } from './errors.js'
 import type { Changefreq, SiteIndexConfig, SiteIndexEntry, SiteIndexManifest } from './types.js'
 import { CHANGEFREQS, MANIFEST_VERSION } from './types.js'
-
-export class SiteIndexError extends Error {
-  readonly issues: string[]
-
-  constructor(message: string, issues: string[] = []) {
-    super(issues.length > 0 ? `${message}\n  - ${issues.join('\n  - ')}` : message)
-    this.name = 'SiteIndexError'
-    this.issues = issues
-  }
-}
 
 export interface DuplicateEntry {
   path: string
@@ -30,10 +21,32 @@ const isChangefreq = (value: unknown): value is Changefreq => {
   return CHANGEFREQS.includes(value as Changefreq)
 }
 
+// URL parsing resolves these exactly like "." and "..", so `/a/%2e%2e/checkout` is `/checkout`.
+const DOT_SEGMENT = /^(?:\.|%2e){1,2}$/i
+
+const hasDotSegment = (path: string): boolean => {
+  const [pathname = ''] = path.split('?')
+
+  return pathname.split('/').some((segment) => {
+    return DOT_SEGMENT.test(segment)
+  })
+}
+
 const getPathIssue = (path: string): string | null => {
   if (!path.startsWith('/') || path.startsWith('//')) return 'must start with a single "/" and carry no host'
+  // URL parsing reads "\" as "/", so `/\evil.com` would resolve to another host.
+  if (path.includes('\\')) return 'must not contain a backslash'
   if (path.includes('#')) return 'must not carry a fragment'
   if (/\s/.test(path)) return 'must not contain whitespace'
+  if (hasDotSegment(path)) return 'must not contain "." or ".." segments'
+
+  return null
+}
+
+// The producer names the manifest file (`<producer>.json`) on disk and in S3.
+const getProducerIssue = (producer: unknown): string | null => {
+  if (typeof producer !== 'string' || producer.length === 0) return 'producer: not a non-empty string'
+  if (/[/\\]/.test(producer) || DOT_SEGMENT.test(producer)) return `producer "${producer}": not usable as a file name`
 
   return null
 }
@@ -146,7 +159,9 @@ export const parseManifest = (raw: unknown, source: string): SiteIndexManifest =
       return `${key}: unknown field; allowed: ${MANIFEST_FIELDS.join(', ')}`
     })
 
-  if (typeof producer !== 'string' || producer.length === 0) issues.push('producer: not a non-empty string')
+  const producerIssue = getProducerIssue(producer)
+
+  if (producerIssue) issues.push(producerIssue)
   if (version !== MANIFEST_VERSION) issues.push(`version: expected ${MANIFEST_VERSION}, got ${String(version)}`)
   if (typeof generatedAt !== 'string') issues.push('generatedAt: not a string')
   if (!Array.isArray(urls)) issues.push('urls: not an array')
