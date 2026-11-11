@@ -197,6 +197,19 @@ describe('boundaries: aliased imports (#root)', () => {
     )
   })
 
+  it('flags an aliased runtime cross-feature import written NodeNext-style (.js)', async () => {
+    expectFlagged(
+      await lintAt(
+        'src/features/beta/x.ts',
+        code`
+          import { thing } from '#root/features/alpha/index.js'
+
+          export const a = thing
+        `,
+      ),
+    )
+  })
+
   it('allows an aliased type-only cross-feature import', async () => {
     expectClean(
       await lintAt(

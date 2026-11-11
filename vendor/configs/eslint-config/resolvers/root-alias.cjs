@@ -27,8 +27,14 @@ const DEFAULT_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs'
 /** package.json lookups are hot in a lint run over thousands of imports. */
 const packageRootCache = new Map()
 
-/** Same target is imported from many files; resolving it once is the bulk of the win. */
+/**
+ * Same target is imported from many files; resolving it once is the bulk of the win. Hits only: a
+ * long-lived ESLint (editor server) would otherwise keep a miss after the file is created.
+ */
 const resolutionCache = new Map()
+
+/** NodeNext specifiers name the emitted file (`./x.js`); the source on disk is its TS counterpart. */
+const TS_SOURCE_EXTENSIONS = { '.js': ['.ts', '.tsx'], '.jsx': ['.tsx'], '.mjs': ['.mts'], '.cjs': ['.cts'] }
 
 /** Nearest ancestor directory containing a package.json, or null at the filesystem root. */
 function findPackageRoot(startDir) {
@@ -69,17 +75,25 @@ const isDirectory = (candidate) => statOf(candidate)?.isDirectory() === true
  * at all — so each branch is covered by a test in __tests__/root-alias-resolver.test.ts.
  */
 function resolveWithExtensions(base, extensions) {
-  const cached = resolutionCache.get(base)
+  const key = `${base}\0${extensions.join(',')}`
+  const cached = resolutionCache.get(key)
   if (cached !== undefined) return cached
 
   const resolved = resolveWithExtensionsUncached(base, extensions)
-  resolutionCache.set(base, resolved)
+  if (resolved) resolutionCache.set(key, resolved)
 
   return resolved
 }
 
 function resolveWithExtensionsUncached(base, extensions) {
   if (isFile(base)) return base
+
+  const emitted = path.extname(base)
+
+  for (const extension of TS_SOURCE_EXTENSIONS[emitted] ?? []) {
+    const candidate = `${base.slice(0, -emitted.length)}${extension}`
+    if (isFile(candidate)) return candidate
+  }
 
   for (const extension of extensions) {
     const candidate = `${base}${extension}`
