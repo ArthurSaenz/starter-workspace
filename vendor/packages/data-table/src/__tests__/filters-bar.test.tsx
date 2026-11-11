@@ -17,6 +17,14 @@ describe('filterBar', () => {
     await expect.element(screen.getByRole('button', { name: 'Reset' })).toBeVisible()
   })
 
+  it('shows a clear-all label on its button only, not again as the field label', async () => {
+    const filters: FilterConfig[] = [{ kind: 'clear-all', id: 'clear', label: 'Reset', onClear: vi.fn() }]
+
+    const screen = await render(<FilterBar filters={filters} />)
+
+    expect(screen.getByText('Reset').elements()).toHaveLength(1)
+  })
+
   it('dispatches every built-in kind to its control under its label', async () => {
     const filters: FilterConfig[] = [
       { kind: 'select', id: 'status', label: 'Status', value: '', onChange: vi.fn(), options: [] },

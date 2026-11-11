@@ -21,7 +21,9 @@ import { TextareaCell } from './textarea-cell'
  * readme's "Registry extension" section).
  */
 export const createCellRegistry = <TData,>(extra?: Partial<CellRegistry<TData>>): CellRegistry<TData> => {
-  return {
+  // `Required` turns a kind added to `CellConfig` without a renderer here into a compile error,
+  // instead of an "Unknown cell kind" cell at runtime.
+  const builtIns = {
     text: createTextCell<TData>(),
     custom: createCustomCell<TData>(),
     expander: createExpanderCell<TData>(),
@@ -34,6 +36,7 @@ export const createCellRegistry = <TData,>(extra?: Partial<CellRegistry<TData>>)
     computed: ComputedCell,
     actions: ActionsCell,
     'checkbox-select': CheckboxSelectCell,
-    ...extra,
-  }
+  } satisfies Required<CellRegistry<TData>>
+
+  return { ...builtIns, ...extra }
 }

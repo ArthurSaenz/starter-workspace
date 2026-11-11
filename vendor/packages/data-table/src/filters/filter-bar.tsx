@@ -1,16 +1,8 @@
 import type { ComponentType } from 'react'
 import { Fragment } from 'react'
 
-import type {
-  ClearAllFilterConfig,
-  DateRangeFilterConfig,
-  FilterConfig,
-  MultiDateFilterConfig,
-  MultiselectFilterConfig,
-  NumberRangeFilterConfig,
-  SearchFilterConfig,
-  SelectFilterConfig,
-} from '../config/filter-config'
+import type { FilterConfig, FilterKind } from '../config/filter-config'
+import type { FilterConfigOfKind } from '../core/cell-renderer-types'
 import { cn } from '../primitives/cn'
 import { ClearAllFilter } from './clear-all-filter'
 import { DateRangeFilter } from './date-range-filter'
@@ -40,93 +32,38 @@ export const FilterBar = (props: FilterBarProps) => {
           return <Fragment key={config.id}>{config.render()}</Fragment>
         }
 
-        switch (config.kind) {
-          case 'search': {
-            const Component = resolvedRegistry.search
+        // The key comes from the config being rendered, so the entry accepts that config; TypeScript
+        // cannot correlate the two across the union (same cast as `resolveCellRenderer`).
+        const Component = resolvedRegistry[config.kind] as ComponentType<{ config: RegisteredFilterConfig }>
 
-            return (
-              <FilterField key={config.id} label={config.label} className={config.className}>
-                <Component config={config} />
-              </FilterField>
-            )
-          }
-          case 'select': {
-            const Component = resolvedRegistry.select
-
-            return (
-              <FilterField key={config.id} label={config.label} className={config.className}>
-                <Component config={config} />
-              </FilterField>
-            )
-          }
-          case 'multiselect': {
-            const Component = resolvedRegistry.multiselect
-
-            return (
-              <FilterField key={config.id} label={config.label} className={config.className}>
-                <Component config={config} />
-              </FilterField>
-            )
-          }
-          case 'multi-date': {
-            const Component = resolvedRegistry['multi-date']
-
-            return (
-              <FilterField key={config.id} label={config.label} className={config.className}>
-                <Component config={config} />
-              </FilterField>
-            )
-          }
-          case 'date-range': {
-            const Component = resolvedRegistry['date-range']
-
-            return (
-              <FilterField key={config.id} label={config.label} className={config.className}>
-                <Component config={config} />
-              </FilterField>
-            )
-          }
-          case 'number-range': {
-            const Component = resolvedRegistry['number-range']
-
-            return (
-              <FilterField key={config.id} label={config.label} className={config.className}>
-                <Component config={config} />
-              </FilterField>
-            )
-          }
-          case 'clear-all': {
-            const Component = resolvedRegistry['clear-all']
-
-            return (
-              <FilterField key={config.id} label={config.label} className={config.className}>
-                <Component config={config} />
-              </FilterField>
-            )
-          }
-          default: {
-            return null
-          }
-        }
+        return (
+          <FilterField
+            key={config.id}
+            label={config.label}
+            // The clear-all button already shows its label; the field only reserves the label row.
+            hideLabel={config.kind === 'clear-all'}
+            className={config.className}
+          >
+            <Component config={config} />
+          </FilterField>
+        )
       })}
     </div>
   )
 }
 
 /**
- * Structural registry type, local to this package until Phase 8 reconciles it with the core
- * registry type living in `src/core`. Maps every non-custom `FilterKind` to the component that
- * renders it; `custom` always renders `config.render()` directly and has no registry entry.
+ * Maps every non-custom `FilterKind` to the component that renders it; `custom` always renders
+ * `config.render()` directly and has no registry entry. A new kind needs only its entry in
+ * `DEFAULT_FILTER_REGISTRY`, which this mapped type makes a compile error to forget.
  */
-export interface FilterRegistry {
-  search: ComponentType<{ config: SearchFilterConfig }>
-  select: ComponentType<{ config: SelectFilterConfig }>
-  multiselect: ComponentType<{ config: MultiselectFilterConfig }>
-  'multi-date': ComponentType<{ config: MultiDateFilterConfig }>
-  'date-range': ComponentType<{ config: DateRangeFilterConfig }>
-  'number-range': ComponentType<{ config: NumberRangeFilterConfig }>
-  'clear-all': ComponentType<{ config: ClearAllFilterConfig }>
+export type FilterRegistry = {
+  [TKind in RegisteredFilterKind]: ComponentType<{ config: FilterConfigOfKind<TKind> }>
 }
+
+type RegisteredFilterKind = Exclude<FilterKind, 'custom'>
+
+type RegisteredFilterConfig = FilterConfigOfKind<RegisteredFilterKind>
 
 const DEFAULT_FILTER_REGISTRY: FilterRegistry = {
   search: SearchFilter,
