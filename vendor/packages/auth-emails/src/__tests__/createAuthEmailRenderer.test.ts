@@ -42,6 +42,18 @@ describe('createAuthEmailRenderer', () => {
     expect(email.text).toContain('This link expires in 15 minutes.')
   })
 
+  it('keeps the default for an override that is explicitly undefined', async () => {
+    const renderEmail = createAuthEmailRenderer({
+      brand: { name: 'Acme' },
+      copy: { 'sign-in': { subject: undefined as unknown as string, buttonLabel: 'Go' } },
+    })
+
+    const email = await renderEmail({ to: 'ada@example.com', link: LINK, expMin: 15, kind: 'sign-in' })
+
+    expect(email.subject).toBe('Your sign-in link')
+    expect(email.html).toContain('Go')
+  })
+
   it('escapes copy instead of injecting it as markup', async () => {
     const renderEmail = createAuthEmailRenderer({
       brand: { name: 'Acme' },

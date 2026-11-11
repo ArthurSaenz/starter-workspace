@@ -41,7 +41,12 @@ export const createAuthEmailRenderer = <TCtx extends AuthContext = AuthContext>(
   lang = 'en',
 }: AuthEmailRendererOptions): RenderMagicLinkEmail<TCtx> => {
   return async ({ to, link, expMin, kind }) => {
-    const copy = { ...DEFAULT_AUTH_EMAIL_COPY[kind], ...copyOverrides?.[kind] }
+    // Per key, so an override that is explicitly `undefined` (a missing translation) keeps the default.
+    const overrides = Object.entries(copyOverrides?.[kind] ?? {}).filter(([, value]) => {
+      return value !== undefined
+    })
+
+    const copy: AuthEmailCopy = { ...DEFAULT_AUTH_EMAIL_COPY[kind], ...Object.fromEntries(overrides) }
     const email = <MagicLinkEmail link={link} expiry={formatExpiry(expMin)} brand={brand} copy={copy} lang={lang} />
     const [html, text] = await Promise.all([render(email), render(email, { plainText: true })])
 
