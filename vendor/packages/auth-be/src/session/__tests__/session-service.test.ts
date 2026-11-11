@@ -61,6 +61,19 @@ describe('refreshSession', () => {
     await expect(auth.refreshSession({ refreshToken: next.refreshToken! })).resolves.toHaveProperty('refreshCookie')
   })
 
+  it('logs a grace answer with the user and both session ids, and no token material', async () => {
+    const fakes = createFakes([invitedUser()])
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    const { auth, result } = await signIn(fakes)
+
+    await auth.refreshSession({ refreshToken: result.refreshToken })
+    await auth.refreshSession({ refreshToken: result.refreshToken }, { logger })
+
+    expect(logger.warn).toHaveBeenCalledWith('Refresh answered from the grace window with a rotated token', {
+      data: { userId: 'u1', rotatedSessionId: '1', successorSessionId: '2' },
+    })
+  })
+
   it.each<[string, (fakes: ReturnType<typeof createFakes>) => void]>([
     [
       'the successor was logged out',

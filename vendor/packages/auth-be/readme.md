@@ -70,6 +70,10 @@ Every flow takes its input object first and the host context second: `requestMag
   `refreshToken` / `refreshCookie` are `undefined`). The loser of a concurrent rotation is answered
   the same way, and fails alone (401) when there is no live successor. A thief replaying inside the
   window gets one access token, never a refresh token.
+- The other direction: a thief who refreshes first with a stolen token leaves the victim's next
+  refresh inside the window answered with access to the thief's session, so theft is noticed only
+  once the window closes. Every grace answer logs a warning
+  (`Refresh answered from the grace window with a rotated token`, data `{ userId, rotatedSessionId, successorSessionId }`).
 - A verify that fails on a store or `onSignIn` error after consuming the link releases it, so the user can click again; an expired link or a refused address stays spent.
 - A released link re-runs `onSignIn` on the next click, so `onSignIn` must be idempotent.
 - `sendInviteLink` resolves `{ emailSent }`. `false` means the mailer or the template threw and the

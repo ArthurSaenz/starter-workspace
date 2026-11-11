@@ -83,7 +83,14 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
 
     const user = await users.findById(successor.userId, ctx)
 
-    return user && deps.isAllowed(user) ? issuer.grantAccess(user) : null
+    if (!user || !deps.isAllowed(user)) return null
+
+    // A thief who refreshed first lands the victim here too; this line is the only trace of it.
+    ctx?.logger?.warn('Refresh answered from the grace window with a rotated token', {
+      data: { userId: successor.userId, rotatedSessionId: rotatedId, successorSessionId: String(successor.id) },
+    })
+
+    return issuer.grantAccess(user)
   }
 
   const requireUser = (headers: HeaderBag): AccessTokenPayload => {
