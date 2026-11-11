@@ -99,7 +99,10 @@ const ServerPagination = (props: ServerPaginationProps) => {
   const pageInputRef = useRef<HTMLInputElement>(null)
 
   const commitPageInput = (value: number) => {
-    if (value >= 1 && value <= totalPages) {
+    // Blur also fires when the field was only focused, and that must not re-request the open page.
+    const isOtherPage = value !== currentPage && Number.isInteger(value) && value >= 1 && value <= totalPages
+
+    if (isOtherPage) {
       onPageChange(value)
     } else if (pageInputRef.current) {
       pageInputRef.current.value = String(currentPage)

@@ -153,6 +153,39 @@ describe('dataTablePagination server mode', () => {
     await expect.element(input).toHaveValue('2')
   })
 
+  it('reverts a fractional page number instead of committing it', async () => {
+    const onPageChange = vi.fn()
+
+    const screen = await render(
+      <DataTablePagination
+        config={{ mode: 'server', page: 2, pageSize: 20, totalCount: 100, onPageChange, onPageSizeChange: vi.fn() }}
+      />,
+    )
+
+    const input = screen.getByRole('textbox', { name: 'Page number' })
+
+    await input.fill('2.5')
+    await userEvent.keyboard('{Enter}')
+
+    expect(onPageChange).not.toHaveBeenCalled()
+    await expect.element(input).toHaveValue('2')
+  })
+
+  it('does not re-request the current page when the page input loses focus unchanged', async () => {
+    const onPageChange = vi.fn()
+
+    const screen = await render(
+      <DataTablePagination
+        config={{ mode: 'server', page: 2, pageSize: 20, totalCount: 100, onPageChange, onPageSizeChange: vi.fn() }}
+      />,
+    )
+
+    await screen.getByRole('textbox', { name: 'Page number' }).click()
+    await userEvent.keyboard('{Tab}')
+
+    expect(onPageChange).not.toHaveBeenCalled()
+  })
+
   it('calls onPageSizeChange when a new page size is selected', async () => {
     const onPageSizeChange = vi.fn()
 
