@@ -2,6 +2,17 @@ import { describe, expect, it, vi } from 'vitest'
 
 import deploy from '../deploy.ts'
 
+// Never the real build output: run from the repo root, the copy would find and overwrite it.
+vi.mock('node:fs/promises', () => {
+  return {
+    default: {
+      copyFile: async () => {
+        throw Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' })
+      },
+    },
+  }
+})
+
 const BUCKET_PARAMETER = '/hulyo/s3/docs/bucket_name'
 const DISTRIBUTION_PARAMETER = '/hulyo/cloudfront/docs/id'
 
@@ -46,7 +57,6 @@ describe('docs-fe deploy', () => {
   })
 
   it('keeps the reason when the SPA shell cannot be copied, and syncs nothing', async () => {
-    // `run` is faked, so no build output exists and the copy fails with ENOENT.
     const toolkit = createToolkit({ [BUCKET_PARAMETER]: 'docs-bucket', [DISTRIBUTION_PARAMETER]: 'E1' })
 
     const error = await runDeploy(toolkit).catch((caught: unknown) => {
