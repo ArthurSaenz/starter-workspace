@@ -45,27 +45,22 @@ export const useBodyScrollLock = (
   scrollLockTarget: React.RefObject<HTMLElement | null>,
   options: Options = {},
 ): void => {
-  useEffect(() => {
-    if (!scrollLockTarget.current) {
-      return (): void => {
-        return undefined
-      }
-    }
+  const { locked = true } = options
 
-    const { locked } = options
+  useEffect(() => {
     const element = scrollLockTarget.current
 
-    if (typeof locked === 'undefined' || locked) {
-      markScrollable(element)
-      disablePageScroll()
-    } else if (!locked) {
-      unmarkScrollable(element)
-      enablePageScroll()
+    // The page lock is reference-counted: only a hook that took a lock may release one.
+    if (!element || !locked) {
+      return
     }
+
+    markScrollable(element)
+    disablePageScroll()
 
     return (): void => {
       unmarkScrollable(element)
       enablePageScroll()
     }
-  }, [scrollLockTarget.current, options])
+  }, [scrollLockTarget.current, locked])
 }
