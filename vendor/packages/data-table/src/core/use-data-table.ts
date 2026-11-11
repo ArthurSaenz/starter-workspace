@@ -1,6 +1,6 @@
 import type { ColumnVisibilityState, ExpandedState, RowData, SortingState } from '@tanstack/react-table'
 import { useTable } from '@tanstack/react-table'
-import { useMemo } from 'react'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 
 import type { CellKind, TableColumnConfig, TableConfig } from '../config'
 import type { BuildColumnDefsHelpers } from './build-column-defs'
@@ -115,6 +115,10 @@ export const useDataTable = <TData extends RowData>(
     }
   }, [getRowIdRef])
 
+  const clientRowIdsKey = useMemo(() => {
+    return isClientPagination ? config.data.map(getRowId).join(ROW_ID_SEPARATOR) : ''
+  }, [isClientPagination, config.data, getRowId])
+
   const clientPageSize = isClientPagination ? (pagination.initialPageSize ?? DEFAULT_CLIENT_PAGE_SIZE) : undefined
 
   const table = useTable<typeof DATA_TABLE_FEATURES, TData>({
@@ -134,6 +138,10 @@ export const useDataTable = <TData extends RowData>(
       : {}),
     getRowId,
     getRowCanExpand,
+    // TanStack would return to page 1 on every `data` identity change, so editing a cell on page 2
+    // (which rebuilds `data`) would jump the table away from the input being typed into. The page
+    // is reset below instead, only when the rows themselves or their order change.
+    autoResetPageIndex: false,
     // TanStack v9 recomputes the core row model on every `data` identity change and then resets
     // expansion unless told otherwise (v8 only did so for grouped rows). Rows are keyed by
     // `getRowId`, so an edited or refetched row keeps its id and must keep its panel (HULY-2770).
@@ -156,6 +164,23 @@ export const useDataTable = <TData extends RowData>(
     },
   })
 
+  const pageResetKey = `${clientRowIdsKey}|${JSON.stringify(sorting)}`
+  const pageResetKeyRef = useRef(pageResetKey)
+
+  // Layout effect: a passive one would paint the stale page index over the new rows first, which
+  // flashes "no results" when that page no longer exists.
+  useLayoutEffect(() => {
+    if (pageResetKeyRef.current === pageResetKey) {
+      return
+    }
+
+    pageResetKeyRef.current = pageResetKey
+
+    if (isClientPagination) {
+      table.setPageIndex(0)
+    }
+  }, [pageResetKey, isClientPagination, table])
+
   return { table, labels }
 }
 
@@ -177,6 +202,7 @@ const buildInitialVisibility = (initialHidden: string[] | undefined): ColumnVisi
 }
 
 const DEFAULT_CLIENT_PAGE_SIZE = 10
+const ROW_ID_SEPARATOR = '\u0001'
 
 const EMPTY_SORTING: SortingState = []
 const EMPTY_VISIBILITY: ColumnVisibilityState = {}
