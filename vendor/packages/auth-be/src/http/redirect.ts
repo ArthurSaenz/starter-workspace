@@ -9,6 +9,16 @@ export const hasUnsafeRedirectChars = (value: string): boolean => {
   return value.includes('\\')
 }
 
+const isUnsafeDecodedPath = (pathname: string): boolean => {
+  try {
+    const decoded = decodeURIComponent(pathname)
+
+    return decoded.startsWith('//') || decoded.includes('\\')
+  } catch {
+    return true
+  }
+}
+
 /**
  * Only an in-app path survives; anything that could leave the origin, or is not a string at all
  * (a store's odd column type), becomes `/`. Never throws.
@@ -20,6 +30,7 @@ export const sanitizeRedirectUrl = (input: unknown): string => {
 
   const path = input.startsWith('/') ? input : `/${input}`
 
-  // `/.//evil.com` resolves to the path `//evil.com`, which a router may hand on as a protocol-relative URL.
-  return new URL(path, 'https://origin.invalid').pathname.startsWith('//') ? '/' : path
+  // `/.//evil.com` resolves to `//evil.com`, and a router that decodes the path turns `/%2f%2fevil.com`
+  // into it too; either may be handed on as a protocol-relative URL.
+  return isUnsafeDecodedPath(new URL(path, 'https://origin.invalid').pathname) ? '/' : path
 }

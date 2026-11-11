@@ -82,7 +82,7 @@ Every flow takes its input object first and the host context second: `requestMag
 - A throwing or rejecting `onError` is ignored (it is awaited first) and a throwing `corsHeaders` yields no CORS headers: neither
   replaces the real response or error envelope.
 - The redirect target is sanitised on write and on read: only an in-app path survives. Anything else
-  (off-origin, a scheme, a backslash or control character, a dot segment that resolves to `//…`,
+  (off-origin, a scheme, a backslash or control character, a dot segment that resolves to `//…`, a path that percent-decodes to `//…` or a backslash or fails to decode,
   over 2048 chars, not a string) is ignored, not refused: the link is still sent and lands on `/`. A link to `/` carries no `redirect` parameter.
 
 ### Timing
