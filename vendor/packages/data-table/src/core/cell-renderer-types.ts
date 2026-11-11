@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react'
 
-import type { CellConfig, CellKind, CellRenderContext, FilterConfig, FilterKind } from '../config'
+import type { CellConfig, CellKind, CellRenderContext } from '../config'
 
 /**
  * What every cell renderer receives.
@@ -32,6 +32,3 @@ export type CellConfigOfKind<TData, TKind extends CellKind> = Extract<CellConfig
 export type CellRegistry<TData> = {
   [TKind in CellKind]?: CellRenderer<TData, CellConfigOfKind<TData, TKind>>
 }
-
-/** Narrows the filter union to the single member a given `kind` discriminant selects. */
-export type FilterConfigOfKind<TKind extends FilterKind> = Extract<FilterConfig, { kind: TKind }>

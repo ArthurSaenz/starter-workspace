@@ -2,13 +2,7 @@
 // The package's public exports live in src/index.ts.
 export type { BuildColumnDefsHelpers, BuildColumnDefsResult } from './build-column-defs'
 export { buildColumnDefs, resolveCellRenderer } from './build-column-defs'
-export type {
-  CellConfigOfKind,
-  CellRegistry,
-  CellRenderer,
-  CellRendererProps,
-  FilterConfigOfKind,
-} from './cell-renderer-types'
+export type { CellConfigOfKind, CellRegistry, CellRenderer, CellRendererProps } from './cell-renderer-types'
 export { DataTable } from './data-table'
 export type {
   DataTableComponents,

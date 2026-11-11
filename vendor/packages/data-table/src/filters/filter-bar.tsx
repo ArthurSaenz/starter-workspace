@@ -1,8 +1,7 @@
 import type { ComponentType } from 'react'
 import { Fragment } from 'react'
 
-import type { FilterConfig, FilterKind } from '../config/filter-config'
-import type { FilterConfigOfKind } from '../core/cell-renderer-types'
+import type { FilterConfig, FilterConfigOfKind, FilterKind } from '../config/filter-config'
 import { cn } from '../primitives/cn'
 import { ClearAllFilter } from './clear-all-filter'
 import { DateRangeFilter } from './date-range-filter'

@@ -119,3 +119,6 @@ export type FilterConfig =
 
 /** Discriminants of every built-in filter kind. */
 export type FilterKind = FilterConfig['kind']
+
+/** Narrows the filter union to the single member a given `kind` discriminant selects. */
+export type FilterConfigOfKind<TKind extends FilterKind> = Extract<FilterConfig, { kind: TKind }>
