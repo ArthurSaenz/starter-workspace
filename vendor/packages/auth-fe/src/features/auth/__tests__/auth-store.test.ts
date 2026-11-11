@@ -128,6 +128,40 @@ describe('submitEmail', () => {
     expect(store.getState().requestLoading).toBe(false)
   })
 
+  it('shares one request between overlapping submits of the same email, and sends a new one after', async () => {
+    let release: () => void = () => {}
+
+    const requestMagicLink = vi.fn(() => {
+      return new Promise<void>((resolve) => {
+        release = resolve
+      })
+    })
+
+    const store = createAuthStore(fakeClient({ requestMagicLink }))
+    const first = store.submitEmail({ email: 'a@b.com' })
+    const second = store.submitEmail({ email: ' A@b.com' })
+
+    expect(second).toBe(first)
+
+    release()
+    await expect(first).resolves.toEqual({ ok: true, email: 'a@b.com' })
+
+    const third = store.submitEmail({ email: 'a@b.com' })
+
+    release()
+    await third
+    expect(requestMagicLink).toHaveBeenCalledTimes(2)
+  })
+
+  it('sends a different email even while another submit is in flight', async () => {
+    const requestMagicLink = vi.fn(async () => {})
+    const store = createAuthStore(fakeClient({ requestMagicLink }))
+
+    await Promise.all([store.submitEmail({ email: 'a@b.com' }), store.submitEmail({ email: 'c@d.com' })])
+
+    expect(requestMagicLink).toHaveBeenCalledTimes(2)
+  })
+
   it('resetSentEmail clears sentToEmail', () => {
     const store = newStore({ initialState: { sentToEmail: 'a@b.com' } })
 

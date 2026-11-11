@@ -53,6 +53,9 @@ export const createAuthStore = <TUser>(
   // calling verify twice would spend it on the first request and fail the second.
   let inFlightVerify: { token: string; result: Promise<VerifyMagicLinkResult> } | null = null
 
+  // A double click on "send link" would otherwise mail two links, the second invalidating the first.
+  let inFlightSubmit: { email: string; result: Promise<MagicLinkResult> } | null = null
+
   // Bumped by logout, so a /me sent before it can never publish over the cleared session.
   let sessionEpoch = 0
 
@@ -100,6 +103,21 @@ export const createAuthStore = <TUser>(
     return request
   }
 
+  const sendEmail = async (email: string, redirectUrl: string | undefined): Promise<MagicLinkResult> => {
+    setState({ requestLoading: true, requestError: null })
+
+    try {
+      await client.requestMagicLink({ email, redirectUrl })
+      setState({ sentToEmail: email, requestLoading: false })
+
+      return { ok: true, email }
+    } catch {
+      setState({ requestError: requestErrorText, requestLoading: false })
+
+      return { ok: false, email }
+    }
+  }
+
   const verifyAndLoad = async (token: string): Promise<VerifyMagicLinkResult> => {
     const epoch = sessionEpoch
     const result = await client.verifyMagicLink(token)
@@ -125,21 +143,18 @@ export const createAuthStore = <TUser>(
         listeners.delete(listener)
       }
     },
-    submitEmail: async (request: MagicLinkRequest): Promise<MagicLinkResult> => {
+    submitEmail: (request: MagicLinkRequest): Promise<MagicLinkResult> => {
       const email = request.email.trim().toLowerCase()
 
-      setState({ requestLoading: true, requestError: null })
+      if (inFlightSubmit?.email === email) return inFlightSubmit.result
 
-      try {
-        await client.requestMagicLink({ email, redirectUrl: request.redirectUrl })
-        setState({ sentToEmail: email, requestLoading: false })
+      const result = sendEmail(email, request.redirectUrl).finally(() => {
+        if (inFlightSubmit?.result === result) inFlightSubmit = null
+      })
 
-        return { ok: true, email }
-      } catch {
-        setState({ requestError: requestErrorText, requestLoading: false })
+      inFlightSubmit = { email, result }
 
-        return { ok: false, email }
-      }
+      return result
     },
     resetSentEmail: () => {
       setState({ sentToEmail: null })

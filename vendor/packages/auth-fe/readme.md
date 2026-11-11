@@ -38,7 +38,8 @@ Root barrel (`src/index.ts`, re-exporting `src/features/auth/index.ts`):
   - `submitEmail({ email, redirectUrl? })` — trims and lower-cases the email, toggles
     `requestLoading`, clears `requestError` on start, sets `sentToEmail` on success or `requestError`
     (`options.requestErrorText`, default `DEFAULT_REQUEST_ERROR_TEXT`) on failure; resolves
-    `{ ok, email }`.
+    `{ ok, email }`. An overlapping submit of the same (normalised) email shares the in-flight request,
+    so a double click mails one link.
   - `resetSentEmail()`.
   - `fetchMe()` — concurrent callers share one in-flight request; on a 401 it calls
     `client.refresh()` once and retries `/me` once; ends `authenticated` + `user`, or `unauthenticated`
