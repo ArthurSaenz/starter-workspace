@@ -180,6 +180,18 @@ describe('e2e boundaries: scope', () => {
     )
   })
 
+  it.each(['e2e/src/lib/view.tsx', 'e2e/src/lib/view.jsx'])('checks %s like a .ts file', async (relPath) => {
+    expectFlagged(
+      await lintAt(
+        relPath,
+        code`
+      import { homePage } from '../pages/home.page'
+      export const view = homePage
+    `,
+      ),
+    )
+  })
+
   it('leaves a non-Playwright package with the same folder names alone', async () => {
     expectClean(
       await lintAt(

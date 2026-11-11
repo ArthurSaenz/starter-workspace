@@ -193,7 +193,8 @@ import { HomePage } from '#root/pages/home.page'             // ✅ domain → s
 import { cart } from '../cart/fixtures/cart.fixture'         // ❌ sibling domain
 ```
 
-It follows the `boundaries` toggle and severity. Source: `src/configs/e2e-boundaries.ts`.
+It covers every JS/TS source in the package — `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`, `.mjs`,
+`.cjs` — and follows the `boundaries` toggle and severity. Source: `src/configs/e2e-boundaries.ts`.
 
 ## E2E trust rules (Playwright packages)
 

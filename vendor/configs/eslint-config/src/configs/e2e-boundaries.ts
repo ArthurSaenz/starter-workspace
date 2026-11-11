@@ -13,7 +13,7 @@ const LAYERS = ['config', 'lib', 'mocks', 'components', 'pages', 'fixtures'] as 
 /** Top-level entry points: nothing imports them, and they may import every shared layer. */
 const DOMAIN_ROOTS = ['tests', 'visual'] as const
 
-const SOURCE_FILE = /\.(?:[cm]?[jt]s)$/
+const SOURCE_FILE = /\.(?:[cm]?[jt]s|[jt]sx)$/
 
 // Same signal as `@wl/package-structure` (@slip-stream-kit/config's DEPENDENCY_SIGNALS), which does
 // not export its detector: the nearest package.json declares `@playwright/test`.
