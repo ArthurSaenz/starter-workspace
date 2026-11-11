@@ -269,10 +269,24 @@ describe('requestMagicLink', () => {
     const auth = createMagicLinkAuth(fakes.config)
 
     await auth.requestMagicLink({ email: 'not-an-email' })
-    await auth.requestMagicLink({ email: 'ada@example.com', redirectUrl: '/a\\b' })
 
     expect(fakes.userStore.findByEmail).not.toHaveBeenCalled()
   })
+
+  it.each(['/a\\b', '/a\nb', 'https://evil.com', '/.//evil.com'])(
+    'still sends the link for a malformed redirect %j, landing on /',
+    async (redirectUrl) => {
+      const fakes = createFakes([invitedUser()])
+      const auth = createMagicLinkAuth(fakes.config)
+
+      await auth.requestMagicLink({ email: 'ada@example.com', redirectUrl })
+
+      expect(fakes.sent).toHaveLength(1)
+      await expect(auth.verifyMagicLink({ rawToken: tokenFromEmail(fakes.sent[0]!) })).resolves.toMatchObject({
+        redirectUrl: '/',
+      })
+    },
+  )
 
   it('uses a host validator in place of the built-in one', async () => {
     const fakes = createFakes([invitedUser()])
@@ -600,6 +614,23 @@ describe('verifyMagicLink', () => {
       data: { name: 'TypeError' },
     })
   })
+
+  it.each([42, { path: '/x' }, '/..//evil.com'])(
+    'lands on / when the stored redirect is %j, after signing in',
+    async (redirectUrl) => {
+      const fakes = createFakes([invitedUser()])
+
+      fakes.magicTokens.consumeByHash.mockResolvedValueOnce({
+        email: 'ada@example.com',
+        redirectUrl: redirectUrl as string,
+        expiresAt: new Date(Date.now() + 60_000),
+      })
+
+      await expect(
+        createMagicLinkAuth(fakes.config).verifyMagicLink({ rawToken: 'ab'.repeat(32) }),
+      ).resolves.toMatchObject({ redirectUrl: '/', accessToken: expect.any(String) })
+    },
+  )
 
   it.each([
     ['past', new Date(Date.now() - 1000)],

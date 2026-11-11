@@ -72,7 +72,9 @@ Every flow takes its input object first and the host context second: `requestMag
 - `sendInviteLink` resolves `{ emailSent }`. `false` means the mailer or the template threw and the
   link is already invalidated: show the admin that the invite did not go out. `requestMagicLink`
   stays silent whatever happens, so an anonymous caller learns nothing.
-- The redirect target is sanitised on write and on read: only an in-app path survives. A link to `/` carries no `redirect` parameter.
+- The redirect target is sanitised on write and on read: only an in-app path survives. Anything else
+  (off-origin, a scheme, a backslash or control character, a dot segment that resolves to `//…`,
+  over 2048 chars, not a string) is ignored, not refused: the link is still sent and lands on `/`. A link to `/` carries no `redirect` parameter.
 
 ### Timing
 

@@ -14,6 +14,15 @@ describe('sanitizeRedirectUrl', () => {
     ['javascript:alert(1)', '/'],
     ['/a\nb', '/'],
     [`/${'a'.repeat(2048)}`, '/'],
+    ['/.//evil.com', '/'],
+    ['/..//evil.com', '/'],
+    ['.//evil.com', '/'],
+    ['/a/../..//evil.com', '/'],
+    ['/%2e%2e//evil.com', '/'],
+    ['/a/./b', '/a/./b'],
+    ['/trips?next=//evil.com', '/trips?next=//evil.com'],
+    [42, '/'],
+    [{}, '/'],
   ])('%s → %s', (input, expected) => {
     expect(sanitizeRedirectUrl(input)).toBe(expected)
   })

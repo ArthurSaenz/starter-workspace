@@ -9,13 +9,17 @@ export const hasUnsafeRedirectChars = (value: string): boolean => {
   return value.includes('\\')
 }
 
-/** Only an in-app path survives; anything that could leave the origin becomes `/`. */
-export const sanitizeRedirectUrl = (input: string | undefined | null): string => {
-  if (!input || input.length > 2048 || hasUnsafeRedirectChars(input)) return '/'
+/**
+ * Only an in-app path survives; anything that could leave the origin, or is not a string at all
+ * (a store's odd column type), becomes `/`. Never throws.
+ */
+export const sanitizeRedirectUrl = (input: unknown): string => {
+  if (typeof input !== 'string' || !input || input.length > 2048 || hasUnsafeRedirectChars(input)) return '/'
 
-  if (input.startsWith('http://') || input.startsWith('https://') || input.startsWith('//')) return '/'
+  if (input.startsWith('//') || input.includes(':')) return '/'
 
-  if (input.includes(':')) return '/'
+  const path = input.startsWith('/') ? input : `/${input}`
 
-  return input.startsWith('/') ? input : `/${input}`
+  // `/.//evil.com` resolves to the path `//evil.com`, which a router may hand on as a protocol-relative URL.
+  return new URL(path, 'https://origin.invalid').pathname.startsWith('//') ? '/' : path
 }

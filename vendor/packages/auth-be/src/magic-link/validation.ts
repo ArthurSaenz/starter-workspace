@@ -1,5 +1,4 @@
 import type { CreateAuthError } from '../errors.js'
-import { hasUnsafeRedirectChars } from '../http/redirect.js'
 import type { StoredMagicToken } from '../ports.js'
 import { toMs } from '../time.js'
 
@@ -11,12 +10,10 @@ export interface RequestValidationInput {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/
 const TOKEN_REGEX = /^[a-f0-9]{16,256}$/i
 
+// No redirect check: a bad one is ignored (the link lands on `/`) by `sanitizeRedirectUrl`, the
+// same as any off-origin one, instead of silently costing the user their sign-in email.
 export const defaultValidateRequest = (input: RequestValidationInput): void => {
   if (input.email.length > 320 || !EMAIL_REGEX.test(input.email)) throw new Error('Invalid email')
-
-  if (input.redirectUrl && (input.redirectUrl.length > 2048 || hasUnsafeRedirectChars(input.redirectUrl))) {
-    throw new Error('Invalid redirectUrl')
-  }
 }
 
 export const createDefaultVerifyValidator = (createError: CreateAuthError) => {
