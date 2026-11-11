@@ -235,7 +235,7 @@ Source: `src/configs/e2e-playwright.ts`.
 
 ## JSDoc layer
 
-Scope: `**/*.{ts,tsx}` minus tests, stories and declarations. Enforced (`src/configs/docs.ts`, where
+Scope: `**/*.{ts,tsx}` minus tests, stories (including `__stories__/` helpers) and declarations. Enforced (`src/configs/docs.ts`, where
 each rule's reason lives): `tag-lines`, `no-blank-blocks`, `no-multi-asterisks`, `no-types`,
 `check-line-alignment` and `check-param-names` at `error`, `informative-docs` at `warn`, plus
 `@wl/max-jsdoc-lines` at `error` (wired in `src/configs/components.ts`, where the `@wl` plugin loads).

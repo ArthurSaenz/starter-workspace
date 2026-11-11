@@ -11,12 +11,13 @@ export const GLOB_MD = '**/*.md'
 
 export const GLOB_SVELTE = '**/*.svelte'
 
-/** Files exempt from the JSDoc layer (tests, stories, declarations). */
+/** Files exempt from the JSDoc layer (tests, stories and their helpers, declarations). */
 export const GLOB_TS_DOC_EXCLUDE = [
   '**/*.test.{ts,tsx}',
   '**/*.spec.{ts,tsx}',
   '**/*.stories.{ts,tsx}',
   '**/__tests__/**',
+  '**/__stories__/**',
   '**/*.d.ts',
 ]
 
