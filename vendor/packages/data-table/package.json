@@ -52,7 +52,7 @@
     "clsx": "catalog:",
     "date-fns": "catalog:",
     "lucide-react": "catalog:",
-    "match-sorter": "^8.3.0",
+    "match-sorter": "^8.3.1",
     "rc-slider": "^11.1.9",
     "react-day-picker": "^10.0.1",
     "tailwind-merge": "catalog:"

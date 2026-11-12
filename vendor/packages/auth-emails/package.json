@@ -32,12 +32,12 @@
     "react-dom": "catalog:"
   },
   "dependencies": {
-    "@react-email/render": "^2.2.0",
+    "@react-email/render": "^2.3.0",
     "@wl/auth-be": "workspace:*",
-    "react-email": "^6.11.6"
+    "react-email": "^6.11.10"
   },
   "devDependencies": {
-    "@react-email/ui": "^6.11.6",
+    "@react-email/ui": "^6.11.10",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
