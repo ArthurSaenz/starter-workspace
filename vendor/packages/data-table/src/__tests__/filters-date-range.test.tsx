@@ -43,4 +43,12 @@ describe('dateRangeFilter', () => {
     await screen.getByRole('button', { name: 'Select date range' }).click()
     await expect.element(screen.getByRole('grid')).toBeVisible()
   })
+
+  it('shows the configured placeholder when the stored from date cannot be parsed', async () => {
+    const config = buildConfig({ value: { from: 'not-a-date', to: '2026-01-10' }, placeholder: 'Stay dates' })
+
+    const screen = await render(<DateRangeFilter config={config} />)
+
+    await expect.element(screen.getByRole('button', { name: 'Stay dates' })).toBeVisible()
+  })
 })

@@ -33,7 +33,8 @@ export const DateRangeFilter = (props: DateRangeFilterProps) => {
     })
   }
 
-  const hasValue = Boolean(value.from ?? value.to)
+  // Keyed on the parsed date: a stored string that does not parse has nothing to show.
+  const hasValue = selectedRange.from !== undefined
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -50,7 +51,7 @@ export const DateRangeFilter = (props: DateRangeFilterProps) => {
         >
           <CalendarIcon className="size-4 shrink-0" />
           <span className="truncate">
-            {hasValue ? formatRangeLabel(value.from, value.to) : (placeholder ?? T.placeholder)}
+            {formatRangeLabel(selectedRange) ?? placeholder ?? T.placeholder}
           </span>
         </Button>
       </PopoverTrigger>
@@ -74,19 +75,16 @@ const parseFilterDate = (value: string | undefined): Date | undefined => {
   return isValid(parsed) ? parsed : undefined
 }
 
-const formatRangeLabel = (from: string | undefined, to: string | undefined): string => {
-  const fromDate = parseFilterDate(from)
-  const toDate = parseFilterDate(to)
-
-  if (fromDate && toDate) {
-    return `${format(fromDate, DISPLAY_FORMAT)} – ${format(toDate, DISPLAY_FORMAT)}`
+const formatRangeLabel = (range: DateRange): string | undefined => {
+  if (!range.from) {
+    return undefined
   }
 
-  if (fromDate) {
-    return format(fromDate, DISPLAY_FORMAT)
+  if (!range.to) {
+    return format(range.from, DISPLAY_FORMAT)
   }
 
-  return T.placeholder
+  return `${format(range.from, DISPLAY_FORMAT)} – ${format(range.to, DISPLAY_FORMAT)}`
 }
 
 /** Copied literally from apps/backoffice/ui catalog2-styles.ts CATALOG2_FILTER_TRIGGER_CLASS. */
