@@ -12,6 +12,7 @@ import { Button } from '../primitives/button'
 import { cn } from '../primitives/cn'
 import { Input } from '../primitives/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../primitives/select'
+import { resolveServerPage } from './page-math'
 import { ADMIN_PAGE_SIZE_OPTIONS } from './page-size-presets'
 
 export interface DataTablePaginationProps<TData extends RowData> {
@@ -82,9 +83,6 @@ const ServerPagination = (props: ServerPaginationProps) => {
   const { config, className } = props
 
   const {
-    page: requestedPage,
-    pageSize,
-    totalCount,
     onPageChange,
     onPageSizeChange,
     pageSizeOptions = ADMIN_PAGE_SIZE_OPTIONS,
@@ -93,9 +91,7 @@ const ServerPagination = (props: ServerPaginationProps) => {
     className: configClassName,
   } = config
 
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
-  // `page` is the consumer's state and can outlive a shrinking `totalCount` for a render.
-  const currentPage = Math.min(requestedPage, totalPages)
+  const { page: currentPage, pageSize, totalCount, totalPages } = resolveServerPage(config)
   const firstItem = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1
   const lastItem = Math.min(currentPage * pageSize, totalCount)
   const pageInputRef = useRef<HTMLInputElement>(null)
@@ -198,7 +194,14 @@ interface PageSizeSelectProps {
 }
 
 const PageSizeSelect = (props: PageSizeSelectProps) => {
-  const { pageSize, options, onPageSizeChange } = props
+  const { pageSize, onPageSizeChange } = props
+
+  // A size the options do not list (a stored preference, a deep link) would leave the trigger blank.
+  const options = props.options.includes(pageSize)
+    ? props.options
+    : [...props.options, pageSize].sort((a, b) => {
+        return a - b
+      })
 
   return (
     <div className="flex items-center gap-2">

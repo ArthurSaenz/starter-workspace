@@ -10,6 +10,7 @@ import type { SearchDrafts } from '../filters/search-drafts'
 import { SearchDraftsContext } from '../filters/search-drafts'
 import { DataTableFullscreenPortal, DataTableFullscreenToggle, useDataTableFullscreen } from '../fullscreen'
 import { DataTablePagination } from '../pagination/data-table-pagination'
+import { normalizePageSize } from '../pagination/page-math'
 import { cn } from '../primitives/cn'
 import { Skeleton } from '../primitives/skeleton'
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '../primitives/table'
@@ -363,7 +364,7 @@ const resolveSkeletonRowCount = (pagination: TableConfig<never>['pagination']): 
 
   const pageSize = pagination.mode === 'server' ? pagination.pageSize : pagination.initialPageSize
 
-  return Math.min(pageSize ?? MAX_SKELETON_ROWS, MAX_SKELETON_ROWS)
+  return Math.min(normalizePageSize(pageSize ?? MAX_SKELETON_ROWS), MAX_SKELETON_ROWS)
 }
 
 const buildSkeletonRows = (args: { rowCount: number; colSpan: number }): ReactNode => {

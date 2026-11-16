@@ -3,6 +3,7 @@ import { useTable } from '@tanstack/react-table'
 import { useLayoutEffect, useMemo, useRef } from 'react'
 
 import type { CellKind, TableColumnConfig, TableConfig } from '../config'
+import { normalizePageSize, resolveServerPage } from '../pagination/page-math'
 import type { BuildColumnDefsHelpers } from './build-column-defs'
 import { buildColumnDefs, resolveCellRenderer } from './build-column-defs'
 import type { CellRegistry } from './cell-renderer-types'
@@ -106,7 +107,7 @@ export const useDataTable = <TData extends RowData>(
   const isExpandable = Boolean(config.expandable)
   const pagination = config.pagination === false ? undefined : config.pagination
   const isClientPagination = pagination?.mode === 'client'
-  const serverPagination = pagination?.mode === 'server' ? pagination : undefined
+  const serverPage = pagination?.mode === 'server' ? resolveServerPage(pagination) : undefined
 
   const getRowCanExpand = useMemo(() => {
     if (!isExpandable) {
@@ -128,7 +129,9 @@ export const useDataTable = <TData extends RowData>(
     return isClientPagination ? config.data.map(getRowId).join(ROW_ID_SEPARATOR) : ''
   }, [isClientPagination, config.data, getRowId])
 
-  const clientPageSize = isClientPagination ? (pagination.initialPageSize ?? DEFAULT_CLIENT_PAGE_SIZE) : undefined
+  const clientPageSize = isClientPagination
+    ? normalizePageSize(pagination.initialPageSize ?? DEFAULT_CLIENT_PAGE_SIZE)
+    : undefined
 
   const table = useTable<typeof DATA_TABLE_FEATURES, TData>({
     features: DATA_TABLE_FEATURES,
@@ -142,9 +145,7 @@ export const useDataTable = <TData extends RowData>(
       : { initialState: { pagination: { pageIndex: 0, pageSize: clientPageSize } } }),
     // The server owns the slice: the table is told how many pages exist and which one it is
     // looking at, and never slices `data` itself.
-    ...(serverPagination
-      ? { pageCount: resolvePageCount(serverPagination.totalCount, serverPagination.pageSize) }
-      : {}),
+    ...(serverPage ? { pageCount: serverPage.totalPages } : {}),
     getRowId,
     getRowCanExpand,
     // TanStack would return to page 1 on every `data` identity change, so editing a cell on page 2
@@ -162,14 +163,7 @@ export const useDataTable = <TData extends RowData>(
       sorting,
       columnVisibility,
       expanded,
-      ...(serverPagination
-        ? {
-            pagination: {
-              pageIndex: Math.max(0, serverPagination.page - 1),
-              pageSize: serverPagination.pageSize,
-            },
-          }
-        : {}),
+      ...(serverPage ? { pagination: { pageIndex: serverPage.page - 1, pageSize: serverPage.pageSize } } : {}),
     },
   })
 
@@ -191,11 +185,6 @@ export const useDataTable = <TData extends RowData>(
   }, [pageResetKey, isClientPagination, table])
 
   return { table, labels }
-}
-
-/** `page` is 1-based and `pageSize` arrives from config, so both need a floor before dividing. */
-const resolvePageCount = (totalCount: number, pageSize: number): number => {
-  return Math.max(1, Math.ceil(totalCount / Math.max(1, pageSize)))
 }
 
 const buildInitialVisibility = (initialHidden: string[] | undefined): ColumnVisibilityState => {
