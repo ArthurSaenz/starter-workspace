@@ -78,6 +78,7 @@ export const MultiDateFilter = (props: MultiDateFilterProps) => {
           <Calendar
             mode="multiple"
             selected={selectedDates}
+            defaultMonth={selectedDates[0]}
             onSelect={handleSelect}
             disabled={isDateDisabled}
             autoFocus

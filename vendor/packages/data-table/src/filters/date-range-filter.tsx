@@ -56,7 +56,13 @@ export const DateRangeFilter = (props: DateRangeFilterProps) => {
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
-        <Calendar mode="range" selected={selectedRange} onSelect={handleSelect} autoFocus />
+        <Calendar
+          mode="range"
+          selected={selectedRange}
+          defaultMonth={selectedRange.from}
+          onSelect={handleSelect}
+          autoFocus
+        />
       </PopoverContent>
     </Popover>
   )
