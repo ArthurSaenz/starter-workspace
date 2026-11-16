@@ -1,4 +1,5 @@
 import type { CellRegistry } from '../core/cell-renderer-types'
+import { mergeOverrides } from '../registry/merge-overrides'
 import { ActionsCell } from './actions-cell'
 import { BadgeCell } from './badge-cell'
 import { CheckboxSelectCell } from './checkbox-select-cell'
@@ -38,5 +39,5 @@ export const createCellRegistry = <TData,>(extra?: Partial<CellRegistry<TData>>)
     'checkbox-select': CheckboxSelectCell,
   } satisfies Required<CellRegistry<TData>>
 
-  return { ...builtIns, ...extra }
+  return mergeOverrides<CellRegistry<TData>>(builtIns, extra)
 }

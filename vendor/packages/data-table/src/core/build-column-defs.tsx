@@ -8,6 +8,7 @@ import type {
 } from '@tanstack/react-table'
 
 import type { CellKind, CellRenderContext, TableColumnConfig } from '../config'
+import { UnknownKind } from '../registry/unknown-kind'
 import type { CellRegistry, CellRenderer } from './cell-renderer-types'
 import { DataTableColumnHeader } from './data-table-column-header'
 import { sortFn_v8Auto } from './table-features'
@@ -54,9 +55,7 @@ const buildCellRenderContext = <TData extends RowData>(
  * through getters rather than accessor paths, so a column without one has nothing to sort on and
  * is a display column as far as the table is concerned.
  *
- * An unknown `cell.kind` renders a visible error string in the cell rather than throwing. A throw
- * during render takes the whole table down over one misconfigured column, while the failure is a
- * config typo that the operator can see and the developer can read straight off the screen.
+ * An unknown `cell.kind` renders `UnknownKind` in the cell rather than throwing.
  */
 export const buildColumnDefs = <TData extends RowData>(
   columns: TableColumnConfig<TData>[],
@@ -93,7 +92,7 @@ export const buildColumnDefs = <TData extends RowData>(
         const Renderer = helpers.getCellRenderer?.(cellConfig.kind) ?? resolveCellRenderer(registry, cellConfig.kind)
 
         if (!Renderer) {
-          return <span className="text-destructive text-sm">{`${T.unknownCellKind} "${cellConfig.kind}"`}</span>
+          return <UnknownKind subject="cell" kind={cellConfig.kind} />
         }
 
         return <Renderer config={cellConfig} ctx={buildCellRenderContext(row, columnId)} row={row.original} />
@@ -127,7 +126,3 @@ export const resolveCellRenderer = <TData extends RowData>(
 ): CellRenderer<TData> | undefined => {
   return registry[kind] as CellRenderer<TData> | undefined
 }
-
-const T = {
-  unknownCellKind: 'Unknown cell kind:',
-} as const

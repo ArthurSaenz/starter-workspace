@@ -3,6 +3,8 @@ import { Fragment } from 'react'
 
 import type { FilterConfig, FilterConfigOfKind, FilterKind } from '../config/filter-config'
 import { cn } from '../primitives/cn'
+import { mergeOverrides } from '../registry/merge-overrides'
+import { UnknownKind } from '../registry/unknown-kind'
 import { ClearAllFilter } from './clear-all-filter'
 import { DateRangeFilter } from './date-range-filter'
 import { FilterField } from './filter-field'
@@ -33,7 +35,14 @@ export const FilterBar = (props: FilterBarProps) => {
 
         // The key comes from the config being rendered, so the entry accepts that config; TypeScript
         // cannot correlate the two across the union (same cast as `resolveCellRenderer`).
-        const Component = resolvedRegistry[config.kind] as ComponentType<{ config: RegisteredFilterConfig }>
+        const Component = resolvedRegistry[config.kind] as
+          | ComponentType<{ config: RegisteredFilterConfig }>
+          | undefined
+
+        // Reachable from untyped callers and stale persisted configs only; the union is closed.
+        if (!Component) {
+          return <UnknownKind key={config.id} subject="filter" kind={config.kind} />
+        }
 
         return (
           <FilterField
@@ -76,5 +85,5 @@ const DEFAULT_FILTER_REGISTRY: FilterRegistry = {
 
 /** Merges `extra` overrides onto the default registry so consumers can replace individual kinds. */
 export const createFilterRegistry = (extra?: Partial<FilterRegistry>): FilterRegistry => {
-  return { ...DEFAULT_FILTER_REGISTRY, ...extra }
+  return mergeOverrides(DEFAULT_FILTER_REGISTRY, extra)
 }
