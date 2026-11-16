@@ -42,14 +42,15 @@ export const NumberRangeFilter = (props: NumberRangeFilterProps) => {
     commit({ min, max })
   }
 
-  // An entry that would cross the other handle is held as a draft until blur: committing it per
-  // keystroke would swap the ends mid-typing (the "2" of "200" lands below the minimum).
+  // An entry below the track or across the other handle is held as a draft until blur. Committing
+  // it per keystroke would clamp or swap mid-typing: the "2" of "200" lands below `bounds.min` or
+  // below the minimum, and the digits that follow are appended to the corrected value.
   const canCommitMin = (min: number) => {
-    return clampEdge(min, bounds) <= value.max
+    return min >= bounds.min && clampEdge(min, bounds) <= value.max
   }
 
   const canCommitMax = (max: number) => {
-    return clampEdge(max, bounds) >= value.min
+    return max >= bounds.min && clampEdge(max, bounds) >= value.min
   }
 
   return (
