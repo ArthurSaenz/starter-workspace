@@ -7,13 +7,12 @@ import type { BackDismissTrigger } from '..'
 interface LayerProps {
   isOpen: boolean
   onDismiss: (trigger: BackDismissTrigger) => void
-  locationKey: string
 }
 
 const Layer = (props: LayerProps) => {
-  const { isOpen, onDismiss, locationKey } = props
+  const { isOpen, onDismiss } = props
 
-  useDismissOnBack({ isOpen, onDismiss, locationKey })
+  useDismissOnBack({ isOpen, onDismiss })
 
   return null
 }
@@ -21,7 +20,7 @@ const Layer = (props: LayerProps) => {
 describe('useDismissOnBack', () => {
   it('leaves back to navigation when nothing is open', async () => {
     const onDismiss = vi.fn()
-    const screen = await render(<Layer isOpen={false} onDismiss={onDismiss} locationKey="/" />)
+    const screen = await render(<Layer isOpen={false} onDismiss={onDismiss} />)
 
     expect(dismissTopLayer()).toBe(false)
     expect(onDismiss).not.toHaveBeenCalled()
@@ -31,7 +30,7 @@ describe('useDismissOnBack', () => {
 
   it('closes the open layer on native back instead of navigating', async () => {
     const onDismiss = vi.fn()
-    const screen = await render(<Layer isOpen={true} onDismiss={onDismiss} locationKey="/" />)
+    const screen = await render(<Layer isOpen={true} onDismiss={onDismiss} />)
 
     expect(dismissTopLayer()).toBe(true)
     expect(onDismiss).toHaveBeenCalledWith('back-button')
@@ -39,22 +38,37 @@ describe('useDismissOnBack', () => {
     screen.unmount()
   })
 
-  it('closes the open layer when the location moves under it', async () => {
+  it('closes the open layer when the user traverses history under it', async () => {
     const onDismiss = vi.fn()
-    const screen = await render(<Layer isOpen={true} onDismiss={onDismiss} locationKey="/results" />)
+    const screen = await render(<Layer isOpen={true} onDismiss={onDismiss} />)
 
-    await screen.rerender(<Layer isOpen={true} onDismiss={onDismiss} locationKey="/" />)
+    window.dispatchEvent(new PopStateEvent('popstate'))
 
     expect(onDismiss).toHaveBeenCalledExactlyOnceWith('navigation')
 
     screen.unmount()
   })
 
-  it('keeps a layer that the location change itself opened', async () => {
+  it('stays open while the app itself pushes or replaces the URL under it', async () => {
     const onDismiss = vi.fn()
-    const screen = await render(<Layer isOpen={false} onDismiss={onDismiss} locationKey="/results" />)
+    const initialUrl = window.location.href
+    const screen = await render(<Layer isOpen={true} onDismiss={onDismiss} />)
 
-    await screen.rerender(<Layer isOpen={true} onDismiss={onDismiss} locationKey="/results?modal=details" />)
+    window.history.pushState(null, '', '?modal=details')
+    window.history.replaceState(null, '', '?modal=details&campaign=1')
+
+    expect(onDismiss).not.toHaveBeenCalled()
+
+    window.history.replaceState(null, '', initialUrl)
+    screen.unmount()
+  })
+
+  it('stops listening for history traversal once the layer closes', async () => {
+    const onDismiss = vi.fn()
+    const screen = await render(<Layer isOpen={true} onDismiss={onDismiss} />)
+
+    await screen.rerender(<Layer isOpen={false} onDismiss={onDismiss} />)
+    window.dispatchEvent(new PopStateEvent('popstate'))
 
     expect(onDismiss).not.toHaveBeenCalled()
 
@@ -67,8 +81,8 @@ describe('useDismissOnBack', () => {
 
     const screen = await render(
       <>
-        <Layer isOpen={true} onDismiss={onDismissMenu} locationKey="/" />
-        <Layer isOpen={true} onDismiss={onDismissModal} locationKey="/" />
+        <Layer isOpen={true} onDismiss={onDismissMenu} />
+        <Layer isOpen={true} onDismiss={onDismissModal} />
       </>,
     )
 
@@ -82,9 +96,9 @@ describe('useDismissOnBack', () => {
 
   it('unregisters once the layer closes', async () => {
     const onDismiss = vi.fn()
-    const screen = await render(<Layer isOpen={true} onDismiss={onDismiss} locationKey="/" />)
+    const screen = await render(<Layer isOpen={true} onDismiss={onDismiss} />)
 
-    await screen.rerender(<Layer isOpen={false} onDismiss={onDismiss} locationKey="/" />)
+    await screen.rerender(<Layer isOpen={false} onDismiss={onDismiss} />)
 
     expect(dismissTopLayer()).toBe(false)
     expect(onDismiss).not.toHaveBeenCalled()
@@ -98,8 +112,8 @@ describe('useDismissOnBack', () => {
 
     const screen = await render(
       <>
-        <Layer isOpen={true} onDismiss={vi.fn()} locationKey="/" />
-        <Layer isOpen={true} onDismiss={vi.fn()} locationKey="/" />
+        <Layer isOpen={true} onDismiss={vi.fn()} />
+        <Layer isOpen={true} onDismiss={vi.fn()} />
       </>,
     )
 
@@ -107,8 +121,8 @@ describe('useDismissOnBack', () => {
 
     await screen.rerender(
       <>
-        <Layer isOpen={true} onDismiss={vi.fn()} locationKey="/" />
-        <Layer isOpen={false} onDismiss={vi.fn()} locationKey="/" />
+        <Layer isOpen={true} onDismiss={vi.fn()} />
+        <Layer isOpen={false} onDismiss={vi.fn()} />
       </>,
     )
 

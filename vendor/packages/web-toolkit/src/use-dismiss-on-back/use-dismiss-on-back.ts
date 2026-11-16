@@ -1,28 +1,24 @@
-import { useEffect, useEffectEvent, useRef } from 'react'
+import { useEffect, useEffectEvent } from 'react'
 
 import { pushDismissLayer } from './dismiss-stack'
 
 /**
  * - `back-button` — the native back (Android button/gesture, via `dismissTopLayer`) closed the layer instead of navigating.
- * - `navigation` — the location moved while the layer was open (iOS edge swipe, browser back), so it must not follow the user to the next page.
+ * - `navigation` — the user traversed history while the layer was open (browser back/forward, iOS edge swipe).
+ *   A layer that lives above the pages (a menu) closes on it; a layer inside a page unmounts with that page and can ignore it.
  */
 export type BackDismissTrigger = 'back-button' | 'navigation'
 
 interface UseDismissOnBackArgs {
   isOpen: boolean
   onDismiss: (trigger: BackDismissTrigger) => void
-  /** Any string that changes with the current location, e.g. pathname + search from the app's router. */
-  locationKey: string
 }
 
 /**
  * @description - Makes an overlay (menu, drawer, modal) close on "back" the way native apps do.
  */
 export const useDismissOnBack = (args: UseDismissOnBackArgs) => {
-  const { isOpen, onDismiss, locationKey } = args
-
-  // An overlay opened by a URL change records the new location, so it does not close itself.
-  const openedAtLocationRef = useRef<string | null>(null)
+  const { isOpen, onDismiss } = args
 
   const handleDismiss = useEffectEvent(onDismiss)
 
@@ -31,26 +27,21 @@ export const useDismissOnBack = (args: UseDismissOnBackArgs) => {
       return
     }
 
-    return pushDismissLayer(() => {
+    const removeLayer = pushDismissLayer(() => {
       handleDismiss('back-button')
     })
-  }, [isOpen])
 
-  useEffect(() => {
-    if (!isOpen) {
-      openedAtLocationRef.current = null
-
-      return
-    }
-
-    if (openedAtLocationRef.current === null) {
-      openedAtLocationRef.current = locationKey
-
-      return
-    }
-
-    if (openedAtLocationRef.current !== locationKey) {
+    // `popstate` fires only on a history traversal. The app's own push/replace does not, so an overlay that writes
+    // its state to the URL while open (a modal's search param) is not mistaken for the user leaving.
+    const handlePopState = () => {
       handleDismiss('navigation')
     }
-  }, [isOpen, locationKey])
+
+    window.addEventListener('popstate', handlePopState)
+
+    return () => {
+      removeLayer()
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [isOpen])
 }

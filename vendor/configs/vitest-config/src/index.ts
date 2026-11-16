@@ -2,6 +2,7 @@ import react from '@vitejs/plugin-react'
 import { playwright } from '@vitest/browser-playwright'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { type ViteUserConfig, mergeConfig } from 'vitest/config'
 
 /**
@@ -24,6 +25,8 @@ const setupFilesFor = (dirname: string): string[] => {
 
   return existsSync(setupFile) ? [setupFile] : []
 }
+
+const ENSURE_BROWSERS = fileURLToPath(new URL('./ensure-browsers.js', import.meta.url))
 
 const rootAliasFor = (dirname: string) => ({
   '#root': resolve(dirname, 'src'),
@@ -62,6 +65,7 @@ export const defineBrowserConfig = (dirname: string, overrides: ViteUserConfig =
       test: {
         exclude: EXCLUDE,
         setupFiles: setupFilesFor(dirname),
+        globalSetup: [ENSURE_BROWSERS],
         browser: {
           enabled: true,
           provider: playwright(),
