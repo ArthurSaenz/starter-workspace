@@ -40,6 +40,9 @@ export const useControllableState = <TState>(
         : updaterOrValue
 
     if (!isControlledRef.current) {
+      // A second updater in the same batch runs before the re-render that would refresh the ref.
+      // Controlled state is left alone: the consumer may still turn `next` down.
+      stateRef.current = next
       setInternalState(next)
     }
 
