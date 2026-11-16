@@ -32,12 +32,6 @@ export interface BuildColumnDefsHelpers<TData extends RowData> {
   getCellRenderer?: (kind: CellKind) => CellRenderer<TData> | undefined
 }
 
-export interface BuildColumnDefsResult<TData extends RowData> {
-  columnDefs: ColumnDef<DataTableFeatures, TData>[]
-  /** id → header label, consumed by the columns-visibility menu. */
-  labels: Map<string, string>
-}
-
 const buildCellRenderContext = <TData extends RowData>(
   row: DataTableRow<TData>,
   columnId: string,
@@ -68,13 +62,9 @@ export const buildColumnDefs = <TData extends RowData>(
   columns: TableColumnConfig<TData>[],
   registry: CellRegistry<TData>,
   helpers: BuildColumnDefsHelpers<TData> = {},
-): BuildColumnDefsResult<TData> => {
-  const labels = new Map<string, string>()
-
-  const columnDefs = columns.map((snapshot): ColumnDef<DataTableFeatures, TData> => {
+): ColumnDef<DataTableFeatures, TData>[] => {
+  return columns.map((snapshot): ColumnDef<DataTableFeatures, TData> => {
     const columnId = snapshot.id
-
-    labels.set(columnId, snapshot.label)
 
     const resolveConfig = () => {
       return helpers.getColumnConfig?.(columnId) ?? snapshot
@@ -124,8 +114,6 @@ export const buildColumnDefs = <TData extends RowData>(
 
     return sortable
   })
-
-  return { columnDefs, labels }
 }
 
 /**

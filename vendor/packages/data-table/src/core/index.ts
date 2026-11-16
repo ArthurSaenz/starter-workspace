@@ -1,6 +1,6 @@
 // Internal barrel — the table shell for use inside this package only.
 // The package's public exports live in src/index.ts.
-export type { BuildColumnDefsHelpers, BuildColumnDefsResult } from './build-column-defs'
+export type { BuildColumnDefsHelpers } from './build-column-defs'
 export { buildColumnDefs, resolveCellRenderer } from './build-column-defs'
 export type { CellConfigOfKind, CellRegistry, CellRenderer, CellRendererProps } from './cell-renderer-types'
 export { DataTable } from './data-table'

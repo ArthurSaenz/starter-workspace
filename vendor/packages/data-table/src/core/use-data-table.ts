@@ -57,7 +57,7 @@ export const useDataTable = <TData extends RowData>(
     })
     .join('|')
 
-  const { columnDefs, labels } = useMemo(() => {
+  const columnDefs = useMemo(() => {
     const helpers: BuildColumnDefsHelpers<TData> = {
       getColumnConfig: (columnId: string) => {
         return columnsByIdRef.current.get(columnId)
@@ -75,6 +75,15 @@ export const useDataTable = <TData extends RowData>(
     // than on `config.columns`'s identity, and every config value a cell reads is fetched through
     // a latest-ref at render time. Identity stays put, content stays fresh.
   }, [structuralKey, columnsByIdRef, columnsRef, registryRef])
+
+  // Not part of the memo above: a label is no structural change, yet the menu must follow it.
+  const labels = useMemo(() => {
+    return new Map(
+      config.columns.map((column) => {
+        return [column.id, column.label]
+      }),
+    )
+  }, [config.columns])
 
   const [sorting, onSortingChange] = useControllableState<SortingState>({
     value: config.sorting?.value,
