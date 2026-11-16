@@ -1,8 +1,7 @@
 import { X } from 'lucide-react'
 import { useState } from 'react'
 
-import { Badge } from '../../primitives/badge'
-import { cn } from '../../primitives/cn'
+import { Badge, cn } from '../../primitives'
 
 interface SelectedChipsProps {
   value: string[]

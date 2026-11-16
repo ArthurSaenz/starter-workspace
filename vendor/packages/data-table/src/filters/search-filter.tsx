@@ -2,9 +2,8 @@ import { Search } from 'lucide-react'
 import type { ChangeEvent } from 'react'
 import { useContext, useEffect, useMemo, useRef, useState } from 'react'
 
-import type { SearchFilterConfig } from '../config/filter-config'
-import { cn } from '../primitives/cn'
-import { Input } from '../primitives/input'
+import type { SearchFilterConfig } from '../config'
+import { FIELD_CLASS, Input, cn } from '../primitives'
 import { debounce } from './lib/debounce'
 import { SearchDraftsContext } from './search-drafts'
 
@@ -114,9 +113,6 @@ export const SearchFilter = (props: SearchFilterProps) => {
     </div>
   )
 }
-
-/** Copied literally from apps/backoffice/ui catalog2-styles.ts CATALOG2_FIELD_CLASS. */
-const FIELD_CLASS = 'border-input bg-white shadow-xs'
 
 const T = {
   searchPlaceholder: 'Search…',

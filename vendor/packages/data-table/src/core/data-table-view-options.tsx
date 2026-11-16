@@ -1,8 +1,9 @@
 import type { RowData } from '@tanstack/react-table'
 import { Settings2 } from 'lucide-react'
 
-import { Button } from '../primitives/button'
+import type { DataTableInstance } from '../engine'
 import {
+  Button,
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -10,8 +11,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '../primitives/dropdown-menu'
-import type { DataTableInstance } from './table-features'
+} from '../primitives'
 
 export interface DataTableViewOptionsProps<TData extends RowData> {
   table: DataTableInstance<TData>

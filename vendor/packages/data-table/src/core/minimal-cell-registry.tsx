@@ -1,7 +1,7 @@
 import { ChevronDown } from 'lucide-react'
 
 import type { CustomCellConfig, ExpanderCellConfig, TextCellConfig } from '../config'
-import { cn } from '../primitives/cn'
+import { cn } from '../primitives'
 import type { CellRegistry, CellRendererProps } from './cell-renderer-types'
 
 /**
@@ -12,7 +12,7 @@ import type { CellRegistry, CellRendererProps } from './cell-renderer-types'
  */
 type TextCellProps<TData> = CellRendererProps<TData, TextCellConfig<TData>>
 
-const TextCell = <TData,>(props: TextCellProps<TData>) => {
+export const TextCell = <TData,>(props: TextCellProps<TData>) => {
   const { config, row } = props
 
   const value = config.value(row)
@@ -23,7 +23,7 @@ const TextCell = <TData,>(props: TextCellProps<TData>) => {
 
 type CustomCellProps<TData> = CellRendererProps<TData, CustomCellConfig<TData>>
 
-const CustomCell = <TData,>(props: CustomCellProps<TData>) => {
+export const CustomCell = <TData,>(props: CustomCellProps<TData>) => {
   const { config, ctx } = props
 
   return <>{config.render(ctx)}</>
@@ -32,7 +32,7 @@ const CustomCell = <TData,>(props: CustomCellProps<TData>) => {
 type ExpanderCellProps<TData> = CellRendererProps<TData, ExpanderCellConfig>
 
 /** Mirrors `FlightsCatalogExpandCell` — a chevron that rotates 180° once the row is open. */
-const ExpanderCell = <TData,>(props: ExpanderCellProps<TData>) => {
+export const ExpanderCell = <TData,>(props: ExpanderCellProps<TData>) => {
   const { ctx } = props
 
   const handleToggleClick = () => {

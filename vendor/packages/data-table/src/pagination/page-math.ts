@@ -19,7 +19,7 @@ export const resolveServerPage = (args: { page: number; pageSize: number; totalC
   const pageSize = normalizePageSize(args.pageSize)
   const totalCount = Number.isFinite(args.totalCount) ? Math.max(0, args.totalCount) : 0
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
-  const page = Number.isFinite(args.page) ? Math.min(Math.max(1, Math.trunc(args.page)), totalPages) : 1
+  const page = Number.isNaN(args.page) ? 1 : Math.min(Math.max(1, Math.trunc(args.page)), totalPages)
 
   return { page, pageSize, totalCount, totalPages }
 }

@@ -1,10 +1,9 @@
 import type { ComponentType } from 'react'
 import { Fragment } from 'react'
 
-import type { FilterConfig, FilterConfigOfKind, FilterKind } from '../config/filter-config'
-import { cn } from '../primitives/cn'
-import { mergeOverrides } from '../registry/merge-overrides'
-import { UnknownKind } from '../registry/unknown-kind'
+import type { FilterConfig, FilterConfigOfKind, FilterKind } from '../config'
+import { cn } from '../primitives'
+import { UnknownKind, mergeOverrides } from '../registry'
 import { ClearAllFilter } from './clear-all-filter'
 import { DateRangeFilter } from './date-range-filter'
 import { FilterField } from './filter-field'
@@ -35,9 +34,7 @@ export const FilterBar = (props: FilterBarProps) => {
 
         // The key comes from the config being rendered, so the entry accepts that config; TypeScript
         // cannot correlate the two across the union (same cast as `resolveCellRenderer`).
-        const Component = resolvedRegistry[config.kind] as
-          | ComponentType<{ config: RegisteredFilterConfig }>
-          | undefined
+        const Component = resolvedRegistry[config.kind] as ComponentType<{ config: RegisteredFilterConfig }> | undefined
 
         // Reachable from untyped callers and stale persisted configs only; the union is closed.
         if (!Component) {

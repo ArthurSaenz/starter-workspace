@@ -25,7 +25,7 @@ export type {
   TextareaCellConfig,
   TextCellConfig,
 } from './cell-config'
-export type { TableColumnConfig } from './column-config'
+export type { ColumnHeaderRenderContext, TableColumnConfig } from './column-config'
 export type { ExpandableConfig } from './expandable-config'
 export type {
   ClearAllFilterConfig,
@@ -33,6 +33,7 @@ export type {
   DateRangeFilterConfig,
   DateRangeValue,
   FilterConfig,
+  FilterConfigOfKind,
   FilterKind,
   FilterOption,
   MultiDateFilterConfig,

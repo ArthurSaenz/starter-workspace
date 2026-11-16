@@ -1,7 +1,6 @@
 import type { SwitchCellConfig } from '../config'
-import type { CellRendererProps } from '../core/cell-renderer-types'
-import { cn } from '../primitives/cn'
-import { Switch } from '../primitives/switch'
+import type { CellRendererProps } from '../core'
+import { Switch, cn } from '../primitives'
 
 type SwitchCellProps<TData> = CellRendererProps<TData, SwitchCellConfig<TData>>
 

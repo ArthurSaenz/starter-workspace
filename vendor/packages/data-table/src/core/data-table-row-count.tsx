@@ -1,4 +1,4 @@
-import { cn } from '../primitives/cn'
+import { cn } from '../primitives'
 
 export interface DataTableRowCountProps {
   visibleCount: number

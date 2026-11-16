@@ -3,12 +3,12 @@ import { useTable } from '@tanstack/react-table'
 import { useLayoutEffect, useMemo, useRef } from 'react'
 
 import type { CellKind, TableColumnConfig, TableConfig } from '../config'
-import { normalizePageSize, resolveServerPage } from '../pagination/page-math'
+import type { DataTableInstance, DataTableRow } from '../engine'
+import { DATA_TABLE_FEATURES } from '../engine'
+import { normalizePageSize, resolveServerPage } from '../pagination'
 import type { BuildColumnDefsHelpers } from './build-column-defs'
 import { buildColumnDefs, resolveCellRenderer } from './build-column-defs'
 import type { CellRegistry } from './cell-renderer-types'
-import type { DataTableInstance, DataTableRow } from './table-features'
-import { DATA_TABLE_FEATURES } from './table-features'
 import { useControllableState } from './use-controllable-state'
 import { useLatestRef } from './use-latest-ref'
 
@@ -16,6 +16,7 @@ export interface UseDataTableResult<TData extends RowData> {
   table: DataTableInstance<TData>
   /** id → header label, for the columns-visibility menu. */
   labels: Map<string, string>
+  columnsById: Map<string, TableColumnConfig<TData>>
 }
 
 /**
@@ -184,7 +185,7 @@ export const useDataTable = <TData extends RowData>(
     }
   }, [pageResetKey, isClientPagination, table])
 
-  return { table, labels }
+  return { table, labels, columnsById }
 }
 
 const buildInitialVisibility = (initialHidden: string[] | undefined): ColumnVisibilityState => {

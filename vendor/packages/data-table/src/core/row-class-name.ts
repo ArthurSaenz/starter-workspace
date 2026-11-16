@@ -1,5 +1,5 @@
 import type { RowClassNameConfig } from '../config'
-import { cn } from '../primitives/cn'
+import { cn } from '../primitives'
 
 /**
  * Zebra backgrounds for `striped: true`.

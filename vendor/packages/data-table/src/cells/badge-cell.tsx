@@ -1,7 +1,6 @@
 import type { BadgeCellConfig } from '../config'
-import type { CellRendererProps } from '../core/cell-renderer-types'
-import { Badge } from '../primitives/badge'
-import { cn } from '../primitives/cn'
+import type { CellRendererProps } from '../core'
+import { Badge, cn } from '../primitives'
 
 type BadgeCellProps<TData> = CellRendererProps<TData, BadgeCellConfig<TData>>
 

@@ -1,8 +1,6 @@
 import type { CurrencySelectCellConfig, CurrencySelectConfig } from '../config'
-import type { CellRendererProps } from '../core/cell-renderer-types'
-import { cn } from '../primitives/cn'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../primitives/select'
-import { CELL_FIELD_CLASS } from './number-input-cell'
+import type { CellRendererProps } from '../core'
+import { FIELD_CLASS, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, cn } from '../primitives'
 
 export interface CurrencySelectFieldProps<TData> {
   config: CurrencySelectConfig<TData>
@@ -44,7 +42,7 @@ export const CurrencySelectField = <TData,>(props: CurrencySelectFieldProps<TDat
  * (apps/backoffice/ui/.../flights-catalog-table-cells.tsx), layered on the same white field
  * styling the price inputs beside it use.
  */
-const CURRENCY_SELECT_TRIGGER_CLASS = `${CELL_FIELD_CLASS} w-20`
+const CURRENCY_SELECT_TRIGGER_CLASS = `${FIELD_CLASS} w-20`
 
 type CurrencySelectCellProps<TData> = CellRendererProps<TData, CurrencySelectCellConfig<TData>>
 

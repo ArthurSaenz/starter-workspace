@@ -1,8 +1,7 @@
 import { Trash2 } from 'lucide-react'
 
-import type { ClearAllFilterConfig } from '../config/filter-config'
-import { Button } from '../primitives/button'
-import { cn } from '../primitives/cn'
+import type { ClearAllFilterConfig } from '../config'
+import { Button, cn } from '../primitives'
 
 export interface ClearAllFilterProps {
   config: ClearAllFilterConfig

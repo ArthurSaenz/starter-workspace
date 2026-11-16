@@ -3,10 +3,8 @@ import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 
 import type { ActionsCellConfig, CellRenderContext, RowActionConfig } from '../config'
-import type { CellRendererProps } from '../core/cell-renderer-types'
-import { Button } from '../primitives/button'
-import { cn } from '../primitives/cn'
-import { Tooltip, TooltipContent, TooltipTrigger } from '../primitives/tooltip'
+import type { CellRendererProps } from '../core'
+import { Button, Tooltip, TooltipContent, TooltipTrigger, cn } from '../primitives'
 
 type ActionsCellProps<TData> = CellRendererProps<TData, ActionsCellConfig<TData>>
 

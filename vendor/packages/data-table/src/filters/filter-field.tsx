@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { cn } from '../primitives/cn'
-import { Label } from '../primitives/label'
+import { Label, cn } from '../primitives'
 
 export interface FilterFieldProps {
   label?: string

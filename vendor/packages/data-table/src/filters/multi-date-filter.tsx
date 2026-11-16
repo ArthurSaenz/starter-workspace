@@ -1,13 +1,19 @@
-import { format, isValid, parse } from 'date-fns'
+import { format } from 'date-fns'
 import { CalendarIcon, X } from 'lucide-react'
 import { useState } from 'react'
 
-import type { MultiDateFilterConfig } from '../config/filter-config'
-import { Badge } from '../primitives/badge'
-import { Button } from '../primitives/button'
-import { Calendar } from '../primitives/calendar'
-import { cn } from '../primitives/cn'
-import { Popover, PopoverContent, PopoverTrigger } from '../primitives/popover'
+import type { MultiDateFilterConfig } from '../config'
+import {
+  Badge,
+  Button,
+  Calendar,
+  FILTER_TRIGGER_CLASS,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  cn,
+} from '../primitives'
+import { parseFilterDate } from './lib/filter-date'
 
 export interface MultiDateFilterProps {
   config: MultiDateFilterConfig
@@ -117,16 +123,7 @@ export const MultiDateFilter = (props: MultiDateFilterProps) => {
   )
 }
 
-const parseFilterDate = (value: string, dateFormat: string): Date | undefined => {
-  const parsed = parse(value, dateFormat, new Date())
-
-  return isValid(parsed) ? parsed : undefined
-}
-
 const DEFAULT_DATE_FORMAT = 'yyyy-MM-dd'
-
-/** Copied literally from apps/backoffice/ui catalog2-styles.ts CATALOG2_FILTER_TRIGGER_CLASS. */
-const FILTER_TRIGGER_CLASS = 'border-input bg-white h-10 shadow-xs'
 
 const T = {
   placeholder: 'Select dates',

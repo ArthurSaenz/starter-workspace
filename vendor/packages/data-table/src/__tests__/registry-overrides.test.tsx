@@ -4,7 +4,7 @@ import { render } from 'vitest-browser-react'
 import { createCellRegistry } from '../cells/cell-registry'
 import type { FilterConfig } from '../config'
 import { DataTable } from '../core/data-table'
-import { createFilterRegistry, FilterBar } from '../filters/filter-bar'
+import { FilterBar, createFilterRegistry } from '../filters/filter-bar'
 
 interface Row {
   id: string

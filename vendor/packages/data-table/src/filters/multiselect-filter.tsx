@@ -1,6 +1,6 @@
 import { matchSorter } from 'match-sorter'
 
-import type { MultiselectFilterConfig } from '../config/filter-config'
+import type { MultiselectFilterConfig } from '../config'
 import type { MultiSelectComboboxOption } from './multi-select-combobox'
 import { MultiSelectCombobox } from './multi-select-combobox'
 

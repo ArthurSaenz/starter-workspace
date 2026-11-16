@@ -7,12 +7,13 @@ import type {
   RowData,
 } from '@tanstack/react-table'
 
-import type { CellKind, CellRenderContext, TableColumnConfig } from '../config'
-import { UnknownKind } from '../registry/unknown-kind'
+import type { CellKind, TableColumnConfig } from '../config'
+import { sortFn_v8Auto } from '../engine'
+import type { DataTableFeatures } from '../engine'
+import { UnknownKind } from '../registry'
 import type { CellRegistry, CellRenderer } from './cell-renderer-types'
 import { DataTableColumnHeader } from './data-table-column-header'
-import { sortFn_v8Auto } from './table-features'
-import type { DataTableFeatures, DataTableRow } from './table-features'
+import { buildRowContext } from './row-context'
 
 type ColumnHeaderContext<TData extends RowData> = HeaderContext<DataTableFeatures, TData, unknown>
 
@@ -31,21 +32,6 @@ type ColumnCellContext<TData extends RowData> = CellContext<DataTableFeatures, T
 export interface BuildColumnDefsHelpers<TData extends RowData> {
   getColumnConfig?: (columnId: string) => TableColumnConfig<TData> | undefined
   getCellRenderer?: (kind: CellKind) => CellRenderer<TData> | undefined
-}
-
-const buildCellRenderContext = <TData extends RowData>(
-  row: DataTableRow<TData>,
-  columnId: string,
-): CellRenderContext<TData> => {
-  return {
-    row: row.original,
-    rowIndex: row.index,
-    isExpanded: row.getIsExpanded(),
-    toggleExpanded: () => {
-      row.toggleExpanded()
-    },
-    columnId,
-  }
 }
 
 /**
@@ -95,7 +81,7 @@ export const buildColumnDefs = <TData extends RowData>(
           return <UnknownKind subject="cell" kind={cellConfig.kind} />
         }
 
-        return <Renderer config={cellConfig} ctx={buildCellRenderContext(row, columnId)} row={row.original} />
+        return <Renderer config={cellConfig} ctx={buildRowContext(row, columnId)} row={row.original} />
       },
     }
 

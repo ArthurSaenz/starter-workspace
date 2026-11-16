@@ -2,8 +2,7 @@
 // swapping the app's Button/cn imports for the package's own primitives. Labels kept verbatim.
 import { Maximize2, Minimize2 } from 'lucide-react'
 
-import { Button } from '../primitives/button'
-import { cn } from '../primitives/cn'
+import { Button, cn } from '../primitives'
 
 export interface DataTableFullscreenToggleProps {
   isFullscreen: boolean

@@ -34,6 +34,10 @@ though those barrels use `export *` internally for this package's own modules to
 Adding to `src/index.ts` is fine; removing or renaming an export is the breaking change the rule
 above refers to.
 
+Modules under `src/` import each other through their `index.ts` only — `eslint.config.js` refuses a
+deeper path — and only downwards: `primitives`, `registry`, `engine` → `config` → `filters`,
+`pagination`, `fullscreen` → `core` → `cells`. Tests are exempt and import the file under test.
+
 `CellConfig` and `FilterConfig` are closed unions by design: `createCellRegistry`/
 `createFilterRegistry` can only override the renderer behind an existing `kind`, never register a
 new `kind` string. `{ kind: 'custom', render }` is the intended escape hatch for anything a built-in
@@ -47,7 +51,7 @@ A dependency uses `catalog:` only if every vendor target's catalog has it; the r
 versions, or `pnpm install` breaks in the targets that lack the entry. `@tanstack/react-table` is a
 literal `"^9.3.1"` for that reason (not every target's catalog carries it).
 
-TanStack v9 only exposes the APIs of registered features. `src/core/table-features.ts` registers every
+TanStack v9 only exposes the APIs of registered features. `src/engine/table-features.ts` registers every
 feature and row model the table uses, once; a new TanStack call (row selection, filtering, pinning…)
 needs its feature added there, or it is missing at runtime and in the types. Sortable columns use
 `sortFn_v8Auto`, not v9's `'auto'`, which samples different rows and reorders client-sorted tables;

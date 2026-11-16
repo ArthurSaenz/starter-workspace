@@ -1,7 +1,6 @@
 import type { ComputedCellConfig } from '../config'
-import type { CellRendererProps } from '../core/cell-renderer-types'
-import { cn } from '../primitives/cn'
-import { Input } from '../primitives/input'
+import type { CellRendererProps } from '../core'
+import { Input, cn } from '../primitives'
 
 type ComputedCellProps<TData> = CellRendererProps<TData, ComputedCellConfig<TData>>
 

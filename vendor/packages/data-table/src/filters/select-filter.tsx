@@ -1,8 +1,7 @@
 import { X } from 'lucide-react'
 
-import type { SelectFilterConfig } from '../config/filter-config'
-import { cn } from '../primitives/cn'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../primitives/select'
+import type { SelectFilterConfig } from '../config'
+import { FILTER_TRIGGER_CLASS, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, cn } from '../primitives'
 
 export interface SelectFilterProps {
   config: SelectFilterConfig
@@ -48,8 +47,7 @@ export const SelectFilter = (props: SelectFilterProps) => {
   )
 }
 
-/** Copied literally from apps/backoffice/ui catalog2-styles.ts CATALOG2_FILTER_SELECT_TRIGGER_CLASS — do not import across the app boundary. */
-const SELECT_TRIGGER_CLASS = 'border-input bg-white h-10 w-full min-w-[140px] shadow-xs'
+const SELECT_TRIGGER_CLASS = `${FILTER_TRIGGER_CLASS} w-full min-w-[140px]`
 
 const T = {
   clear: 'Clear',

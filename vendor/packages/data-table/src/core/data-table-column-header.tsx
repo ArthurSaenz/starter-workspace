@@ -2,16 +2,16 @@ import type { RowData } from '@tanstack/react-table'
 import { ArrowDown, ArrowUp, ChevronsUpDown, ListRestart } from 'lucide-react'
 import type { HTMLAttributes } from 'react'
 
-import { Button } from '../primitives/button'
-import { cn } from '../primitives/cn'
+import type { DataTableColumn, DataTableInstance } from '../engine'
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '../primitives/dropdown-menu'
-import type { DataTableColumn, DataTableInstance } from './table-features'
+  cn,
+} from '../primitives'
 
 export interface DataTableColumnHeaderProps<TData extends RowData, TValue> extends HTMLAttributes<HTMLDivElement> {
   column: DataTableColumn<TData, TValue>

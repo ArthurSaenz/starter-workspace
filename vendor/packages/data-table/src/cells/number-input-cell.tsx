@@ -1,9 +1,8 @@
 import type { ChangeEvent, FocusEvent } from 'react'
 
 import type { NumberInputCellConfig, PriceFieldConfig } from '../config'
-import type { CellRendererProps } from '../core/cell-renderer-types'
-import { cn } from '../primitives/cn'
-import { Input } from '../primitives/input'
+import type { CellRendererProps } from '../core'
+import { FIELD_CLASS, Input, cn } from '../primitives'
 
 export interface PriceFieldInputProps<TData> {
   field: PriceFieldConfig<TData>
@@ -52,7 +51,7 @@ export const PriceFieldInput = <TData,>(props: PriceFieldInputProps<TData>) => {
         type="number"
         placeholder={placeholder}
         disabled={isDisabled}
-        className={cn(CELL_FIELD_CLASS, 'w-20', inputClassName)}
+        className={cn(FIELD_CLASS, 'w-20', inputClassName)}
         value={value(row) ?? ''}
         onChange={handleChange}
         onBlur={handleBlur}
@@ -60,13 +59,6 @@ export const PriceFieldInput = <TData,>(props: PriceFieldInputProps<TData>) => {
     </div>
   )
 }
-
-/**
- * Consistent white field styling for editable table cells. Copied from
- * apps/backoffice/ui/.../catalog2-styles.ts `CATALOG2_FIELD_CLASS` — the package cannot import
- * from the app, so the class string is vendored here as the single package-owned constant.
- */
-export const CELL_FIELD_CLASS = 'border-input bg-white shadow-xs'
 
 type NumberInputCellProps<TData> = CellRendererProps<TData, NumberInputCellConfig<TData>>
 

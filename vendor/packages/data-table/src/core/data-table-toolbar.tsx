@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { cn } from '../primitives/cn'
+import { cn } from '../primitives'
 
 export interface DataTableToolbarProps {
   toolbar?: ReactNode

@@ -1,6 +1,6 @@
 import type { PriceInputCellConfig } from '../config'
-import type { CellRendererProps } from '../core/cell-renderer-types'
-import { cn } from '../primitives/cn'
+import type { CellRendererProps } from '../core'
+import { cn } from '../primitives'
 import { CurrencySelectField } from './currency-select-cell'
 import { PriceFieldInput } from './number-input-cell'
 

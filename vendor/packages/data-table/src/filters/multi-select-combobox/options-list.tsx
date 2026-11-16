@@ -3,8 +3,7 @@ import type { CSSProperties, RefObject } from 'react'
 import { useLayoutEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
-import { cn } from '../../primitives/cn'
-import { DATA_TABLE_POPOVER_Z_INDEX } from '../../primitives/z-index'
+import { DATA_TABLE_POPOVER_Z_INDEX, cn } from '../../primitives'
 import { MULTI_SELECT_COMBOBOX_LIST_SLOT } from './list-slot'
 import type { MultiSelectComboboxOption } from './types'
 

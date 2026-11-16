@@ -1,7 +1,7 @@
 import type { RowData } from '@tanstack/react-table'
 import type { ReactNode } from 'react'
 
-import type { DataTableColumn, DataTableInstance } from '../core/table-features'
+import type { DataTableColumn, DataTableInstance } from '../engine'
 import type { CellConfig, CellRenderContext } from './cell-config'
 
 export interface ColumnHeaderRenderContext<TData extends RowData> {

@@ -4,26 +4,26 @@
 // detail and may change without notice.
 
 // Cell kind registry
-export { createCellRegistry } from './cells/cell-registry'
+export { createCellRegistry } from './cells'
 
 // Every config type a column/cell/filter/pagination/row-styling schema is written against.
 export type * from './config'
 
 // Table shell
-export { DataTable } from './core/data-table'
-export type { DataTableProps } from './core/data-table'
-export { DataTableColumnHeader } from './core/data-table-column-header'
-export type { DataTableColumnHeaderProps } from './core/data-table-column-header'
-export { DataTableRowCount } from './core/data-table-row-count'
-export type { DataTableRowCountProps } from './core/data-table-row-count'
-export { DataTableViewOptions } from './core/data-table-view-options'
-export type { DataTableViewOptionsProps } from './core/data-table-view-options'
+export { DataTable } from './core'
+export type { DataTableProps } from './core'
+export { DataTableColumnHeader } from './core'
+export type { DataTableColumnHeaderProps } from './core'
+export { DataTableRowCount } from './core'
+export type { DataTableRowCountProps } from './core'
+export { DataTableViewOptions } from './core'
+export type { DataTableViewOptionsProps } from './core'
 
 // Filters
-export { createFilterRegistry, FilterBar } from './filters/filter-bar'
-export type { FilterRegistry } from './filters/filter-bar'
-export { FilterField } from './filters/filter-field'
-export type { FilterFieldProps } from './filters/filter-field'
+export { createFilterRegistry, FilterBar } from './filters'
+export type { FilterRegistry } from './filters'
+export { FilterField } from './filters'
+export type { FilterFieldProps } from './filters'
 export {
   areAllOptionsSelected,
   filterOptions,
@@ -31,26 +31,26 @@ export {
   MULTI_SELECT_COMBOBOX_LIST_SLOT,
   MultiSelectCombobox,
   toggleValue,
-} from './filters/multi-select-combobox'
-export type { MultiSelectComboboxOption, MultiSelectComboboxProps } from './filters/multi-select-combobox'
+} from './filters'
+export type { MultiSelectComboboxOption, MultiSelectComboboxProps } from './filters'
 
 // Fullscreen
-export { DataTableFullscreenPortal } from './fullscreen/data-table-fullscreen-portal'
-export type { DataTableFullscreenPortalProps } from './fullscreen/data-table-fullscreen-portal'
-export { DataTableFullscreenToggle } from './fullscreen/data-table-fullscreen-toggle'
-export type { DataTableFullscreenToggleProps } from './fullscreen/data-table-fullscreen-toggle'
-export { useDataTableFullscreen } from './fullscreen/use-data-table-fullscreen'
-export type { UseDataTableFullscreenResult } from './fullscreen/use-data-table-fullscreen'
+export { DataTableFullscreenPortal } from './fullscreen'
+export type { DataTableFullscreenPortalProps } from './fullscreen'
+export { DataTableFullscreenToggle } from './fullscreen'
+export type { DataTableFullscreenToggleProps } from './fullscreen'
+export { useDataTableFullscreen } from './fullscreen'
+export type { UseDataTableFullscreenResult } from './fullscreen'
 
 // Pagination
-export { DataTablePagination } from './pagination/data-table-pagination'
-export type { DataTablePaginationProps } from './pagination/data-table-pagination'
-export { ADMIN_PAGE_SIZE_OPTIONS, CATALOG_PAGE_SIZE_OPTIONS } from './pagination/page-size-presets'
-export type { AdminPageSize, CatalogPageSize } from './pagination/page-size-presets'
+export { DataTablePagination } from './pagination'
+export type { DataTablePaginationProps } from './pagination'
+export { ADMIN_PAGE_SIZE_OPTIONS, CATALOG_PAGE_SIZE_OPTIONS } from './pagination'
+export type { AdminPageSize, CatalogPageSize } from './pagination'
 
 // Shared z-index scale, for consumers that need to stack their own UI above/below the table's
 // fullscreen overlay or portaled popovers.
-export { DATA_TABLE_FULLSCREEN_Z_INDEX, DATA_TABLE_POPOVER_Z_INDEX } from './primitives/z-index'
+export { DATA_TABLE_FULLSCREEN_Z_INDEX, DATA_TABLE_POPOVER_Z_INDEX } from './primitives'
 
 // TanStack state types that consumers hold when they control table state, re-exported so apps
 // depend on `@wl/data-table` alone and never import `@tanstack/react-table` directly.

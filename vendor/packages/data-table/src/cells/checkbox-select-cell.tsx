@@ -1,7 +1,6 @@
 import type { CheckboxSelectCellConfig } from '../config'
-import type { CellRendererProps } from '../core/cell-renderer-types'
-import { Checkbox } from '../primitives/checkbox'
-import { cn } from '../primitives/cn'
+import type { CellRendererProps } from '../core'
+import { Checkbox, cn } from '../primitives'
 
 type CheckboxSelectCellProps<TData> = CellRendererProps<TData, CheckboxSelectCellConfig<TData>>
 

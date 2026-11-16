@@ -6,8 +6,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
 
-import type { DataTableFeatures } from '../core/table-features'
-import { DATA_TABLE_FEATURES } from '../core/table-features'
+import type { DataTableFeatures } from '../engine'
+import { DATA_TABLE_FEATURES } from '../engine'
 import { DataTablePagination } from '../pagination/data-table-pagination'
 
 describe('dataTablePagination server mode', () => {

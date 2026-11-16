@@ -3,9 +3,8 @@ import 'rc-slider/assets/index.css'
 import type { ChangeEvent } from 'react'
 import { useEffect, useState } from 'react'
 
-import type { NumberRangeFilterConfig, NumberRangeValue } from '../config/filter-config'
-import { cn } from '../primitives/cn'
-import { Input } from '../primitives/input'
+import type { NumberRangeFilterConfig, NumberRangeValue } from '../config'
+import { Input, cn } from '../primitives'
 
 export interface NumberRangeFilterProps {
   config: NumberRangeFilterConfig

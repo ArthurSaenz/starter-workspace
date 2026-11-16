@@ -1,10 +1,8 @@
 import type { ChangeEvent } from 'react'
 
 import type { TextareaCellConfig } from '../config'
-import type { CellRendererProps } from '../core/cell-renderer-types'
-import { cn } from '../primitives/cn'
-import { Textarea } from '../primitives/textarea'
-import { CELL_FIELD_CLASS } from './number-input-cell'
+import type { CellRendererProps } from '../core'
+import { FIELD_CLASS, Textarea, cn } from '../primitives'
 
 type TextareaCellProps<TData> = CellRendererProps<TData, TextareaCellConfig<TData>>
 
@@ -33,4 +31,4 @@ export const TextareaCell = <TData,>(props: TextareaCellProps<TData>) => {
   )
 }
 
-const TEXTAREA_CELL_CLASS = `${CELL_FIELD_CLASS} w-full`
+const TEXTAREA_CELL_CLASS = `${FIELD_CLASS} w-full`

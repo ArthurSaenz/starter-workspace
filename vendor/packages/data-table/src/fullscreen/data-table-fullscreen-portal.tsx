@@ -6,9 +6,7 @@ import { X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
-import { Button } from '../primitives/button'
-import { cn } from '../primitives/cn'
-import { DATA_TABLE_FULLSCREEN_Z_INDEX } from '../primitives/z-index'
+import { Button, DATA_TABLE_FULLSCREEN_Z_INDEX, cn } from '../primitives'
 
 export interface DataTableFullscreenPortalProps {
   isOpen: boolean
