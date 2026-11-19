@@ -7,8 +7,8 @@ import { assertSyncedBundle } from './bundle.ts'
 import { CliError, EXIT_FAILURE } from './cli-error.ts'
 import { resolveDomain } from './domain.ts'
 import type { Exec } from './exec.ts'
-import type { Stamp } from './version.ts'
-import { parseAndroid, parseIos, stampAndroid, stampIos } from './version.ts'
+import { fetchOrigin, readGitState } from './git-state.ts'
+import { assertNotDelivered, checkWorkingTree, nextMajorHint, nextVersion, stampAndroid, stampIos } from './version.ts'
 
 export const GRADLE_PATH = 'android/app/build.gradle'
 export const PBXPROJ_PATH = 'ios/App/App.xcodeproj/project.pbxproj'
@@ -68,14 +68,11 @@ const resolveApp = (appDir: string): App => {
   return { appDir, repoRoot: findRepoRoot(appDir), name: manifest.name }
 }
 
-const nextStamp = (current: Stamp, version: string): Stamp => {
-  // Same marketing version → same build number, so a re-run does not burn a store build number.
-  return current.version === version ? current : { version, build: current.build + 1 }
-}
-
 const formatVersions = (android: string, ios: string): string => {
   return android === ios ? android : `${android} (iOS ${ios})`
 }
+
+const NATIVE_PATHS = [GRADLE_PATH, PBXPROJ_PATH]
 
 export const runBuild = (args: CliArgs, deps: RunDeps): void => {
   const { exec, log, warn } = deps
@@ -83,23 +80,40 @@ export const runBuild = (args: CliArgs, deps: RunDeps): void => {
   const { VITE_MOBILE_DOMAIN_URL: envDomain } = deps.env
   const origin = resolveDomain(args.domain, envDomain)
   const remoteEntry = `${origin}/mfe/remoteEntry.js`
+
+  fetchOrigin(exec, app.appDir, log)
+
+  const { head, history, delivered } = readGitState(exec, app.appDir, { gradle: GRADLE_PATH, pbxproj: PBXPROJ_PATH })
+  const derivation = nextVersion(args.env, head, history, args.version)
+
+  assertNotDelivered(args.env, derivation, args.version !== undefined, delivered)
+
   const gradleFile = resolve(app.appDir, GRADLE_PATH)
   const pbxprojFile = resolve(app.appDir, PBXPROJ_PATH)
   const gradle = readFileSync(gradleFile, 'utf8')
   const pbxproj = readFileSync(pbxprojFile, 'utf8')
-  const currentAndroid = parseAndroid(gradle)
-  const currentIos = parseIos(pbxproj)
-  const android = nextStamp(currentAndroid, args.version)
-  const ios = nextStamp(currentIos, args.version)
+  const android = { version: derivation.version, build: derivation.android.build }
+  const ios = { version: derivation.version, build: derivation.ios.build }
 
-  log(
-    `${args.env} · ${formatVersions(currentAndroid.version, currentIos.version)} → ${args.version} · iOS ${ios.build} · Android ${android.build} · ${origin}`,
+  const actions = checkWorkingTree(
+    { android: { source: gradle, head: head.android }, ios: { source: pbxproj, head: head.ios } },
+    { android, ios },
+    NATIVE_PATHS,
   )
 
-  if (args.dryRun) return
+  log(
+    `${args.env} · ${formatVersions(head.android.version, head.ios.version)} → ${derivation.version} · iOS ${ios.build} · Android ${android.build} · ${origin} · builds after iOS ${derivation.ios.source}, Android ${derivation.android.source}`,
+  )
 
-  writeFileSync(gradleFile, stampAndroid(gradle, android))
-  writeFileSync(pbxprojFile, stampIos(pbxproj, ios))
+  if (args.dryRun) {
+    log(nextMajorHint(derivation.major))
+
+    return
+  }
+
+  if (actions.android === 'stamp') writeFileSync(gradleFile, stampAndroid(gradle, android))
+
+  if (actions.ios === 'stamp') writeFileSync(pbxprojFile, stampIos(pbxproj, ios))
 
   const childEnv = { ...deps.env, VITE_MOBILE_DOMAIN_URL: origin }
 
@@ -128,7 +142,13 @@ export const runBuild = (args: CliArgs, deps: RunDeps): void => {
   assertSyncedBundle(resolve(app.appDir, IOS_ASSETS_PATH), remoteEntry, log)
   assertSyncedBundle(resolve(app.appDir, ANDROID_ASSETS_PATH), remoteEntry, log)
 
-  log(`\nDone. Archive in Xcode (pnpm ios) / Android Studio (pnpm android) as ${args.version}.`)
+  log(`\nDone. Archive in Xcode (pnpm ios) / Android Studio (pnpm android) as ${derivation.version}.`)
+  log(
+    `review \`git diff -- ${NATIVE_PATHS.join(' ')}\` first: \`cap sync\` may have changed more than the version lines`,
+  )
+  log(
+    `git commit -m "[APP] Stamp ${app.name} ${derivation.version} for the ${args.env} native build (Android ${android.build}, iOS build ${ios.build})" -- ${NATIVE_PATHS.join(' ')}`,
+  )
 }
 
 export const main = (argv: string[], deps: RunDeps): number => {

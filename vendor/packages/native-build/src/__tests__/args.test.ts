@@ -34,6 +34,15 @@ describe('parseCliArgs', () => {
     })
   })
 
+  it('leaves --version optional', () => {
+    expect(parseCliArgs(['prod', '--domain', 'https://www.example.com'])).toEqual({
+      help: false,
+      env: 'prod',
+      domain: 'https://www.example.com',
+      dryRun: false,
+    })
+  })
+
   it('returns help without validating anything else', () => {
     expect(parseCliArgs(['--help'])).toEqual({ help: true })
     expect(parseCliArgs(['-h'])).toEqual({ help: true })
@@ -47,7 +56,6 @@ describe('parseCliArgs', () => {
     ['a missing --domain', ['dev', '--version', '1.0.0']],
     ['a non-https --domain', ['dev', '--domain', 'wss://x.y', '--version', '1.0.0']],
     ['a --domain that is not a URL', ['dev', '--domain', 'x.y', '--version', '1.0.0']],
-    ['a missing --version', ['dev', '--domain', 'https://x.y']],
     ['a --version that is not x.y.z', ['dev', '--domain', 'https://x.y', '--version', '10.9']],
   ])('refuses %s with exit 2', (_name, argv) => {
     const error = usageError(argv)
