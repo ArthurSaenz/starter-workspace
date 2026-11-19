@@ -38,7 +38,7 @@ export interface FixtureApp {
 
 /** A git repo root holding a Capacitor app at `apps/mobile`, with the native files committed on `main`. */
 export const createFixtureApp = (repo: 'hulyo' | 'travelist' = 'hulyo'): FixtureApp => {
-  const root = mkdtempSync(resolve(tmpdir(), 'native-build-'))
+  const root = mkdtempSync(resolve(tmpdir(), 'mobile-native-build-'))
   const appDir = resolve(root, 'apps/mobile')
 
   const write = (path: string, content: string): void => {

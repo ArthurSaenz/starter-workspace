@@ -14,7 +14,7 @@ export interface CliArgs {
 
 export type ParsedArgs = { help: true } | ({ help: false } & CliArgs)
 
-export const USAGE = `Usage: wl-native-build <dev|prod> --domain <https-url> [--version <x.y.z>] [--dry-run]
+export const USAGE = `Usage: wl-mobile-native-build <dev|prod> --domain <https-url> [--version <x.y.z>] [--dry-run]
 
 Stamps the native version, builds the Capacitor app against <domain> and syncs it into ios/ and android/.
 Run it from the Capacitor app directory (pnpm run does that).

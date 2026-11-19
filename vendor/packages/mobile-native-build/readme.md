@@ -1,4 +1,4 @@
-# @wl/native-build
+# @wl/mobile-native-build
 
 One-shot native build for a Capacitor app: derive and stamp the version into `android/app/build.gradle` and
 `ios/App/App.xcodeproj/project.pbxproj`, build the MFE host bundle against the target domain, and sync it into
@@ -13,11 +13,11 @@ In the Capacitor app's `package.json`:
 ```json
 {
   "scripts": {
-    "build-native-dev": "wl-native-build dev --domain https://dev.example.com",
-    "build-native-prod": "wl-native-build prod --domain https://www.example.com"
+    "build-native-dev": "wl-mobile-native-build dev --domain https://dev.example.com",
+    "build-native-prod": "wl-mobile-native-build prod --domain https://www.example.com"
   },
   "devDependencies": {
-    "@wl/native-build": "workspace:*"
+    "@wl/mobile-native-build": "workspace:*"
   }
 }
 ```
@@ -45,7 +45,7 @@ pnpm run build-native-prod
 For a one-off domain, such as a preview environment, call the bin directly:
 
 ```sh
-pnpm exec wl-native-build dev --domain <preview-url>
+pnpm exec wl-mobile-native-build dev --domain <preview-url>
 ```
 
 A non-zero `cap sync` exit is only a warning: its final `xcodebuild clean` can fail after the copy and pod install

@@ -688,7 +688,7 @@ importers:
         specifier: 'catalog:'
         version: 8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.99.0)(stylus@0.62.0(supports-color@7.2.0))(yaml@2.9.1)
 
-  vendor/packages/native-build:
+  vendor/packages/mobile-native-build:
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

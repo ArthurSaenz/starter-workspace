@@ -8,7 +8,7 @@ import { assertSyncedBundle } from '../bundle.ts'
 const REMOTE_ENTRY = 'https://dev.example.com/mfe/remoteEntry.js'
 
 const createAssets = (files: Record<string, string>): string => {
-  const dir = resolve(mkdtempSync(resolve(tmpdir(), 'native-build-bundle-')), 'assets')
+  const dir = resolve(mkdtempSync(resolve(tmpdir(), 'mobile-native-build-bundle-')), 'assets')
 
   mkdirSync(dir)
 
