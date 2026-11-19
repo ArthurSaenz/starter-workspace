@@ -1,0 +1,12 @@
+{
+  "extends": "@wl/ts-config/tsconfig.service.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "types": ["node"]
+  },
+  "include": ["src"],
+  "exclude": ["node_modules"]
+}

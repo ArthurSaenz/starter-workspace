@@ -1,0 +1,30 @@
+{
+  "name": "@wl/native-build",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "wl-native-build": "./src/bin.ts"
+  },
+  "scripts": {
+    "clean-cache": "rm -rf node_modules/.cache .eslintcache tsconfig.tsbuildinfo .turbo .swc",
+    "ts-check": "tsc --noEmit",
+    "prettier-check": "pnpm exec prettier --check * --no-error-on-unmatched-pattern --log-level silent --ignore-path ../../../.prettierignore",
+    "prettier-fix": "pnpm exec prettier --write * --no-error-on-unmatched-pattern --log-level silent --ignore-path ../../../.prettierignore",
+    "eslint-check": "pnpm exec eslint --cache --quiet --report-unused-disable-directives ./src",
+    "eslint-fix": "pnpm exec eslint --cache --quiet --report-unused-disable-directives ./src --fix",
+    "test": "pnpm exec vitest run --reporter=minimal",
+    "test-report": "pnpm exec vitest run --coverage --silent passed-only",
+    "infra-kit-check": "infra-kit audit"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@wl/eslint-config": "workspace:*",
+    "@wl/ts-config": "workspace:*",
+    "@wl/vitest-config": "workspace:*",
+    "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">=24.x"
+  }
+}
