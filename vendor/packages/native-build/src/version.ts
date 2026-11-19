@@ -76,7 +76,7 @@ export interface Derivation {
 
 export type Delivered =
   | { state: 'no-ref'; ref: string }
-  | { state: 'no-files'; ref: string; path: string }
+  | { state: 'unreadable'; ref: string; problems: string[] }
   | { state: 'found'; ref: string; commit: string; date: string; android: Stamp; ios: Stamp }
 
 export const majorOf = (version: string): number => {
@@ -217,16 +217,31 @@ const assertFoundLine = (
   { version, major }: Derivation,
   override: string | undefined,
   delivered: FoundDelivered,
-): void => {
+): string | undefined => {
   const where = `${delivered.ref} (${delivered.commit}, ${delivered.date})`
-  const deliveredMajor = Math.max(majorOf(delivered.android.version), majorOf(delivered.ios.version))
+
+  const majors = [delivered.android.version, delivered.ios.version].flatMap((deliveredVersion) => {
+    return VERSION_PARTS.test(deliveredVersion) ? [majorOf(deliveredVersion)] : []
+  })
+
+  if (majors.length === 0) {
+    const unreadable = `${where} holds no x.y.z version (${describeDelivered(delivered)})`
+
+    if (override !== undefined) return `--version ${override} is not checked against the delivered line: ${unreadable}`
+
+    if (env === 'prod') throw prodRefusal(`cannot verify the delivered version: ${unreadable}.`, version, major)
+
+    throw new CliError(`cannot verify the delivered version: ${unreadable}.\nPass --version to stamp one explicitly.`)
+  }
+
+  const deliveredMajor = Math.max(...majors)
 
   if (override !== undefined) {
     if (majorOf(override) < deliveredMajor) {
       throw new CliError(`--version ${override} is below the delivered major ${deliveredMajor} on ${where}`)
     }
 
-    return
+    return undefined
   }
 
   if (deliveredMajor > major) {
@@ -237,31 +252,61 @@ const assertFoundLine = (
   }
 
   if (env === 'prod') assertProdAboveDelivered(version, major, delivered, where)
+
+  return undefined
 }
 
 /**
  * Play accepts any `versionName`, so nothing downstream stops a plain run from stamping a version at or below the
  * one `origin/main` delivered. Only the delivered line counts: an undelivered higher major on a parallel release
- * branch must not block this one.
+ * branch must not block this one. Returns a notice when `--version` could not be checked against it.
  */
 export const assertDeliveredLine = (
   env: 'dev' | 'prod',
   derivation: Derivation,
   override: string | undefined,
   delivered: Delivered,
-): void => {
-  if (delivered.state === 'found') {
-    assertFoundLine(env, derivation, override, delivered)
+): string | undefined => {
+  if (delivered.state === 'found') return assertFoundLine(env, derivation, override, delivered)
 
-    return
-  }
-
-  if (env === 'dev' || override !== undefined) return
+  if (env === 'dev' || override !== undefined) return undefined
 
   const reason =
-    delivered.state === 'no-ref' ? `no ${delivered.ref}` : `${delivered.ref} has no native files at ${delivered.path}`
+    delivered.state === 'no-ref' ? `no ${delivered.ref}` : `${delivered.ref}: ${delivered.problems.join(', ')}`
 
   throw prodRefusal(`cannot verify the delivered version: ${reason}`, derivation.version, derivation.major)
+}
+
+/**
+ * A prod stamp of a higher major committed on any branch may already be in the stores ahead of main; stamping a
+ * lower prod version after it would pass Play silently. Dev builds stay free to run on parallel branches.
+ */
+export const assertNoHigherProdStamp = (
+  env: 'dev' | 'prod',
+  { major }: Derivation,
+  override: string | undefined,
+  history: HistoryEntry[],
+): void => {
+  if (env !== 'prod' || override !== undefined) return
+
+  let highest: { version: string; source: string } | undefined
+
+  for (const entry of history) {
+    for (const platform of PLATFORMS) {
+      const version = entry[platform]?.version
+
+      if (version === undefined || !/^\d+\.0\.0$/.test(version) || majorOf(version) <= major) continue
+
+      if (!highest || majorOf(version) > majorOf(highest.version)) highest = { version, source: entry.source }
+    }
+  }
+
+  if (highest) {
+    throw new CliError(
+      `a committed prod ${highest.version} above HEAD's major ${major} is on ${highest.source}.\n` +
+        'Merge that line into this branch first, or pass --version.',
+    )
+  }
 }
 
 export type WorkingTreeAction = 'stamp' | 'unchanged'

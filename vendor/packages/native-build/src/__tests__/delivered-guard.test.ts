@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Delivered, HistoryEntry, NativeStamps } from '../version.ts'
-import { assertDeliveredLine, compareVersions, nextVersion } from '../version.ts'
+import { assertDeliveredLine, assertNoHigherProdStamp, compareVersions, nextVersion } from '../version.ts'
 
 const stamps = (version: string, ios: number, android: number, androidVersion = version): NativeStamps => {
   return { ios: { version, build: ios }, android: { version: androidVersion, build: android } }
@@ -153,12 +153,12 @@ describe('delivered-version guard', () => {
     expect(error.message).toMatch(/^prod 10\.0\.0 is below the delivered 10\.9\.13 on origin\/main/)
   })
 
-  it('refuses plain prod when the delivered version cannot be compared', () => {
+  it('refuses plain prod when one delivered platform cannot be compared', () => {
     expect(
       refusal(() => {
-        return attempt('prod', deliveredAt('10.0'))
+        return attempt('prod', deliveredAt('x', '9.0.0'))
       }).message,
-    ).toContain('cannot compare prod 10.0.0 with "10.0"')
+    ).toContain('cannot compare prod 10.0.0 with "x"')
   })
 
   it('leaves dev and prod unchanged when main is on an older version (travelist after #1020)', () => {
@@ -213,16 +213,23 @@ describe('delivered-version guard', () => {
   })
 
   describe('with origin/main lacking the native files', () => {
-    const delivered: Delivered = { state: 'no-files', ref: 'origin/main', path: 'apps/mobile/android/app/build.gradle' }
+    const delivered: Delivered = {
+      state: 'unreadable',
+      ref: 'origin/main',
+      problems: [
+        'apps/mobile/android/app/build.gradle is missing',
+        'apps/mobile/ios/App/App.xcodeproj/project.pbxproj is missing',
+      ],
+    }
 
-    it('fails closed on plain prod, naming the path, with both commands', () => {
+    it('fails closed on plain prod, naming each path and its cause, with both commands', () => {
       const error = refusal(() => {
         return attempt('prod', delivered)
       })
 
       expect(error.exitCode).toBe(2)
       expect(error.message).toMatch(
-        /origin\/main has no native files at apps\/mobile\/android\/app\/build\.gradle\n.*--version 11\.0\.0\n.*--version 10\.0\.0$/,
+        /^cannot verify the delivered version: origin\/main: apps\/mobile\/android\/app\/build\.gradle is missing, apps\/mobile\/ios\/App\/App\.xcodeproj\/project\.pbxproj is missing\n.*--version 11\.0\.0\n.*--version 10\.0\.0$/,
       )
     })
 
@@ -230,5 +237,90 @@ describe('delivered-version guard', () => {
       expect(attempt('prod', delivered, { override: '10.0.0' }).version).toBe('10.0.0')
       expect(attempt('dev', delivered).version).toBe('10.9.14')
     })
+  })
+
+  describe('a delivered version that is not x.y.z', () => {
+    it('takes the major from the platform that parses (HEAD 9.0.0, main Android 10.0.0, iOS unparseable)', () => {
+      const delivered = deliveredAt('$(MARKETING)', '10.0.0')
+
+      expect(
+        refusal(() => {
+          return attempt('dev', delivered, { head: HEAD_9, history: [] })
+        }).message,
+      ).toMatch(/^this branch is behind the delivered version: HEAD is at major 9/)
+      expect(
+        refusal(() => {
+          return attempt('prod', delivered, { head: HEAD_9, history: [], override: '9.5.0' })
+        }).message,
+      ).toContain('--version 9.5.0 is below the delivered major 10')
+    })
+
+    describe('on both platforms', () => {
+      const delivered = deliveredAt('10.0')
+
+      it.each(['dev', 'prod'] as const)('refuses plain %s with exit 2', (env) => {
+        const error = refusal(() => {
+          return attempt(env, delivered)
+        })
+
+        expect(error.exitCode).toBe(2)
+        expect(error.message).toMatch(
+          /^cannot verify the delivered version: origin\/main \(432b071dd, 2026-10-21\) holds no x\.y\.z version \(10\.0\)\./,
+        )
+      })
+
+      it('lets --version through, with a notice that it was not floor-checked', () => {
+        const derivation = nextVersion('prod', HEAD_10, DEV_HISTORY, '10.9.9')
+
+        expect(assertDeliveredLine('prod', derivation, '10.9.9', delivered)).toBe(
+          '--version 10.9.9 is not checked against the delivered line: origin/main (432b071dd, 2026-10-21) holds no x.y.z version (10.0)',
+        )
+      })
+    })
+  })
+})
+
+describe('committed higher prod stamp on another branch', () => {
+  const higherProd: HistoryEntry = { source: 'release/next (bbb123456)', ...stamps('10.0.0', 5038, 50038) }
+
+  const run = (env: 'dev' | 'prod', history: HistoryEntry[], override?: string) => {
+    const derivation = nextVersion(env, HEAD_9, history, override)
+
+    assertDeliveredLine(env, derivation, override, deliveredAt('8.0.0'))
+    assertNoHigherProdStamp(env, derivation, override, history)
+
+    return derivation
+  }
+
+  it('refuses plain prod on a 9.x branch with main at 8.0.0, naming the commit', () => {
+    const error = refusal(() => {
+      return run('prod', [higherProd])
+    })
+
+    expect(error.exitCode).toBe(2)
+    expect(error.message).toBe(
+      "a committed prod 10.0.0 above HEAD's major 9 is on release/next (bbb123456).\n" +
+        'Merge that line into this branch first, or pass --version.',
+    )
+  })
+
+  it('names the highest such major', () => {
+    expect(
+      refusal(() => {
+        return run('prod', [higherProd, { source: 'release/far (ccc)', ...stamps('12.0.0', 5040, 50040) }])
+      }).message,
+    ).toContain('prod 12.0.0')
+  })
+
+  it('does not count an undelivered dev stamp of a higher major', () => {
+    expect(run('prod', [{ source: 'release/next (ddd)', ...stamps('10.9.3', 5038, 50038) }]).version).toBe('9.0.0')
+  })
+
+  it('leaves plain dev alone', () => {
+    expect(run('dev', [higherProd]).version).toBe('9.9.9')
+  })
+
+  it('is bypassed by --version', () => {
+    expect(run('prod', [higherProd], '9.0.0').version).toBe('9.0.0')
   })
 })

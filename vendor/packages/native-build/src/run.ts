@@ -10,6 +10,7 @@ import type { Exec } from './exec.ts'
 import { fetchOrigin, readGitState } from './git-state.ts'
 import {
   assertDeliveredLine,
+  assertNoHigherProdStamp,
   checkWorkingTree,
   majorOf,
   nextMajorHint,
@@ -94,7 +95,11 @@ export const runBuild = (args: CliArgs, deps: RunDeps): void => {
   const { head, history, delivered } = readGitState(exec, app.appDir, { gradle: GRADLE_PATH, pbxproj: PBXPROJ_PATH })
   const derivation = nextVersion(args.env, head, history, args.version)
 
-  assertDeliveredLine(args.env, derivation, args.version, delivered)
+  const deliveredNotice = assertDeliveredLine(args.env, derivation, args.version, delivered)
+
+  if (deliveredNotice) warn(deliveredNotice)
+
+  assertNoHigherProdStamp(args.env, derivation, args.version, history)
 
   const gradleFile = resolve(app.appDir, GRADLE_PATH)
   const pbxprojFile = resolve(app.appDir, PBXPROJ_PATH)

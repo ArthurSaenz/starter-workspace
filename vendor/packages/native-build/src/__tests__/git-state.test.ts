@@ -155,9 +155,9 @@ describe('readGitState', () => {
     git(app.root, 'checkout', '--quiet', '--force', 'main')
 
     expect(readGitState(isolatedExec, app.appDir, PATHS).delivered).toEqual({
-      state: 'no-files',
+      state: 'unreadable',
       ref: 'origin/main',
-      path: `apps/mobile/${GRADLE_PATH}`,
+      problems: [`apps/mobile/${GRADLE_PATH} is missing`, `apps/mobile/${PBXPROJ_PATH} is missing`],
     })
   })
 
@@ -171,9 +171,25 @@ describe('readGitState', () => {
     git(app.root, 'checkout', '--quiet', 'main')
 
     expect(readGitState(isolatedExec, app.appDir, PATHS).delivered).toEqual({
-      state: 'no-files',
+      state: 'unreadable',
       ref: 'origin/main',
-      path: `apps/mobile/${PBXPROJ_PATH}`,
+      problems: [`apps/mobile/${PBXPROJ_PATH} is missing`],
+    })
+  })
+
+  it('names a file on origin/main that exists but has no parseable version lines', () => {
+    const { app } = createRepo()
+
+    git(app.root, 'checkout', '--quiet', '-b', 'broken-gradle')
+    app.write(GRADLE_PATH, 'android {}\n')
+    app.commit('break gradle')
+    git(app.root, 'update-ref', DELIVERED_REF, 'HEAD')
+    git(app.root, 'checkout', '--quiet', 'main')
+
+    expect(readGitState(isolatedExec, app.appDir, PATHS).delivered).toEqual({
+      state: 'unreadable',
+      ref: 'origin/main',
+      problems: [`apps/mobile/${GRADLE_PATH} has no parseable version lines`],
     })
   })
 

@@ -90,21 +90,27 @@ const shortRef = (ref: string): string => {
 
 const readDelivered = (
   logLine: string | undefined,
-  stamps: { android: Stamp | undefined; ios: Stamp | undefined },
-  gradlePath: string,
-  pbxprojPath: string,
+  files: { path: string; blob: string | undefined; stamp: Stamp | undefined }[],
 ): Delivered => {
   const ref = shortRef(DELIVERED_REF)
 
   if (logLine === undefined) return { state: 'no-ref', ref }
 
-  if (!logLine || !stamps.android) return { state: 'no-files', ref, path: gradlePath }
+  const problems = files.flatMap(({ path, blob, stamp }) => {
+    if (blob === undefined) return [`${path} is missing`]
 
-  if (!stamps.ios) return { state: 'no-files', ref, path: pbxprojPath }
+    return stamp ? [] : [`${path} has no parseable version lines`]
+  })
+
+  const [android, ios] = files.map(({ stamp }) => {
+    return stamp
+  })
+
+  if (problems.length > 0 || !android || !ios) return { state: 'unreadable', ref, problems }
 
   const [commit = '', date = ''] = logLine.split(' ')
 
-  return { state: 'found', ref, commit, date, android: stamps.android, ios: stamps.ios }
+  return { state: 'found', ref, commit, date, android, ios }
 }
 
 export const readGitState = (exec: Exec, cwd: string, paths: NativePaths): GitState => {
@@ -177,6 +183,9 @@ export const readGitState = (exec: Exec, cwd: string, paths: NativePaths): GitSt
     history: commits.map(({ source }, index) => {
       return { source, ...stampsAt(index + historyOffset) }
     }),
-    delivered: readDelivered(deliveredCommit, stampsAt(1), `${prefix}${paths.gradle}`, `${prefix}${paths.pbxproj}`),
+    delivered: readDelivered(deliveredCommit, [
+      { path: `${prefix}${paths.gradle}`, blob: blobs[2], stamp: stampsAt(1).android },
+      { path: `${prefix}${paths.pbxproj}`, blob: blobs[3], stamp: stampsAt(1).ios },
+    ]),
   }
 }

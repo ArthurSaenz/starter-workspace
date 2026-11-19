@@ -80,8 +80,16 @@ line counts: an undelivered higher major on a parallel release branch never bloc
   marketing version on `origin/main` (either platform) exits 2.
 - **`--version` floor.** A `--version` whose major is below HEAD's major or the delivered major exits 2. The
   delivered `N.0.0` itself (a confirmed rebuild) and `<N+1>.0.0` pass.
-- **Fail closed.** Plain `prod` also exits 2 when `origin/main` does not exist, or has no native files at the app's
-  path. `--version` proceeds, and `dev` is unaffected.
+- **Fail closed.** Plain `prod` also exits 2 when `origin/main` does not exist, or when a native file at the app's
+  path is missing there or has no parseable version lines; the refusal names each file and its cause. `--version`
+  proceeds, and `dev` is unaffected.
+- **Unreadable delivered version.** A marketing version on `origin/main` that is not `x.y.z` is skipped when taking
+  the delivered major from the other platform. When neither platform's version is `x.y.z`, plain `dev` and plain
+  `prod` both exit 2; `--version` proceeds with a one-line notice that it was not checked against the delivered line.
+- **Higher prod stamp elsewhere (plain `prod` only).** When any branch in history holds a committed `M.0.0` with `M`
+  above HEAD's major, plain `prod` exits 2 and names the commit: that version may have reached the stores before
+  `origin/main`, and Play would accept the lower one. Merge that line first, or pass `--version`. Plain `dev` is
+  unaffected, so parallel release branches keep building dev builds.
 
 A plain `prod` refusal prints both ways forward:
 
