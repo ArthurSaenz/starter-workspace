@@ -230,6 +230,14 @@ describe('main', () => {
     expect(lines.at(-1)).toBe('next major: pnpm run build-native-prod --version 11.0.0')
   })
 
+  it('bases the --dry-run hint on a --version major above HEAD', () => {
+    const app = createFixtureApp()
+    const { deps, lines } = createDeps(app)
+
+    expect(main(['prod', '--domain', DOMAIN, '--version', '11.0.0', '--dry-run'], deps)).toBe(0)
+    expect(lines.at(-1)).toBe('next major: pnpm run build-native-prod --version 12.0.0')
+  })
+
   it('exits 2 on a mismatching VITE_MOBILE_DOMAIN_URL', () => {
     const app = createFixtureApp()
     const { deps, calls } = createDeps(app)

@@ -58,6 +58,38 @@ describe.each(FIXTURES)('$repo native files', ({ repo, android, ios, occurrences
   })
 })
 
+describe('commented-out and look-alike version lines', () => {
+  const gradle = readFixture('hulyo-build.gradle').replace(
+    '        versionCode 2000000040',
+    '        // versionCode 1999999999\n        // versionName "9.9.9"\n        versionCode 2000000040',
+  )
+
+  const pbxproj = readFixture('hulyo-project.pbxproj').replace(
+    '\t\t\t\tMARKETING_VERSION = 10.0.0;',
+    '\t\t\t\tOTHER_MARKETING_VERSION = 1.2.3;\n\t\t\t\tMARKETING_VERSION = 10.0.0;',
+  )
+
+  const next = { version: '10.9.14', build: 7000 }
+
+  it('neither parses nor stamps a commented-out gradle line above the real one', () => {
+    const stamped = stampAndroid(gradle, next)
+
+    expect(parseAndroid(gradle)).toEqual({ version: '10.0.0', build: 2000000040 })
+    expect(stamped).toContain(
+      '        // versionCode 1999999999\n        // versionName "9.9.9"\n        versionCode 7000',
+    )
+    expect(stamped).toContain('        versionName "10.9.14"')
+  })
+
+  it('leaves a pbxproj key that merely ends in MARKETING_VERSION alone', () => {
+    const stamped = stampIos(pbxproj, next)
+
+    expect(parseIos(pbxproj)).toEqual({ version: '10.0.0', build: 5062 })
+    expect(stamped).toContain('OTHER_MARKETING_VERSION = 1.2.3;')
+    expect(stamped.match(/^\t+MARKETING_VERSION = 10\.9\.14;$/gm)).toHaveLength(4)
+  })
+})
+
 describe('missing version patterns', () => {
   it.each([
     [

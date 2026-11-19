@@ -8,7 +8,15 @@ import { CliError, EXIT_FAILURE } from './cli-error.ts'
 import { resolveDomain } from './domain.ts'
 import type { Exec } from './exec.ts'
 import { fetchOrigin, readGitState } from './git-state.ts'
-import { assertNotDelivered, checkWorkingTree, nextMajorHint, nextVersion, stampAndroid, stampIos } from './version.ts'
+import {
+  assertDeliveredLine,
+  checkWorkingTree,
+  majorOf,
+  nextMajorHint,
+  nextVersion,
+  stampAndroid,
+  stampIos,
+} from './version.ts'
 
 export const GRADLE_PATH = 'android/app/build.gradle'
 export const PBXPROJ_PATH = 'ios/App/App.xcodeproj/project.pbxproj'
@@ -86,7 +94,7 @@ export const runBuild = (args: CliArgs, deps: RunDeps): void => {
   const { head, history, delivered } = readGitState(exec, app.appDir, { gradle: GRADLE_PATH, pbxproj: PBXPROJ_PATH })
   const derivation = nextVersion(args.env, head, history, args.version)
 
-  assertNotDelivered(args.env, derivation, args.version !== undefined, delivered)
+  assertDeliveredLine(args.env, derivation, args.version, delivered)
 
   const gradleFile = resolve(app.appDir, GRADLE_PATH)
   const pbxprojFile = resolve(app.appDir, PBXPROJ_PATH)
@@ -106,7 +114,7 @@ export const runBuild = (args: CliArgs, deps: RunDeps): void => {
   )
 
   if (args.dryRun) {
-    log(nextMajorHint(derivation.major))
+    log(nextMajorHint(Math.max(derivation.major, majorOf(derivation.version))))
 
     return
   }

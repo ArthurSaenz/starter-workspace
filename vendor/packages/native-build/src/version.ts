@@ -5,13 +5,15 @@ export interface Stamp {
   build: number
 }
 
-const ANDROID_CODE = /versionCode (\d+)/
-const ANDROID_NAME = /versionName "([^"]+)"/
-const IOS_BUILD = /CURRENT_PROJECT_VERSION = (\d+);/
-const IOS_VERSION = /MARKETING_VERSION = ([^;]+);/
+// Whole lines only: a commented-out `// versionCode 1` above the real one must be neither parsed nor stamped.
+// `[ \t]` rather than `\s`, which would let `^` match on a blank line above and swallow the newline.
+const ANDROID_CODE = /^([ \t]*)versionCode (?<value>\d+)[ \t]*$/m
+const ANDROID_NAME = /^([ \t]*)versionName "(?<value>[^"\n]+)"[ \t]*$/m
+const IOS_BUILD = /^([ \t]*)CURRENT_PROJECT_VERSION = (?<value>\d+);[ \t]*$/m
+const IOS_VERSION = /^([ \t]*)MARKETING_VERSION = (?<value>[^;\n]+);[ \t]*$/m
 
 const match = (source: string, pattern: RegExp, file: string): string => {
-  const value = pattern.exec(source)?.[1]
+  const { value } = pattern.exec(source)?.groups ?? {}
 
   if (value === undefined) throw new CliError(`${file}: pattern not found: ${pattern}`)
 
@@ -21,7 +23,7 @@ const match = (source: string, pattern: RegExp, file: string): string => {
 const replaceAll = (source: string, pattern: RegExp, replacement: string, file: string): string => {
   if (!pattern.test(source)) throw new CliError(`${file}: pattern not found: ${pattern}`)
 
-  return source.replaceAll(new RegExp(pattern.source, 'g'), replacement)
+  return source.replaceAll(new RegExp(pattern.source, `${pattern.flags}g`), `$1${replacement}`)
 }
 
 export const parseAndroid = (gradle: string): Stamp => {
@@ -72,13 +74,10 @@ export interface Derivation {
   ios: BuildPick
 }
 
-export interface Delivered {
-  ref: string
-  commit: string
-  date: string
-  android: Stamp | undefined
-  ios: Stamp | undefined
-}
+export type Delivered =
+  | { state: 'no-ref'; ref: string }
+  | { state: 'no-files'; ref: string; path: string }
+  | { state: 'found'; ref: string; commit: string; date: string; android: Stamp; ios: Stamp }
 
 export const majorOf = (version: string): number => {
   return Number.parseInt(version, 10)
@@ -112,7 +111,6 @@ const devVersion = (major: number, versions: string[]): string => {
 }
 
 const nextBuild = (platform: Platform, head: NativeStamps, history: HistoryEntry[]): BuildPick => {
-  // HEAD first and a strict `>` below: a tie reports HEAD as the source.
   let max: BuildPick = { build: head[platform].build, source: 'HEAD' }
 
   for (const entry of history) {
@@ -158,37 +156,112 @@ export const nextMajorHint = (major: number): string => {
   return `next major: pnpm run build-native-prod --version ${major + 1}.0.0`
 }
 
-const guardRefusal = (headline: string, version: string, major: number): CliError => {
+const VERSION_PARTS = /^(\d+)\.(\d+)\.(\d+)$/
+
+/** Negative, zero or positive as `a` is below, equal to or above `b`; `undefined` when either is not x.y.z. */
+export const compareVersions = (a: string, b: string): number | undefined => {
+  const left = VERSION_PARTS.exec(a)?.slice(1).map(Number)
+  const right = VERSION_PARTS.exec(b)?.slice(1).map(Number)
+
+  if (!left || !right) return undefined
+
+  const index = left.findIndex((part, position) => {
+    return part !== right[position]
+  })
+
+  return index === -1 ? 0 : (left[index] ?? 0) - (right[index] ?? 0)
+}
+
+const prodRefusal = (headline: string, version: string, major: number): CliError => {
   return new CliError(
     [
       headline,
       `Start the next major:   pnpm run build-native-prod --version ${major + 1}.0.0`,
       `Rebuild ${version} anyway:  pnpm run build-native-prod --version ${version}`,
-      nextMajorHint(major),
     ].join('\n'),
   )
 }
 
-/** Play accepts any `versionName`, so a plain prod run must not silently re-stamp an already delivered `N.0.0`. */
-export const assertNotDelivered = (
+const describeDelivered = ({ android, ios }: { android: Stamp; ios: Stamp }): string => {
+  return android.version === ios.version ? android.version : `${android.version} (iOS ${ios.version})`
+}
+
+type FoundDelivered = Extract<Delivered, { state: 'found' }>
+
+const assertProdAboveDelivered = (version: string, major: number, delivered: FoundDelivered, where: string): void => {
+  const comparisons = [delivered.android.version, delivered.ios.version].map((deliveredVersion) => {
+    return { deliveredVersion, order: compareVersions(version, deliveredVersion) }
+  })
+
+  if (
+    comparisons.some(({ order }) => {
+      return order === 0
+    })
+  ) {
+    throw prodRefusal(`prod ${version} is already delivered on ${where}.`, version, major)
+  }
+
+  for (const { deliveredVersion, order } of comparisons) {
+    if (order === undefined) {
+      throw prodRefusal(`cannot compare prod ${version} with "${deliveredVersion}" on ${where}.`, version, major)
+    }
+
+    if (order < 0) {
+      throw prodRefusal(`prod ${version} is below the delivered ${deliveredVersion} on ${where}.`, version, major)
+    }
+  }
+}
+
+const assertFoundLine = (
   env: 'dev' | 'prod',
-  derivation: Derivation,
-  hasOverride: boolean,
-  delivered: Delivered | undefined,
+  { version, major }: Derivation,
+  override: string | undefined,
+  delivered: FoundDelivered,
 ): void => {
-  if (env !== 'prod' || hasOverride) return
+  const where = `${delivered.ref} (${delivered.commit}, ${delivered.date})`
+  const deliveredMajor = Math.max(majorOf(delivered.android.version), majorOf(delivered.ios.version))
 
-  const { version, major } = derivation
+  if (override !== undefined) {
+    if (majorOf(override) < deliveredMajor) {
+      throw new CliError(`--version ${override} is below the delivered major ${deliveredMajor} on ${where}`)
+    }
 
-  if (!delivered) throw guardRefusal('cannot verify the delivered version: no origin/main', version, major)
+    return
+  }
 
-  if (delivered.android?.version === version || delivered.ios?.version === version) {
-    throw guardRefusal(
-      `prod ${version} is already delivered on ${delivered.ref} (${delivered.commit}, ${delivered.date}).`,
-      version,
-      major,
+  if (deliveredMajor > major) {
+    throw new CliError(
+      `this branch is behind the delivered version: HEAD is at major ${major}, ${where} holds ${describeDelivered(delivered)}.\n` +
+        'Merge the integration branch into this branch first, or pass --version.',
     )
   }
+
+  if (env === 'prod') assertProdAboveDelivered(version, major, delivered, where)
+}
+
+/**
+ * Play accepts any `versionName`, so nothing downstream stops a plain run from stamping a version at or below the
+ * one `origin/main` delivered. Only the delivered line counts: an undelivered higher major on a parallel release
+ * branch must not block this one.
+ */
+export const assertDeliveredLine = (
+  env: 'dev' | 'prod',
+  derivation: Derivation,
+  override: string | undefined,
+  delivered: Delivered,
+): void => {
+  if (delivered.state === 'found') {
+    assertFoundLine(env, derivation, override, delivered)
+
+    return
+  }
+
+  if (env === 'dev' || override !== undefined) return
+
+  const reason =
+    delivered.state === 'no-ref' ? `no ${delivered.ref}` : `${delivered.ref} has no native files at ${delivered.path}`
+
+  throw prodRefusal(`cannot verify the delivered version: ${reason}`, derivation.version, derivation.major)
 }
 
 export type WorkingTreeAction = 'stamp' | 'unchanged'

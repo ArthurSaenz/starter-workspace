@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { HistoryEntry, NativeStamps } from '../version.ts'
-import { assertNotDelivered, nextVersion } from '../version.ts'
+import { assertDeliveredLine, nextVersion } from '../version.ts'
 
 type Kind = 'exact' | 'builds' | 'new-major' | 'single-platform'
 
@@ -111,7 +111,7 @@ describe.each([
 describe('next build after the replay', () => {
   it('hulyo: dev 10.9.14, plain prod refused, --version 10.0.0 / 11.0.0 accepted', () => {
     const { history, head } = replay(HULYO)
-    const delivered = { ref: 'origin/main', commit: '432b071dd', date: '2026-10-21', ...head }
+    const delivered = { state: 'found' as const, ref: 'origin/main', commit: '432b071dd', date: '2026-10-21', ...head }
 
     expect(nextVersion('dev', head, history)).toMatchObject({
       version: '10.9.14',
@@ -119,13 +119,13 @@ describe('next build after the replay', () => {
       android: { build: 2000000041 },
     })
     expect(() => {
-      assertNotDelivered('prod', nextVersion('prod', head, history), false, delivered)
+      assertDeliveredLine('prod', nextVersion('prod', head, history), undefined, delivered)
     }).toThrow(expect.objectContaining({ exitCode: 2 }))
 
     for (const version of ['10.0.0', '11.0.0']) {
       const derivation = nextVersion('prod', head, history, version)
 
-      assertNotDelivered('prod', derivation, true, delivered)
+      assertDeliveredLine('prod', derivation, version, delivered)
       expect(derivation).toMatchObject({ version, ios: { build: 5063 }, android: { build: 2000000041 } })
     }
   })
@@ -134,6 +134,7 @@ describe('next build after the replay', () => {
     const { history, head } = replay(TRAVELIST)
 
     const delivered = {
+      state: 'found' as const,
       ref: 'origin/main',
       commit: 'ce64ef6684',
       date: '2026-06-15',
@@ -148,7 +149,7 @@ describe('next build after the replay', () => {
 
     const prod = nextVersion('prod', head, history)
 
-    assertNotDelivered('prod', prod, false, delivered)
+    assertDeliveredLine('prod', prod, undefined, delivered)
     expect(prod).toMatchObject({ version: '10.0.0', ios: { build: 5039 }, android: { build: 50039 } })
   })
 })

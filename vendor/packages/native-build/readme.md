@@ -51,9 +51,9 @@ pnpm exec wl-native-build dev --domain <preview-url>
 A non-zero `cap sync` exit is only a warning: its final `xcodebuild clean` can fail after the copy and pod install
 are done. The build then passes only if both synced bundles reference `<domain>/mfe/remoteEntry.js`.
 
-Exit codes: `0` success; `1` build or bundle-assertion failure; `2` usage error, contract violation, domain
-mismatch, disagreeing majors, a `--version` major below HEAD's, an uncommitted foreign stamp, a failed fetch, or the
-delivered-version guard.
+Exit codes: `0` success; `1` build, bundle-assertion or git plumbing failure; `2` usage error, contract violation, domain
+mismatch, disagreeing majors, a `--version` major below HEAD's, an uncommitted foreign stamp, a failed fetch, or a
+delivered-line refusal.
 
 ## Version rule: sticky major
 
@@ -67,19 +67,31 @@ must agree on it).
   platform. Every real run stamps new build numbers.
 - History is every commit on local branches and `origin/*` that touches either native file, read after
   `git fetch origin`. Other refs are ignored.
-- `--version x.y.z` stamps the value as given. A major below HEAD's major exits 2.
+- `--version x.y.z` stamps the value as given. A major below HEAD's major, or below the delivered major (next
+  section), exits 2.
 
-**Delivered-version guard.** A plain `prod` exits 2 when `N.0.0` is already the marketing version on `origin/main`
-(on either platform), and also when `origin/main` does not exist. Play accepts any `versionName`, so re-stamping a
-delivered version would ship different binaries under one version without any store error. The refusal prints both
-ways forward:
+**Delivered line.** `origin/main` (read as `refs/remotes/origin/main`) is what ships to the stores. Play accepts any
+`versionName`, so a downgraded or re-stamped marketing version would ship without any store error. Only the delivered
+line counts: an undelivered higher major on a parallel release branch never blocks this one.
+
+- **Behind the delivered major.** When `origin/main`'s major (on either platform) is above HEAD's, plain `dev` and
+  plain `prod` both exit 2: merge the integration branch into this branch first, or pass `--version`.
+- **Plain `prod` at or below the delivered version.** A derived version numerically less than or equal to the
+  marketing version on `origin/main` (either platform) exits 2.
+- **`--version` floor.** A `--version` whose major is below HEAD's major or the delivered major exits 2. The
+  delivered `N.0.0` itself (a confirmed rebuild) and `<N+1>.0.0` pass.
+- **Fail closed.** Plain `prod` also exits 2 when `origin/main` does not exist, or has no native files at the app's
+  path. `--version` proceeds, and `dev` is unaffected.
+
+A plain `prod` refusal prints both ways forward:
 
 ```text
 Start the next major:   pnpm run build-native-prod --version 11.0.0
 Rebuild 10.0.0 anyway:  pnpm run build-native-prod --version 10.0.0
 ```
 
-Starting a new major is the one decision a human makes per release cycle. Every dry run and every refusal prints it:
+Starting a new major is the one decision a human makes per release cycle. Every dry run prints it, based on the
+higher of HEAD's major and the `--version` being stamped:
 
 ```text
 next major: pnpm run build-native-prod --version <N+1>.0.0

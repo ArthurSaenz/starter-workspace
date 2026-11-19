@@ -1,13 +1,14 @@
 import type { Buffer } from 'node:buffer'
 
-import { CliError } from './cli-error.ts'
+import { CliError, EXIT_FAILURE } from './cli-error.ts'
 import type { Exec } from './exec.ts'
 import type { Delivered, HistoryEntry, NativeStamps, Stamp } from './version.ts'
 import { parseAndroid, parseIos } from './version.ts'
 
 // main is what ships to the stores in both git flows, and Play accepts any `versionName`, so a delivered
-// marketing version is only detectable here.
-export const DELIVERED_REF = 'origin/main'
+// marketing version is only detectable here. The full ref, because a local branch named `origin/main` would win
+// the short name's resolution.
+export const DELIVERED_REF = 'refs/remotes/origin/main'
 
 export interface NativePaths {
   gradle: string
@@ -17,7 +18,7 @@ export interface NativePaths {
 export interface GitState {
   head: NativeStamps
   history: HistoryEntry[]
-  delivered: Delivered | undefined
+  delivered: Delivered
 }
 
 const git = (exec: Exec, cwd: string, args: string[], input?: string) => {
@@ -28,7 +29,10 @@ const gitText = (exec: Exec, cwd: string, args: string[]): string => {
   const result = git(exec, cwd, args)
 
   if (result.status !== 0) {
-    throw new CliError(`git ${args.join(' ')} exited with ${result.status}: ${result.stderr.toString().trim()}`)
+    throw new CliError(
+      `git ${args.join(' ')} exited with ${result.status}: ${result.stderr.toString().trim()}`,
+      EXIT_FAILURE,
+    )
   }
 
   return result.stdout.toString()
@@ -50,7 +54,7 @@ const parseBatch = (output: Buffer, count: number): (string | undefined)[] => {
   while (blobs.length < count) {
     const lineEnd = output.indexOf('\n', offset)
 
-    if (lineEnd === -1) throw new CliError('git cat-file --batch ended early')
+    if (lineEnd === -1) throw new CliError('git cat-file --batch ended early', EXIT_FAILURE)
 
     const header = output.subarray(offset, lineEnd).toString()
 
@@ -82,6 +86,25 @@ const tryParse = (parse: (source: string) => Stamp, source: string | undefined):
 
 const shortRef = (ref: string): string => {
   return ref.replace(/^refs\/heads\//, '').replace(/^refs\/remotes\//, '')
+}
+
+const readDelivered = (
+  logLine: string | undefined,
+  stamps: { android: Stamp | undefined; ios: Stamp | undefined },
+  gradlePath: string,
+  pbxprojPath: string,
+): Delivered => {
+  const ref = shortRef(DELIVERED_REF)
+
+  if (logLine === undefined) return { state: 'no-ref', ref }
+
+  if (!logLine || !stamps.android) return { state: 'no-files', ref, path: gradlePath }
+
+  if (!stamps.ios) return { state: 'no-files', ref, path: pbxprojPath }
+
+  const [commit = '', date = ''] = logLine.split(' ')
+
+  return { state: 'found', ref, commit, date, android: stamps.android, ios: stamps.ios }
 }
 
 export const readGitState = (exec: Exec, cwd: string, paths: NativePaths): GitState => {
@@ -117,10 +140,11 @@ export const readGitState = (exec: Exec, cwd: string, paths: NativePaths): GitSt
   ])
 
   const deliveredCommit = deliveredLog.status === 0 ? deliveredLog.stdout.toString().trim() : undefined
+  const hasDeliveredRef = deliveredCommit !== undefined
 
   const revisions = [
     'HEAD',
-    ...(deliveredCommit === undefined ? [] : [DELIVERED_REF]),
+    ...(hasDeliveredRef ? [DELIVERED_REF] : []),
     ...commits.map(({ sha }) => {
       return sha
     }),
@@ -132,7 +156,7 @@ export const readGitState = (exec: Exec, cwd: string, paths: NativePaths): GitSt
 
   const batch = git(exec, cwd, ['cat-file', '--batch'], `${requests.join('\n')}\n`)
 
-  if (batch.status !== 0) throw new CliError(`git cat-file --batch exited with ${batch.status}`)
+  if (batch.status !== 0) throw new CliError(`git cat-file --batch exited with ${batch.status}`, EXIT_FAILURE)
 
   const blobs = parseBatch(batch.stdout, requests.length)
 
@@ -146,14 +170,13 @@ export const readGitState = (exec: Exec, cwd: string, paths: NativePaths): GitSt
     throw new CliError(`HEAD has no committed version in ${prefix}${paths.gradle} and ${prefix}${paths.pbxproj}`)
   }
 
-  const historyOffset = deliveredCommit === undefined ? 1 : 2
-  const [commit = '', date = ''] = (deliveredCommit ?? '').split(' ')
+  const historyOffset = hasDeliveredRef ? 2 : 1
 
   return {
     head: { android: head.android, ios: head.ios },
     history: commits.map(({ source }, index) => {
       return { source, ...stampsAt(index + historyOffset) }
     }),
-    delivered: deliveredCommit === undefined ? undefined : { ref: DELIVERED_REF, commit, date, ...stampsAt(1) },
+    delivered: readDelivered(deliveredCommit, stampsAt(1), `${prefix}${paths.gradle}`, `${prefix}${paths.pbxproj}`),
   }
 }

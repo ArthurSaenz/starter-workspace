@@ -114,20 +114,86 @@ describe('readGitState', () => {
     ).toBe(true)
   })
 
-  it('reads the delivered line from origin/main, or reports it missing', () => {
+  it('reads the delivered line from refs/remotes/origin/main, or reports the ref missing', () => {
     const { app, mainSha } = createRepo()
 
-    expect(readGitState(isolatedExec, app.appDir, PATHS).delivered).toBeUndefined()
+    expect(readGitState(isolatedExec, app.appDir, PATHS).delivered).toEqual({ state: 'no-ref', ref: 'origin/main' })
 
-    git(app.root, 'update-ref', `refs/remotes/${DELIVERED_REF}`, mainSha)
+    git(app.root, 'update-ref', DELIVERED_REF, mainSha)
 
     expect(readGitState(isolatedExec, app.appDir, PATHS).delivered).toEqual({
+      state: 'found',
       ref: 'origin/main',
       commit: git(app.root, 'rev-parse', '--short', mainSha),
       date: git(app.root, 'log', '-1', '--format=%cs', mainSha),
       ios: { version: '10.0.0', build: 5062 },
       android: { version: '10.0.0', build: 2000000040 },
     })
+  })
+
+  it('reads the remote-tracking ref even when a local branch is named origin/main', () => {
+    const { app, mainSha, commitOnSide } = createRepo()
+
+    git(app.root, 'update-ref', DELIVERED_REF, mainSha)
+    commitOnSide('refs/heads/origin/main', 5070)
+
+    expect(readGitState(isolatedExec, app.appDir, PATHS).delivered).toMatchObject({
+      state: 'found',
+      ios: { version: '10.0.0', build: 5062 },
+    })
+  })
+
+  it('yields no delivered values when origin/main lacks the native files at the app path', () => {
+    const { app } = createRepo()
+
+    git(app.root, 'checkout', '--quiet', '--orphan', 'bare-main')
+    git(app.root, 'rm', '-r', '--quiet', '--cached', '.')
+    app.write('../../readme.md', 'no app here')
+    git(app.root, 'add', 'readme.md')
+    git(app.root, 'commit', '--quiet', '-m', 'main without the app')
+    git(app.root, 'update-ref', DELIVERED_REF, 'HEAD')
+    git(app.root, 'checkout', '--quiet', '--force', 'main')
+
+    expect(readGitState(isolatedExec, app.appDir, PATHS).delivered).toEqual({
+      state: 'no-files',
+      ref: 'origin/main',
+      path: `apps/mobile/${GRADLE_PATH}`,
+    })
+  })
+
+  it('yields no delivered values when the files were removed from origin/main', () => {
+    const { app } = createRepo()
+
+    git(app.root, 'checkout', '--quiet', '-b', 'drop-ios')
+    rmSync(resolve(app.appDir, 'ios'), { recursive: true })
+    app.commit('drop ios')
+    git(app.root, 'update-ref', DELIVERED_REF, 'HEAD')
+    git(app.root, 'checkout', '--quiet', 'main')
+
+    expect(readGitState(isolatedExec, app.appDir, PATHS).delivered).toEqual({
+      state: 'no-files',
+      ref: 'origin/main',
+      path: `apps/mobile/${PBXPROJ_PATH}`,
+    })
+  })
+
+  it('exits 1 when git plumbing fails', () => {
+    const { app } = createRepo()
+
+    expect(() => {
+      return readGitState(
+        (file, args, options) => {
+          return args[0] === 'cat-file'
+            ? { ...isolatedExec(file, args, options), status: 128 }
+            : isolatedExec(file, args, options)
+        },
+        app.appDir,
+        PATHS,
+      )
+    }).toThrow(expect.objectContaining({ exitCode: 1 }))
+    expect(() => {
+      return readGitState(isolatedExec, resolve(app.root, '..'), PATHS)
+    }).toThrow(expect.objectContaining({ exitCode: 1 }))
   })
 
   it('exits 2 when HEAD has no committed native files', () => {

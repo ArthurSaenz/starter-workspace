@@ -54,6 +54,7 @@ describe('parseCliArgs', () => {
     ['an env other than dev or prod', ['staging', '--domain', 'https://x.y', '--version', '1.0.0']],
     ['a missing env', ['--domain', 'https://x.y', '--version', '1.0.0']],
     ['a missing --domain', ['dev', '--version', '1.0.0']],
+    ['an http --domain', ['dev', '--domain', ['http', '://x.y'].join(''), '--version', '1.0.0']],
     ['a non-https --domain', ['dev', '--domain', 'wss://x.y', '--version', '1.0.0']],
     ['a --domain that is not a URL', ['dev', '--domain', 'x.y', '--version', '1.0.0']],
     ['a --version that is not x.y.z', ['dev', '--domain', 'https://x.y', '--version', '10.9']],
