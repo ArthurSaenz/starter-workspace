@@ -1,5 +1,7 @@
 import type { MagicLinkAuthConfig } from './auth-config.js'
 import { defaultCreateAuthError } from './errors.js'
+import { assertGoogleConfig } from './google/config.js'
+import { createGoogleSignIn } from './google/google-sign-in.js'
 import { resolveCookieOptions } from './http/cookies.js'
 import { assertMagicLinkConfig, defaultIsAllowed, defaultRolesOf } from './magic-link/config.js'
 import { createMagicLinkFlows } from './magic-link/magic-link-flows.js'
@@ -13,8 +15,8 @@ export type MagicLinkAuth<TUser extends AuthUser, TMe, TCtx extends AuthContext>
 >
 
 /**
- * The engine: the magic-link sign-in (request, invite, verify) on top of the session service
- * (refresh, logout, the request readers), wired from one host config.
+ * The engine: the magic-link sign-in (request, invite, verify) and, when configured, Google, on
+ * top of the session service (refresh, logout, the request readers), wired from one host config.
  */
 export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends AuthContext = AuthContext>(
   config: MagicLinkAuthConfig<TUser, TMe, TCtx>,
@@ -34,6 +36,8 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
   const { baseUrl: rawBaseUrl } = config.magicLink
   // `https://app.test/` + `/auth/verify` would mail a `//auth/verify` link no SPA route matches.
   const baseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl
+
+  if (config.google) assertGoogleConfig(config.google, baseUrl)
 
   const session = createSessionService<TUser, TMe, TCtx>({
     users,
@@ -79,5 +83,21 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
     uninvitedRequest,
     ...magicLink,
     ...session,
+    ...(config.google
+      ? {
+          google: createGoogleSignIn<TUser, TCtx>({
+            google: config.google,
+            baseUrl,
+            identity,
+            accessSecret: config.jwt.accessSecret,
+            users,
+            isAllowed,
+            checkRate,
+            verifyLimit: limits.perIpVerify,
+            issueSession: session.issueSession,
+            onSignIn: config.onSignIn,
+          }),
+        }
+      : {}),
   }
 }

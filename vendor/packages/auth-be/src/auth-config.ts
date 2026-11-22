@@ -1,4 +1,5 @@
 import type { CreateAuthError } from './errors.js'
+import type { GoogleSignInConfig } from './google/config.js'
 import type { CookieOptions } from './http/cookies.js'
 import type { MagicLinkEmailText, RenderMagicLinkEmail } from './magic-link/email.js'
 import type { RequestValidationInput } from './magic-link/validation.js'
@@ -57,4 +58,6 @@ export interface MagicLinkAuthConfig<TUser extends AuthUser, TMe, TCtx extends A
   }
   createError?: CreateAuthError
   notInvitedMessage?: string
+  /** Enables Google sign-in on the same users, allowlist, sessions and rate gate; absent, `auth.google` is too. */
+  google?: GoogleSignInConfig<TUser, TCtx>
 }

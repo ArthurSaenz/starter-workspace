@@ -503,7 +503,10 @@ describe('engine shape', () => {
   it('keeps its method set and return types', () => {
     const auth = createMagicLinkAuth(createFakes().config)
 
-    const keys: Record<keyof MagicLinkAuth<TestUser, { id: string; email: string }, object>, true> = {
+    const keys: Record<
+      Exclude<keyof MagicLinkAuth<TestUser, { id: string; email: string }, object>, 'google'>,
+      true
+    > = {
       cookies: true,
       identity: true,
       uninvitedRequest: true,
@@ -523,6 +526,7 @@ describe('engine shape', () => {
 
     expect(Object.keys(keys)).toHaveLength(15)
     expect(Object.keys(auth).sort()).toEqual(Object.keys(keys).sort())
+    expect('google' in auth).toBe(false)
     expectTypeOf(auth.sendInviteLink).returns.resolves.toEqualTypeOf<{ emailSent: boolean }>()
     expectTypeOf(auth.issueSession).returns.resolves.toEqualTypeOf<TokenPair>()
     // `| undefined` because exactOptionalPropertyTypes drops it from optional tuple elements, not from optional parameters.

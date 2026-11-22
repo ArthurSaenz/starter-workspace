@@ -5,6 +5,13 @@ export { createE2eLogin, parseAllowedEmails, safeSecretEqual } from './e2e-login
 export type { E2eLoginConfig, E2eLoginInput } from './e2e-login.js'
 export { AuthError, defaultCreateAuthError } from './errors.js'
 export type { AuthErrorCode, AuthErrorInit, CreateAuthError } from './errors.js'
+export type { GoogleIdentity, GoogleSignInConfig, GoogleSignInError } from './google/config.js'
+export type {
+  GoogleCallbackInput,
+  GoogleCallbackResult,
+  GoogleSignIn,
+  GoogleStartResult,
+} from './google/google-sign-in.js'
 export {
   buildAccessCookie,
   buildClearCookies,
