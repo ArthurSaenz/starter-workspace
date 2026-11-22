@@ -87,7 +87,11 @@ export interface SessionStore<TCtx extends AuthContext = AuthContext> {
    * row was not written: the engine then answers from `findSuccessor` inside the grace window.
    */
   rotate: (oldId: string, next: NewSession, ctx?: TCtx) => Promise<StoredSession | null>
-  /** The row `rotate(id, …)` inserted, whatever its state now; `null` if `id` was never rotated. */
+  /**
+   * The row `rotate(id, …)` inserted, whatever its state now; `null` if `id` was never rotated.
+   * Security-critical: reuse detection depends on it. An implementation that always returns `null`
+   * turns every replayed token into a plain 401 and stops revoking the thief's session.
+   */
   findSuccessor: (id: string, ctx?: TCtx) => Promise<StoredSession | null>
   revokeByTokenHash: (tokenHash: string, ctx?: TCtx) => Promise<void>
   revokeAllForUser: (userId: string, ctx?: TCtx) => Promise<void>

@@ -89,12 +89,6 @@ describe('refreshSession', () => {
       },
     ],
     [
-      'the successor is gone',
-      (fakes) => {
-        fakes.sessions.splice(1, 1)
-      },
-    ],
-    [
       'the user was deleted',
       (fakes) => {
         fakes.users.delete('u1')
@@ -160,6 +154,93 @@ describe('refreshSession', () => {
     await expectAuthError(auth.refreshSession({ refreshToken: result.refreshToken }), 'INVALID_REFRESH_TOKEN', 401)
     await expectAuthError(auth.refreshSession({ refreshToken: next.refreshToken! }), 'INVALID_REFRESH_TOKEN', 401)
     expect(fakes.sessionStore.revokeAllForUser).toHaveBeenCalledWith('u1', undefined)
+  })
+
+  it("a refresh racing a logout fails alone and leaves the user's other sessions alive", async () => {
+    const fakes = createFakes([invitedUser()])
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    const first = await signIn(fakes)
+
+    await signIn(fakes)
+    await first.auth.logout(first.result.refreshToken)
+
+    await expectAuthError(
+      first.auth.refreshSession({ refreshToken: first.result.refreshToken }, { logger }),
+      'INVALID_REFRESH_TOKEN',
+      401,
+    )
+    expect(fakes.sessions[1]!.revokedAt).toBeNull()
+    expect(fakes.sessionStore.revokeAllForUser).not.toHaveBeenCalled()
+    expect(logger.warn).toHaveBeenCalledWith('Refresh with a revoked, never-rotated token', { data: { userId: 'u1' } })
+  })
+
+  it('refuses a session row whose userId differs from the token subject', async () => {
+    const fakes = createFakes([invitedUser(), invitedUser({ id: 'u2', email: 'bob@example.com' })])
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    const { auth, result } = await signIn(fakes)
+
+    await signIn(fakes, 'bob@example.com')
+    fakes.sessionStore.findByTokenHash.mockResolvedValueOnce(fakes.sessions[1]!)
+
+    await expectAuthError(
+      auth.refreshSession({ refreshToken: result.refreshToken }, { logger }),
+      'INVALID_REFRESH_TOKEN',
+      401,
+    )
+    expect(fakes.sessionStore.rotate).not.toHaveBeenCalled()
+    expect(fakes.sessionStore.revokeAllForUser).not.toHaveBeenCalled()
+    expect(logger.error).toHaveBeenCalledWith('Refresh token subject does not match its session row', {
+      data: { sessionId: '2' },
+    })
+  })
+
+  it('refuses a revoked, rotated session row of another user inside the grace window', async () => {
+    const fakes = createFakes([invitedUser(), invitedUser({ id: 'u2', email: 'bob@example.com' })])
+    const { auth, result } = await signIn(fakes)
+    const bob = await signIn(fakes, 'bob@example.com')
+
+    await bob.auth.refreshSession({ refreshToken: bob.result.refreshToken })
+    fakes.sessionStore.findByTokenHash.mockResolvedValueOnce(fakes.sessions[1]!)
+
+    await expectAuthError(auth.refreshSession({ refreshToken: result.refreshToken }), 'INVALID_REFRESH_TOKEN', 401)
+    expect(fakes.sessionStore.findSuccessor).not.toHaveBeenCalled()
+    expect(fakes.sessionStore.revokeAllForUser).not.toHaveBeenCalled()
+  })
+
+  it('refuses a grace successor of another user', async () => {
+    const fakes = createFakes([invitedUser(), invitedUser({ id: 'u2', email: 'bob@example.com' })])
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    const { auth, result } = await signIn(fakes)
+
+    await auth.refreshSession({ refreshToken: result.refreshToken })
+    await signIn(fakes, 'bob@example.com')
+    fakes.sessionStore.findSuccessor.mockResolvedValueOnce(fakes.sessions[2]!)
+
+    await expectAuthError(
+      auth.refreshSession({ refreshToken: result.refreshToken }, { logger }),
+      'INVALID_REFRESH_TOKEN',
+      401,
+    )
+    expect(fakes.sessionStore.revokeAllForUser).not.toHaveBeenCalled()
+    expect(logger.error).toHaveBeenCalledWith('Refresh token subject does not match its session row', {
+      data: { sessionId: '1', successorSessionId: '3' },
+    })
+  })
+
+  it('accepts a session row whose userId is a non-string id equal to the subject', async () => {
+    const fakes = createFakes([invitedUser()])
+    const { auth, result } = await signIn(fakes)
+
+    fakes.sessionStore.findByTokenHash.mockResolvedValueOnce({
+      ...fakes.sessions[0]!,
+      userId: {
+        toString: () => {
+          return 'u1'
+        },
+      } as never,
+    })
+
+    await expect(auth.refreshSession({ refreshToken: result.refreshToken })).resolves.toHaveProperty('refreshCookie')
   })
 
   it('fails only the loser of a concurrent rotation', async () => {

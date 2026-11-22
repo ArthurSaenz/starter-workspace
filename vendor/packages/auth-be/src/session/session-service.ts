@@ -87,21 +87,27 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
     return !Number.isFinite(expiresAtMs) || expiresAtMs < Date.now()
   }
 
+  // Written so an unparseable `rotatedAt` (NaN) lands outside the window.
+  const withinGrace = (rotatedAt: Date | string): boolean => {
+    return Date.now() - toMs(rotatedAt) < deps.refreshGraceSec * 1000
+  }
+
   // Two tabs refreshing with one cookie: the later one presents a token the first rotated moments
   // ago. That is not theft, so inside the grace window it gets access to the successor session.
   const graceAccess = async (
     rotatedId: string,
-    rotatedAt: Date | string,
+    successor: StoredSession | null,
+    subject: string,
     ctx?: TCtx,
   ): Promise<AccessOnlyPair | null> => {
-    // Written so an unparseable `rotatedAt` (NaN) lands outside the window.
-    const withinGrace = Date.now() - toMs(rotatedAt) < deps.refreshGraceSec * 1000
-
-    if (!withinGrace) return null
-
-    const successor = await sessions.findSuccessor(rotatedId, ctx)
-
     if (!successor || successor.revokedAt || isExpired(successor.expiresAt)) return null
+
+    if (String(successor.userId) !== subject) {
+      ctx?.logger?.error('Refresh token subject does not match its session row', {
+        data: { sessionId: rotatedId, successorSessionId: String(successor.id) },
+      })
+      throw invalidSession()
+    }
 
     const user = await users.findById(successor.userId, ctx)
 
@@ -113,6 +119,33 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
     })
 
     return issuer.grantAccess(user)
+  }
+
+  const refreshRevoked = async (
+    session: StoredSession,
+    revokedAt: Date | string,
+    subject: string,
+    ctx?: TCtx,
+  ): Promise<AccessOnlyPair> => {
+    const sessionId = String(session.id)
+    const successor = await sessions.findSuccessor(sessionId, ctx)
+    const grace = withinGrace(revokedAt) ? await graceAccess(sessionId, successor, subject, ctx) : null
+
+    if (grace) return grace
+
+    // Revoked by a logout or a revoke-all, not by rotation: no successor was handed out, so a
+    // replay of this token is not evidence of theft.
+    if (!successor) {
+      ctx?.logger?.warn('Refresh with a revoked, never-rotated token', { data: { userId: session.userId } })
+      throw invalidSession()
+    }
+
+    ctx?.logger?.warn('Refresh token reuse detected; revoking every session of the user', {
+      data: { userId: session.userId },
+    })
+    await sessions.revokeAllForUser(session.userId, ctx)
+
+    throw invalidSession()
   }
 
   const requireUser = (headers: HeaderBag): AccessTokenPayload => {
@@ -138,18 +171,14 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
 
     if (!session) throw invalidSession()
 
-    if (session.revokedAt) {
-      const grace = await graceAccess(String(session.id), session.revokedAt, ctx)
+    const sessionId = String(session.id)
 
-      if (grace) return grace
-
-      ctx?.logger?.warn('Refresh token reuse detected; revoking every session of the user', {
-        data: { userId: session.userId },
-      })
-      await sessions.revokeAllForUser(session.userId, ctx)
-
+    if (String(session.userId) !== payload.sub) {
+      ctx?.logger?.error('Refresh token subject does not match its session row', { data: { sessionId } })
       throw invalidSession()
     }
+
+    if (session.revokedAt) return refreshRevoked(session, session.revokedAt, payload.sub, ctx)
 
     if (isExpired(session.expiresAt)) throw invalidSession()
 
@@ -174,7 +203,9 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
 
     // The `revokedAt` read above happens outside the rotation transaction, so two refreshes with one
     // live token both pass it and `rotate` settles the race under its row lock.
-    const grace = await graceAccess(String(session.id), new Date(), ctx)
+    const grace = withinGrace(new Date())
+      ? await graceAccess(sessionId, await sessions.findSuccessor(sessionId, ctx), payload.sub, ctx)
+      : null
 
     if (grace) return grace
 
