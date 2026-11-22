@@ -7,7 +7,8 @@ import type { TestUser } from '../../__tests__/helpers/fakes.js'
 import { ACCESS_SECRET, IDENTITY, createFakes, invitedUser, tokenFromEmail } from '../../__tests__/helpers/fakes.js'
 import type { MagicLinkAuth } from '../../create-auth.js'
 import { createMagicLinkAuth } from '../../create-auth.js'
-import type { RefreshResult, RefreshSessionInput, TokenPair } from '../../session/types.js'
+import type { RefreshResult, RefreshSessionInput, RequestMeta, TokenPair } from '../../session/types.js'
+import type { AuthMethod } from '../../tokens.js'
 import { hashToken } from '../../tokens.js'
 import type { RenderMagicLinkEmail } from '../email.js'
 
@@ -524,6 +525,10 @@ describe('engine shape', () => {
     expect(Object.keys(auth).sort()).toEqual(Object.keys(keys).sort())
     expectTypeOf(auth.sendInviteLink).returns.resolves.toEqualTypeOf<{ emailSent: boolean }>()
     expectTypeOf(auth.issueSession).returns.resolves.toEqualTypeOf<TokenPair>()
+    // `| undefined` because exactOptionalPropertyTypes drops it from optional tuple elements, not from optional parameters.
+    expectTypeOf(auth.issueSession).parameters.toEqualTypeOf<
+      [TestUser, (RequestMeta | undefined)?, (object | undefined)?, ({ authMethod?: AuthMethod } | undefined)?]
+    >()
     expectTypeOf(auth.refreshSession).returns.resolves.toEqualTypeOf<RefreshResult>()
     expectTypeOf(auth.refreshSession).parameter(0).toEqualTypeOf<RefreshSessionInput>()
   })

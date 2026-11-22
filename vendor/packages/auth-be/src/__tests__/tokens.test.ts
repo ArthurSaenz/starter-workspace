@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 
 import { AuthError } from '../errors.js'
 import {
@@ -11,6 +11,7 @@ import {
   verifyAccessToken,
   verifyRefreshToken,
 } from '../tokens.js'
+import type { AccessTokenPayload } from '../tokens.js'
 import { ACCESS_SECRET, IDENTITY, REFRESH_SECRET } from './helpers/fakes.js'
 
 describe('signed tokens', () => {
@@ -35,6 +36,32 @@ describe('verifying tokens', () => {
       authMethod: 'magic',
     })
     expect(verifyRefreshToken(refresh.token, REFRESH_SECRET, IDENTITY)).toEqual({ sub: 'u1', jti: 'j1' })
+  })
+
+  it('returns the authMethod claim only when it is a known method', () => {
+    const google = signRefreshToken({ sub: 'u1', jti: 'j1', authMethod: 'google' }, REFRESH_SECRET, IDENTITY)
+
+    const unknown = jwt.sign({ sub: 'u1', jti: 'j2', authMethod: 'saml' }, REFRESH_SECRET, {
+      algorithm: 'HS256',
+      ...IDENTITY,
+    })
+
+    expect(verifyRefreshToken(google.token, REFRESH_SECRET, IDENTITY)).toEqual({
+      sub: 'u1',
+      jti: 'j1',
+      authMethod: 'google',
+    })
+    expect(verifyRefreshToken(unknown, REFRESH_SECRET, IDENTITY)).not.toHaveProperty('authMethod')
+  })
+
+  it("nomadream's IAccessTokenPayload is assignable from AccessTokenPayload", () => {
+    interface IAccessTokenPayload {
+      sub: string
+      roles: string[]
+      authMethod: 'magic' | 'google'
+    }
+
+    expectTypeOf<AccessTokenPayload>().toExtend<IAccessTokenPayload>()
   })
 
   it.each([

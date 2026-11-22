@@ -66,4 +66,4 @@ export {
   verifyAccessToken,
   verifyRefreshToken,
 } from './tokens.js'
-export type { AccessTokenPayload, JwtIdentity, RefreshTokenPayload, SignedToken } from './tokens.js'
+export type { AccessTokenPayload, AuthMethod, JwtIdentity, RefreshTokenPayload, SignedToken } from './tokens.js'

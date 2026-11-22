@@ -15,7 +15,7 @@ import { createMagicLinkAuth } from '../../create-auth.js'
 import { AuthError } from '../../errors.js'
 import type { HeaderBag } from '../../http/headers.js'
 import type { SessionStore } from '../../ports.js'
-import { signRefreshToken } from '../../tokens.js'
+import { hashToken, signRefreshToken } from '../../tokens.js'
 
 describe('refreshSession', () => {
   it('rotates: a new pair, the old refresh token dead', async () => {
@@ -482,5 +482,87 @@ describe('session reads', () => {
       'sid=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0',
       'rid=; HttpOnly; Secure; SameSite=Lax; Path=/auth; Max-Age=0',
     ])
+  })
+})
+
+describe('sign-in method', () => {
+  const methodOf = (token: string, secret: string): unknown => {
+    return (jwt.verify(token, secret, IDENTITY) as { authMethod?: unknown }).authMethod
+  }
+
+  const googleSession = async () => {
+    const fakes = createFakes([invitedUser()])
+    const auth = createMagicLinkAuth(fakes.config)
+    const pair = await auth.issueSession(invitedUser(), {}, undefined, { authMethod: 'google' })
+
+    return { fakes, auth, pair }
+  }
+
+  it('issueSession with authMethod google mints access and refresh tokens that say google', async () => {
+    const { pair } = await googleSession()
+
+    expect(methodOf(pair.accessToken, ACCESS_SECRET)).toBe('google')
+    expect(methodOf(pair.refreshToken, REFRESH_SECRET)).toBe('google')
+  })
+
+  it('rotation keeps the method of the session it rotates', async () => {
+    const { auth, pair } = await googleSession()
+
+    const next = await auth.refreshSession({ refreshToken: pair.refreshToken })
+
+    expect(methodOf(next.accessToken, ACCESS_SECRET)).toBe('google')
+    expect(methodOf(next.refreshToken!, REFRESH_SECRET)).toBe('google')
+  })
+
+  it('a grace answer keeps the method', async () => {
+    const { fakes, auth, pair } = await googleSession()
+
+    await auth.refreshSession({ refreshToken: pair.refreshToken })
+
+    const late = await auth.refreshSession({ refreshToken: pair.refreshToken })
+
+    // A stale read of the rotated row sends the refresh down the lost-race path instead.
+    fakes.sessionStore.findByTokenHash.mockResolvedValueOnce({ ...fakes.sessions[0]!, revokedAt: null })
+
+    const raced = await auth.refreshSession({ refreshToken: pair.refreshToken })
+
+    expect(late.refreshToken).toBeUndefined()
+    expect(raced.refreshToken).toBeUndefined()
+    expect(methodOf(late.accessToken, ACCESS_SECRET)).toBe('google')
+    expect(methodOf(raced.accessToken, ACCESS_SECRET)).toBe('google')
+  })
+
+  const rotateHandSigned = async (refreshToken: string) => {
+    const fakes = createFakes([invitedUser()])
+
+    await fakes.sessionStore.create({
+      userId: 'u1',
+      tokenHash: hashToken(refreshToken),
+      jti: 'hand-signed',
+      expiresAt: new Date(Date.now() + 60_000),
+    })
+
+    return createMagicLinkAuth(fakes.config).refreshSession({ refreshToken })
+  }
+
+  it('a refresh token without the claim rotates as magic', async () => {
+    const next = await rotateHandSigned(
+      signRefreshToken({ sub: 'u1', jti: 'hand-signed' }, REFRESH_SECRET, IDENTITY).token,
+    )
+
+    expect(methodOf(next.accessToken, ACCESS_SECRET)).toBe('magic')
+    expect(methodOf(next.refreshToken!, REFRESH_SECRET)).toBe('magic')
+  })
+
+  it('an unknown authMethod claim reads as magic', async () => {
+    const next = await rotateHandSigned(
+      jwt.sign({ sub: 'u1', jti: 'hand-signed', authMethod: 'saml' }, REFRESH_SECRET, {
+        algorithm: 'HS256',
+        ...IDENTITY,
+      }),
+    )
+
+    expect(methodOf(next.accessToken, ACCESS_SECRET)).toBe('magic')
+    expect(methodOf(next.refreshToken!, REFRESH_SECRET)).toBe('magic')
   })
 })
