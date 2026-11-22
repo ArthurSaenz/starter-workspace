@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react'
 import type { CSSProperties, RefObject } from 'react'
-import { useLayoutEffect, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { DATA_TABLE_POPOVER_Z_INDEX, cn } from '../../primitives'
@@ -39,6 +39,7 @@ export const OptionsList = (props: OptionsListProps) => {
   } = props
 
   const [position, setPosition] = useState<DropdownPosition | null>(null)
+  const listRef = useRef<HTMLUListElement>(null)
 
   useLayoutEffect(() => {
     const updatePosition = () => {
@@ -49,11 +50,19 @@ export const OptionsList = (props: OptionsListProps) => {
       }
 
       const rect = anchor.getBoundingClientRect()
+      const listHeight = Math.min(listRef.current?.scrollHeight ?? DROPDOWN_MAX_HEIGHT_PX, DROPDOWN_MAX_HEIGHT_PX)
+      const spaceBelow = window.innerHeight - rect.bottom - DROPDOWN_OFFSET_PX - DROPDOWN_VIEWPORT_MARGIN_PX
+      const spaceAbove = rect.top - DROPDOWN_OFFSET_PX - DROPDOWN_VIEWPORT_MARGIN_PX
+      // The list is fixed to the viewport, so one that overflows the bottom edge cannot be scrolled into view.
+      const shouldOpenUpward = listHeight > spaceBelow && spaceAbove > spaceBelow
 
       setPosition({
-        top: rect.bottom + DROPDOWN_OFFSET_PX,
+        ...(shouldOpenUpward
+          ? { bottom: window.innerHeight - rect.top + DROPDOWN_OFFSET_PX }
+          : { top: rect.bottom + DROPDOWN_OFFSET_PX }),
         left: rect.left,
         width: rect.width,
+        maxHeight: Math.min(DROPDOWN_MAX_HEIGHT_PX, Math.max(shouldOpenUpward ? spaceAbove : spaceBelow, 0)),
       })
     }
 
@@ -68,16 +77,12 @@ export const OptionsList = (props: OptionsListProps) => {
     }
   }, [anchorRef, filteredOptions.length, shouldShowSelectAll, canCreate, trimmedQuery])
 
-  if (!position) {
-    return null
-  }
-
   const list = (
     <ul
+      ref={listRef}
       style={{
-        top: position.top,
-        left: position.left,
-        width: position.width,
+        // Rendered hidden for the first layout pass: its content height decides which way it opens.
+        ...(position ?? { top: 0, left: 0, maxHeight: DROPDOWN_MAX_HEIGHT_PX, visibility: 'hidden' }),
         // Inline: Radix modal dialogs set pointer-events:none on body. The list
         // is portaled to body, so a class-only override can lose the cascade.
         pointerEvents: 'auto',
@@ -86,7 +91,7 @@ export const OptionsList = (props: OptionsListProps) => {
       }}
       data-slot={MULTI_SELECT_COMBOBOX_LIST_SLOT}
       className={cn(
-        'bg-popover text-popover-foreground pointer-events-auto fixed max-h-60 overflow-auto rounded-md border p-1 shadow-md',
+        'bg-popover text-popover-foreground pointer-events-auto fixed overflow-auto rounded-md border p-1 shadow-md',
         portalZIndexClassName,
       )}
       role="listbox"
@@ -170,12 +175,16 @@ export const OptionsList = (props: OptionsListProps) => {
 }
 
 interface DropdownPosition {
-  top: number
+  top?: number
+  bottom?: number
   left: number
   width: number
+  maxHeight: number
 }
 
 const DROPDOWN_OFFSET_PX = 4
+const DROPDOWN_MAX_HEIGHT_PX = 240
+const DROPDOWN_VIEWPORT_MARGIN_PX = 8
 
 const T = {
   addPrefix: 'Add ',
