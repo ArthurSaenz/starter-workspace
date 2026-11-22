@@ -56,8 +56,8 @@ export type AuthHandlersOptions<TCtx> = AuthRoutesOptions &
   Pick<ToLambdaHandlerOptions<TCtx>, 'context' | 'toErrorResponse' | 'onError'>
 
 /**
- * {@link createAuthRoutes} and {@link toLambdaHandler} in one call: the five endpoints as ready
- * Lambda handlers, for a host with no controller envelope of its own.
+ * {@link createAuthRoutes} and {@link toLambdaHandler} in one call: the five endpoints (seven with
+ * Google) as ready Lambda handlers, for a host with no controller envelope of its own.
  */
 export const createAuthHandlers = <TUser extends AuthUser, TMe, TCtx extends AuthContext>(
   auth: MagicLinkAuth<TUser, TMe, TCtx>,
@@ -75,5 +75,7 @@ export const createAuthHandlers = <TUser extends AuthUser, TMe, TCtx extends Aut
     refresh: toHandler(routes.refresh),
     logout: toHandler(routes.logout),
     me: toHandler(routes.me),
+    ...(routes.googleStart ? { googleStart: toHandler(routes.googleStart) } : {}),
+    ...(routes.googleCallback ? { googleCallback: toHandler(routes.googleCallback) } : {}),
   }
 }

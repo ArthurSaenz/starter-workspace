@@ -21,7 +21,7 @@ const setup = (uninvitedRequest: 'silent' | 'reject' = 'silent') => {
     clientIp: { trustedProxyHops: 0 },
   })
 
-  const wrap = (route: (typeof routes)[keyof typeof routes]) => {
+  const wrap = (route: NonNullable<(typeof routes)[keyof typeof routes]>) => {
     return toLambdaHandler(route, {
       corsHeaders: () => {
         return CORS

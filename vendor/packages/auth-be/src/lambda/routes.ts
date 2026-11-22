@@ -22,9 +22,10 @@ export interface AuthRoutesOptions {
 
 /**
  * The five auth endpoints as Lambda bodies: `POST magic-link`, `GET magic-link/verify?token=`,
- * `POST refresh`, `POST logout`, `GET me`. Each `handle` throws the engine's errors; wrap it with
- * the host's error envelope, honouring `fallbackResponse` / `clearCookiesOn401`, or use
- * {@link toLambdaHandler}.
+ * `POST refresh`, `POST logout`, `GET me`, plus `GET google/start?redirect=` and
+ * `GET google/callback` only when the engine has `google`. Each `handle` throws the engine's
+ * errors; wrap it with the host's error envelope, honouring `fallbackResponse` /
+ * `clearCookiesOn401`, or use {@link toLambdaHandler}.
  */
 export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthContext>(
   auth: MagicLinkAuth<TUser, TMe, TCtx>,
@@ -136,5 +137,47 @@ export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthC
     },
   }
 
-  return { requestMagicLink, verifyMagicLink, refresh, logout, me }
+  const redirect = (location: string, cookies: string[]): LambdaResult => {
+    return {
+      statusCode: 302,
+      headers: { ...responseHeaders(), Location: location },
+      ...(cookies.length > 0 ? { multiValueHeaders: { 'Set-Cookie': cookies } } : {}),
+      body: '',
+    }
+  }
+
+  // Both are full-page navigations, so a failure must land on the SPA's error page, never an envelope.
+  const googleRoutes = (google: NonNullable<MagicLinkAuth<TUser, TMe, TCtx>['google']>) => {
+    const googleStart: AuthRoute<TCtx> = {
+      handle: async (event) => {
+        const { redirect: redirectUrl } = event.queryStringParameters ?? {}
+        const started = google.start({ redirectUrl })
+
+        return redirect(started.location, [started.stateCookie])
+      },
+      fallbackResponse: () => {
+        return redirect(google.failureLocation('failed'), [])
+      },
+    }
+
+    const googleCallback: AuthRoute<TCtx> = {
+      handle: async (event, ctx) => {
+        const { code, state, error } = event.queryStringParameters ?? {}
+
+        const result = await google.complete(
+          { query: { code, state, error }, headers: event.headers, ...requestMeta(event, ctx) },
+          ctx,
+        )
+
+        return redirect(result.location, result.cookies)
+      },
+      fallbackResponse: () => {
+        return redirect(google.failureLocation('failed'), [google.clearStateCookie()])
+      },
+    }
+
+    return { googleStart, googleCallback }
+  }
+
+  return { requestMagicLink, verifyMagicLink, refresh, logout, me, ...(auth.google ? googleRoutes(auth.google) : {}) }
 }
