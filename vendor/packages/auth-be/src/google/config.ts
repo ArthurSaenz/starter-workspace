@@ -105,6 +105,11 @@ export const assertGoogleConfig = <TUser extends AuthUser, TCtx extends AuthCont
     throw new Error('auth: google.errorPath must be an in-app path')
   }
 
+  // A failure redirect appends `?auth_error=…` to it.
+  if (/[?#]/.test(errorPath)) {
+    throw new Error('auth: google.errorPath must not carry a query or fragment')
+  }
+
   const { hostedDomains } = google
 
   // An empty list would refuse every sign-in, which is a config mistake, not a policy.

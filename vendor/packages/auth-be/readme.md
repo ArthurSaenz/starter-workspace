@@ -194,7 +194,7 @@ and the same `redirectUri` goes to the authorization request and the code exchan
 throws unless `redirectUri` is absolute, `https:` (or `http:` on `localhost`, `127.0.0.1` or
 `*.localhost`), has no `#`, and is on the same origin as `magicLink.baseUrl`: the callback sets the
 session cookies, so it must answer on the origin the SPA reads them from. `errorPath` must survive
-`sanitizeRedirectUrl` unchanged, and `hostedDomains`, when set, must be a non-empty list of non-empty
+`sanitizeRedirectUrl` unchanged and carry no `?` or `#`, and `hostedDomains`, when set, must be a non-empty list of non-empty
 strings (an empty list would refuse everyone, so it throws).
 
 **Outbound HTTPS.** The callback calls Google's token endpoint and fetches its signing keys

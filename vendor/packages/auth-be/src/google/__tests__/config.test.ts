@@ -44,6 +44,8 @@ describe('assertGoogleConfig', () => {
     ['a protocol-relative errorPath', { errorPath: '//evil.com' }, /errorPath/],
     ['an errorPath without a leading slash', { errorPath: 'auth/sign-in' }, /errorPath/],
     ['an absolute errorPath', { errorPath: 'https://evil.com/sign-in' }, /errorPath/],
+    ['an errorPath with a query', { errorPath: '/sign-in?x=1' }, /errorPath must not carry a query or fragment/],
+    ['an errorPath with a fragment', { errorPath: '/sign-in#top' }, /errorPath must not carry a query or fragment/],
     ['an empty hostedDomains list', { hostedDomains: [] }, /hostedDomains/],
     ['an empty hosted domain', { hostedDomains: ['example.com', ''] }, /hostedDomains/],
     ['hostedDomains as a string', { hostedDomains: 'example.com' as unknown as string[] }, /hostedDomains/],
