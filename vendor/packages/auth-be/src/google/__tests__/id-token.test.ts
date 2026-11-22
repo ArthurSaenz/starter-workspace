@@ -118,4 +118,56 @@ describe('verifyGoogleIdToken', () => {
     await verify(stub.signIdToken({ nonce: NONCE }), NONCE)
     expect(stub.jwksFetches()).toBe(3)
   })
+
+  it('keeps serving cached keys when a refresh fails after max-age', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+
+    const { stub, verify } = setup()
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+
+    stub.jwksCacheControl = null
+    await verify(stub.signIdToken({ nonce: NONCE }), NONCE)
+    vi.setSystemTime(Date.now() + 3601 * 1000)
+    stub.jwksResponse = async () => {
+      return new Response('down', { status: 503 })
+    }
+
+    await expect(verify(stub.signIdToken({ nonce: NONCE }), NONCE, logger)).resolves.toMatchObject({ ok: true })
+    expect(stub.jwksFetches()).toBe(2)
+    expect(logger.warn).toHaveBeenCalledWith('Google JWKS refresh failed', {
+      data: { name: 'Error', cachedKeyCount: 1 },
+    })
+  })
+
+  it('a failing JWKS endpoint costs one fetch per window', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+
+    const { stub, verify } = setup()
+
+    stub.jwksCacheControl = null
+    stub.jwksResponse = async () => {
+      throw new TypeError('fetch failed')
+    }
+
+    await expect(verify(stub.signIdToken({ nonce: NONCE }), NONCE)).resolves.toEqual({ ok: false, step: 'jwks' })
+    await verify(stub.signIdToken({ nonce: NONCE }), NONCE)
+    vi.setSystemTime(Date.now() + 59 * 1000)
+    await verify(stub.signIdToken({ nonce: NONCE }), NONCE)
+    expect(stub.jwksFetches()).toBe(1)
+
+    vi.setSystemTime(Date.now() + 2 * 1000)
+    stub.jwksResponse = undefined
+    await expect(verify(stub.signIdToken({ nonce: NONCE }), NONCE)).resolves.toMatchObject({ ok: true })
+    expect(stub.jwksFetches()).toBe(2)
+
+    vi.setSystemTime(Date.now() + 3601 * 1000)
+    stub.jwksResponse = async () => {
+      return new Response('down', { status: 500 })
+    }
+    stub.rotateKey('kid-forged', { publish: false })
+
+    for (let attempt = 0; attempt < 5; attempt++) await verify(stub.signIdToken({ nonce: NONCE }), NONCE)
+
+    expect(stub.jwksFetches()).toBe(3)
+  })
 })

@@ -198,7 +198,8 @@ session cookies, so it must answer on the origin the SPA reads them from. `error
 strings (an empty list would refuse everyone, so it throws).
 
 **Outbound HTTPS.** The callback calls Google's token endpoint and fetches its signing keys
-(`https://www.googleapis.com/oauth2/v3/certs`, cached by `Cache-Control`), with a 5 s timeout. A
+(`https://www.googleapis.com/oauth2/v3/certs`, cached by `Cache-Control`; a failed refresh keeps the
+cached keys and retries after 60 s, logging `Google JWKS refresh failed`), with a 5 s timeout. A
 Lambda in a VPC needs a NAT gateway (or an equivalent egress) for that; without one every sign-in
 ends `failed` at step `token-exchange`.
 

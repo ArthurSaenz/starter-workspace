@@ -1,12 +1,13 @@
 import jwt from 'jsonwebtoken'
 import crypto from 'node:crypto'
 
+import { errorName } from '../errors.js'
 import type { AuthLogger } from '../ports.js'
 import type { GoogleFailureStep, GoogleIdentity } from './config.js'
 import { GOOGLE_ISSUERS, GOOGLE_JWKS_URI, GOOGLE_TIMEOUT_MS } from './config.js'
 
 const DEFAULT_JWKS_MAX_AGE_SEC = 3600
-const UNKNOWN_KID_REFETCH_MS = 60 * 1000
+const REFETCH_WINDOW_MS = 60 * 1000
 const CLOCK_TOLERANCE_SEC = 30
 
 export type IdTokenCheck =
@@ -30,7 +31,10 @@ const parseJwks = (body: unknown): Map<string, crypto.KeyObject> => {
   )
 }
 
-/** `kid → KeyObject` for the life of the container, refetched on `max-age` and, rate-bounded, on an unknown `kid`. */
+/**
+ * `kid → KeyObject` for the life of the container, refetched on `max-age` and, rate-bounded, on an
+ * unknown `kid` or after a failed fetch.
+ */
 const createJwksCache = (fetchImpl: typeof fetch) => {
   let keys = new Map<string, crypto.KeyObject>()
   let expiresAt = 0
@@ -38,13 +42,23 @@ const createJwksCache = (fetchImpl: typeof fetch) => {
 
   const refresh = async (logger: AuthLogger | undefined): Promise<void> => {
     const fetchedAt = Date.now()
-    const response = await fetchImpl(GOOGLE_JWKS_URI, { signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS) })
 
-    if (!response.ok) throw new Error(`JWKS answered ${response.status}`)
+    try {
+      const response = await fetchImpl(GOOGLE_JWKS_URI, { signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS) })
 
-    keys = parseJwks(await response.json())
-    expiresAt = fetchedAt + maxAgeMs(response.headers.get('cache-control'))
-    logger?.info('Google JWKS refreshed', { data: { keyCount: keys.size } })
+      if (!response.ok) throw new Error(`JWKS answered ${response.status}`)
+
+      keys = parseJwks(await response.json())
+      expiresAt = fetchedAt + maxAgeMs(response.headers.get('cache-control'))
+      logger?.info('Google JWKS refreshed', { data: { keyCount: keys.size } })
+    } catch (error) {
+      // The cached keys keep serving until a fetch succeeds. That fails closed: Google lists a key
+      // before signing with it, so a stale cache only misses a newer kid. A key Google has since
+      // withdrawn stays trusted meanwhile, but ID tokens come only from the token endpoint over TLS.
+      expiresAt = fetchedAt + REFETCH_WINDOW_MS
+      unknownKidRefetchAt = fetchedAt
+      logger?.warn('Google JWKS refresh failed', { data: { name: errorName(error), cachedKeyCount: keys.size } })
+    }
   }
 
   return async (kid: string, logger: AuthLogger | undefined): Promise<crypto.KeyObject | undefined> => {
@@ -52,9 +66,9 @@ const createJwksCache = (fetchImpl: typeof fetch) => {
 
     if (now >= expiresAt) {
       await refresh(logger)
-    } else if (!keys.has(kid) && now - unknownKidRefetchAt >= UNKNOWN_KID_REFETCH_MS) {
+    } else if (!keys.has(kid) && now - unknownKidRefetchAt >= REFETCH_WINDOW_MS) {
       // A key Google rotated in since our fetch. Stamped before the fetch, so a stream of forged
-      // kids, or a failing endpoint, costs one fetch per window rather than one per request.
+      // kids costs one fetch per window rather than one per request.
       unknownKidRefetchAt = now
       await refresh(logger)
     }
@@ -93,11 +107,7 @@ export const createIdTokenVerifier = (options: { clientId: string; fetch: typeof
   const lookupKey = async (kid: unknown, logger: AuthLogger | undefined): Promise<crypto.KeyObject | undefined> => {
     if (typeof kid !== 'string' || !kid) return undefined
 
-    try {
-      return await keyFor(kid, logger)
-    } catch {
-      return undefined
-    }
+    return keyFor(kid, logger)
   }
 
   return async (idToken: string, nonce: string, logger?: AuthLogger): Promise<IdTokenCheck> => {
