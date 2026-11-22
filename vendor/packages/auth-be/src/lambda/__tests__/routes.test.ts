@@ -3,11 +3,12 @@ import { Buffer } from 'node:buffer'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createFakes, invitedUser, tokenFromEmail } from '../../__tests__/helpers/fakes.js'
-import { createMagicLinkAuth } from '../../magic-link/magic-link-auth.js'
+import { createMagicLinkAuth } from '../../create-auth.js'
 import { toLambdaHandler } from '../handler.js'
 import { createAuthRoutes } from '../routes.js'
 
 const CORS = { 'Access-Control-Allow-Origin': 'https://app.test', 'Access-Control-Allow-Credentials': 'true' }
+const NO_STORE = { 'Cache-Control': 'no-store' }
 
 const setup = (uninvitedRequest: 'silent' | 'reject' = 'silent') => {
   const fakes = createFakes([invitedUser()])
@@ -20,7 +21,7 @@ const setup = (uninvitedRequest: 'silent' | 'reject' = 'silent') => {
     clientIp: { trustedProxyHops: 0 },
   })
 
-  const wrap = (route: (typeof routes)[keyof typeof routes]) => {
+  const wrap = (route: NonNullable<(typeof routes)[keyof typeof routes]>) => {
     return toLambdaHandler(route, {
       corsHeaders: () => {
         return CORS
@@ -124,7 +125,7 @@ describe('auth routes', () => {
 
     expect(verified.statusCode).toBe(200)
     expect(JSON.parse(verified.body)).toEqual({ ok: true, redirect: '/' })
-    expect(verified.headers).toEqual(CORS)
+    expect(verified.headers).toEqual({ ...CORS, ...NO_STORE })
   })
 
   it('verifyMagicLink maps a bad token to the error envelope', async () => {
@@ -142,6 +143,17 @@ describe('auth routes', () => {
 
     expect(JSON.parse(me.body)).toEqual({ id: 'u1', email: 'ada@example.com' })
     expect((await wrap(routes.me)({ headers: {} })).statusCode).toBe(401)
+  })
+
+  it('me answers 403 NOT_INVITED for a de-invited user', async () => {
+    const { routes, wrap, cookie, fakes } = await signedIn()
+
+    fakes.users.get('u1')!.invited = false
+
+    const me = await wrap(routes.me)({ headers: { Cookie: cookie } })
+
+    expect(me.statusCode).toBe(403)
+    expect(JSON.parse(me.body)).toMatchObject({ type: 'NOT_INVITED' })
   })
 
   it('refresh rotates the cookies, and clears them on a 401', async () => {
@@ -180,6 +192,54 @@ describe('auth routes', () => {
 
       expect(result.statusCode).toBe(204)
       expect(result.multiValueHeaders!['Set-Cookie']).toHaveLength(2)
+    }
+  })
+
+  it('every route answers Cache-Control: no-store, over a host corsHeaders value', async () => {
+    const { auth, fakes } = setup()
+
+    const routes = createAuthRoutes(auth, {
+      corsHeaders: () => {
+        return { ...CORS, 'Cache-Control': 'public, max-age=600' }
+      },
+      clientIp: { trustedProxyHops: 0 },
+    })
+
+    await routes.requestMagicLink.handle({ body: '{"email":"ada@example.com"}' })
+
+    const verified = await routes.verifyMagicLink.handle({
+      queryStringParameters: { token: tokenFromEmail(fakes.sent[0]!) },
+    })
+
+    const [accessCookie, refreshCookie] = verified.multiValueHeaders!['Set-Cookie']!
+    const cookie = `${accessCookie!.split(';')[0]}; ${refreshCookie!.split(';')[0]}`
+
+    const results = [
+      await routes.requestMagicLink.handle({ body: '{"email":"ada@example.com"}' }),
+      routes.requestMagicLink.fallbackResponse!(),
+      verified,
+      await routes.me.handle({ headers: { cookie } }),
+      await routes.refresh.handle({ headers: { cookie } }),
+      await routes.logout.handle({ headers: { cookie } }),
+      routes.logout.fallbackResponse!(),
+    ]
+
+    for (const result of results) expect(result.headers).toEqual({ ...CORS, ...NO_STORE })
+  })
+
+  it('a host cache-control in any case is replaced by no-store', async () => {
+    const { auth } = setup()
+
+    for (const name of ['cache-control', 'CACHE-CONTROL', 'Cache-control']) {
+      const corsHeaders = () => {
+        return { ...CORS, [name]: 'public, max-age=600' }
+      }
+
+      const routes = createAuthRoutes(auth, { corsHeaders, clientIp: { trustedProxyHops: 0 } })
+      const handler = toLambdaHandler(routes.me, { corsHeaders, clearCookies: auth.clearCookies })
+
+      expect((await routes.logout.handle({ headers: {} })).headers).toEqual({ ...CORS, ...NO_STORE })
+      expect((await handler({ headers: {} })).headers).toEqual({ ...CORS, ...NO_STORE })
     }
   })
 

@@ -1,6 +1,6 @@
 import { vi } from 'vitest'
 
-import type { MagicLinkAuthConfig } from '../../magic-link/config.js'
+import type { MagicLinkAuthConfig } from '../../auth-config.js'
 import type {
   AuthUser,
   MagicLinkEmail,
@@ -53,7 +53,9 @@ export const createFakes = (seed: TestUser[] = []) => {
     }),
     consumeByHash: vi.fn(async (tokenHash: string): Promise<StoredMagicToken | null> => {
       const row = tokens.find((token) => {
-        return token.tokenHash === tokenHash && !token.spent
+        return (
+          token.tokenHash === tokenHash && !token.spent && !(token.expiresAt && token.expiresAt.getTime() <= Date.now())
+        )
       })
 
       if (!row) return null

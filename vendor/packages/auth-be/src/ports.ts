@@ -80,14 +80,21 @@ export interface StoredSession {
 
 export interface SessionStore<TCtx extends AuthContext = AuthContext> {
   create: (data: NewSession, ctx?: TCtx) => Promise<unknown>
+  /** The row whatever its state, revoked included: reuse detection reads a revoked row. */
   findByTokenHash: (tokenHash: string, ctx?: TCtx) => Promise<StoredSession | null>
   /**
    * Revoke `oldId` and insert its successor atomically, resolving the new row. Must resolve `null`
-   * when a concurrent caller already rotated `oldId`, never hand out a refresh token whose session
-   * row was not written: the engine then answers from `findSuccessor` inside the grace window.
+   * when `oldId` is already rotated or revoked (a concurrent refresh, or a logout landing between
+   * the engine's `revokedAt` read and this call), never hand out a refresh token whose session row
+   * was not written: the engine then answers from `findSuccessor` inside the grace window.
    */
   rotate: (oldId: string, next: NewSession, ctx?: TCtx) => Promise<StoredSession | null>
-  /** The row `rotate(id, …)` inserted, whatever its state now; `null` if `id` was never rotated. */
+  /**
+   * The row `rotate(id, …)` inserted, whatever its state now, revoked or rotated in turn included;
+   * `null` only if `id` was never rotated.
+   * Security-critical: reuse detection depends on it. An implementation that always returns `null`
+   * turns every replayed token into a plain 401 and stops revoking the thief's session.
+   */
   findSuccessor: (id: string, ctx?: TCtx) => Promise<StoredSession | null>
   revokeByTokenHash: (tokenHash: string, ctx?: TCtx) => Promise<void>
   revokeAllForUser: (userId: string, ctx?: TCtx) => Promise<void>

@@ -11,10 +11,11 @@ import {
   invitedUser,
   tokenFromEmail,
 } from '../../__tests__/helpers/fakes.js'
+import { createMagicLinkAuth } from '../../create-auth.js'
 import { AuthError } from '../../errors.js'
-import { createMagicLinkAuth } from '../../magic-link/magic-link-auth.js'
+import type { HeaderBag } from '../../http/headers.js'
 import type { SessionStore } from '../../ports.js'
-import { signRefreshToken } from '../../tokens.js'
+import { hashToken, signRefreshToken } from '../../tokens.js'
 
 describe('refreshSession', () => {
   it('rotates: a new pair, the old refresh token dead', async () => {
@@ -88,12 +89,6 @@ describe('refreshSession', () => {
       },
     ],
     [
-      'the successor is gone',
-      (fakes) => {
-        fakes.sessions.splice(1, 1)
-      },
-    ],
-    [
       'the user was deleted',
       (fakes) => {
         fakes.users.delete('u1')
@@ -159,6 +154,127 @@ describe('refreshSession', () => {
     await expectAuthError(auth.refreshSession({ refreshToken: result.refreshToken }), 'INVALID_REFRESH_TOKEN', 401)
     await expectAuthError(auth.refreshSession({ refreshToken: next.refreshToken! }), 'INVALID_REFRESH_TOKEN', 401)
     expect(fakes.sessionStore.revokeAllForUser).toHaveBeenCalledWith('u1', undefined)
+  })
+
+  it('a replayed token two rotations old still revokes every session', async () => {
+    const fakes = createFakes([invitedUser()])
+    const { auth, result } = await signIn(fakes)
+    const next = await auth.refreshSession({ refreshToken: result.refreshToken })
+
+    await auth.refreshSession({ refreshToken: next.refreshToken! })
+    fakes.sessions[0]!.revokedAt = new Date(Date.now() - 31_000)
+
+    await expectAuthError(auth.refreshSession({ refreshToken: result.refreshToken }), 'INVALID_REFRESH_TOKEN', 401)
+    expect(fakes.sessionStore.revokeAllForUser).toHaveBeenCalledWith('u1', undefined)
+    expect(
+      fakes.sessions.every((session) => {
+        return Boolean(session.revokedAt)
+      }),
+    ).toBe(true)
+  })
+
+  it("a refresh racing a logout fails alone and leaves the user's other sessions alive", async () => {
+    const fakes = createFakes([invitedUser()])
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    const first = await signIn(fakes)
+
+    await signIn(fakes)
+    await first.auth.logout(first.result.refreshToken)
+
+    await expectAuthError(
+      first.auth.refreshSession({ refreshToken: first.result.refreshToken }, { logger }),
+      'INVALID_REFRESH_TOKEN',
+      401,
+    )
+    expect(fakes.sessions[1]!.revokedAt).toBeNull()
+    expect(fakes.sessionStore.revokeAllForUser).not.toHaveBeenCalled()
+    expect(logger.warn).toHaveBeenCalledWith('Refresh with a revoked, never-rotated token', { data: { userId: 'u1' } })
+  })
+
+  it('a replayed rotated token whose successor row was pruned fails alone', async () => {
+    const fakes = createFakes([invitedUser()])
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    const { auth, result } = await signIn(fakes)
+
+    await auth.refreshSession({ refreshToken: result.refreshToken })
+    fakes.sessions.splice(1, 1)
+
+    await expectAuthError(
+      auth.refreshSession({ refreshToken: result.refreshToken }, { logger }),
+      'INVALID_REFRESH_TOKEN',
+      401,
+    )
+    expect(fakes.sessionStore.revokeAllForUser).not.toHaveBeenCalled()
+    expect(logger.warn).toHaveBeenCalledWith('Refresh with a revoked, never-rotated token', { data: { userId: 'u1' } })
+  })
+
+  it('refuses a session row whose userId differs from the token subject', async () => {
+    const fakes = createFakes([invitedUser(), invitedUser({ id: 'u2', email: 'bob@example.com' })])
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    const { auth, result } = await signIn(fakes)
+
+    await signIn(fakes, 'bob@example.com')
+    fakes.sessionStore.findByTokenHash.mockResolvedValueOnce(fakes.sessions[1]!)
+
+    await expectAuthError(
+      auth.refreshSession({ refreshToken: result.refreshToken }, { logger }),
+      'INVALID_REFRESH_TOKEN',
+      401,
+    )
+    expect(fakes.sessionStore.rotate).not.toHaveBeenCalled()
+    expect(fakes.sessionStore.revokeAllForUser).not.toHaveBeenCalled()
+    expect(logger.error).toHaveBeenCalledWith('Refresh token subject does not match its session row', {
+      data: { sessionId: '2' },
+    })
+  })
+
+  it('refuses a revoked, rotated session row of another user inside the grace window', async () => {
+    const fakes = createFakes([invitedUser(), invitedUser({ id: 'u2', email: 'bob@example.com' })])
+    const { auth, result } = await signIn(fakes)
+    const bob = await signIn(fakes, 'bob@example.com')
+
+    await bob.auth.refreshSession({ refreshToken: bob.result.refreshToken })
+    fakes.sessionStore.findByTokenHash.mockResolvedValueOnce(fakes.sessions[1]!)
+
+    await expectAuthError(auth.refreshSession({ refreshToken: result.refreshToken }), 'INVALID_REFRESH_TOKEN', 401)
+    expect(fakes.sessionStore.findSuccessor).not.toHaveBeenCalled()
+    expect(fakes.sessionStore.revokeAllForUser).not.toHaveBeenCalled()
+  })
+
+  it('refuses a grace successor of another user', async () => {
+    const fakes = createFakes([invitedUser(), invitedUser({ id: 'u2', email: 'bob@example.com' })])
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    const { auth, result } = await signIn(fakes)
+
+    await auth.refreshSession({ refreshToken: result.refreshToken })
+    await signIn(fakes, 'bob@example.com')
+    fakes.sessionStore.findSuccessor.mockResolvedValueOnce(fakes.sessions[2]!)
+
+    await expectAuthError(
+      auth.refreshSession({ refreshToken: result.refreshToken }, { logger }),
+      'INVALID_REFRESH_TOKEN',
+      401,
+    )
+    expect(fakes.sessionStore.revokeAllForUser).not.toHaveBeenCalled()
+    expect(logger.error).toHaveBeenCalledWith('Refresh token subject does not match its session row', {
+      data: { sessionId: '1', successorSessionId: '3' },
+    })
+  })
+
+  it('accepts a session row whose userId is a non-string id equal to the subject', async () => {
+    const fakes = createFakes([invitedUser()])
+    const { auth, result } = await signIn(fakes)
+
+    fakes.sessionStore.findByTokenHash.mockResolvedValueOnce({
+      ...fakes.sessions[0]!,
+      userId: {
+        toString: () => {
+          return 'u1'
+        },
+      } as never,
+    })
+
+    await expect(auth.refreshSession({ refreshToken: result.refreshToken })).resolves.toHaveProperty('refreshCookie')
   })
 
   it('fails only the loser of a concurrent rotation', async () => {
@@ -298,6 +414,61 @@ describe('session reads', () => {
     await expectAuthError(auth.authenticate(headers), 'USER_NOT_FOUND', 401)
   })
 
+  it.each<[string, (auth: Awaited<ReturnType<typeof signIn>>['auth'], headers: HeaderBag) => Promise<unknown>]>([
+    [
+      'authenticate',
+      (auth, headers) => {
+        return auth.authenticate(headers)
+      },
+    ],
+    [
+      'getMe',
+      (auth, headers) => {
+        return auth.getMe(auth.requireUser(headers))
+      },
+    ],
+  ])('%s refuses a signed-in user whose invite was revoked and ends their sessions', async (_label, read) => {
+    const fakes = createFakes([invitedUser()])
+    const first = await signIn(fakes)
+    const second = await signIn(fakes)
+
+    fakes.users.get('u1')!.invited = false
+
+    await expectAuthError(read(first.auth, { cookie: `access_token=${first.result.accessToken}` }), 'NOT_INVITED', 403)
+    expect(fakes.sessions).toHaveLength(2)
+    expect(
+      fakes.sessions.every((session) => {
+        return session.revokedAt
+      }),
+    ).toBe(true)
+
+    for (const { auth, result } of [first, second]) {
+      await expectAuthError(auth.refreshSession({ refreshToken: result.refreshToken }), 'INVALID_REFRESH_TOKEN', 401)
+    }
+  })
+
+  it('a failed revoke still answers NOT_INVITED', async () => {
+    const fakes = createFakes([invitedUser()])
+    const { auth, result } = await signIn(fakes)
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+
+    fakes.users.get('u1')!.invited = false
+    fakes.sessionStore.revokeAllForUser.mockRejectedValueOnce(new Error('db down'))
+
+    await expectAuthError(
+      auth.authenticate({ cookie: `access_token=${result.accessToken}` }, { logger }),
+      'NOT_INVITED',
+      403,
+    )
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Authenticated request by a user who may no longer sign in; revoking every session',
+      { data: { userId: 'u1' } },
+    )
+    expect(logger.error).toHaveBeenCalledWith('Failed to revoke the sessions of a user who may no longer sign in', {
+      data: { name: 'Error' },
+    })
+  })
+
   it('logout revokes the session and never throws', async () => {
     const fakes = createFakes([invitedUser()])
     const { auth, result } = await signIn(fakes)
@@ -328,5 +499,87 @@ describe('session reads', () => {
       'sid=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0',
       'rid=; HttpOnly; Secure; SameSite=Lax; Path=/auth; Max-Age=0',
     ])
+  })
+})
+
+describe('sign-in method', () => {
+  const methodOf = (token: string, secret: string): unknown => {
+    return (jwt.verify(token, secret, IDENTITY) as { authMethod?: unknown }).authMethod
+  }
+
+  const googleSession = async () => {
+    const fakes = createFakes([invitedUser()])
+    const auth = createMagicLinkAuth(fakes.config)
+    const pair = await auth.issueSession(invitedUser(), {}, undefined, { authMethod: 'google' })
+
+    return { fakes, auth, pair }
+  }
+
+  it('issueSession with authMethod google mints access and refresh tokens that say google', async () => {
+    const { pair } = await googleSession()
+
+    expect(methodOf(pair.accessToken, ACCESS_SECRET)).toBe('google')
+    expect(methodOf(pair.refreshToken, REFRESH_SECRET)).toBe('google')
+  })
+
+  it('rotation keeps the method of the session it rotates', async () => {
+    const { auth, pair } = await googleSession()
+
+    const next = await auth.refreshSession({ refreshToken: pair.refreshToken })
+
+    expect(methodOf(next.accessToken, ACCESS_SECRET)).toBe('google')
+    expect(methodOf(next.refreshToken!, REFRESH_SECRET)).toBe('google')
+  })
+
+  it('a grace answer keeps the method', async () => {
+    const { fakes, auth, pair } = await googleSession()
+
+    await auth.refreshSession({ refreshToken: pair.refreshToken })
+
+    const late = await auth.refreshSession({ refreshToken: pair.refreshToken })
+
+    // A stale read of the rotated row sends the refresh down the lost-race path instead.
+    fakes.sessionStore.findByTokenHash.mockResolvedValueOnce({ ...fakes.sessions[0]!, revokedAt: null })
+
+    const raced = await auth.refreshSession({ refreshToken: pair.refreshToken })
+
+    expect(late.refreshToken).toBeUndefined()
+    expect(raced.refreshToken).toBeUndefined()
+    expect(methodOf(late.accessToken, ACCESS_SECRET)).toBe('google')
+    expect(methodOf(raced.accessToken, ACCESS_SECRET)).toBe('google')
+  })
+
+  const rotateHandSigned = async (refreshToken: string) => {
+    const fakes = createFakes([invitedUser()])
+
+    await fakes.sessionStore.create({
+      userId: 'u1',
+      tokenHash: hashToken(refreshToken),
+      jti: 'hand-signed',
+      expiresAt: new Date(Date.now() + 60_000),
+    })
+
+    return createMagicLinkAuth(fakes.config).refreshSession({ refreshToken })
+  }
+
+  it('a refresh token without the claim rotates as magic', async () => {
+    const next = await rotateHandSigned(
+      signRefreshToken({ sub: 'u1', jti: 'hand-signed' }, REFRESH_SECRET, IDENTITY).token,
+    )
+
+    expect(methodOf(next.accessToken, ACCESS_SECRET)).toBe('magic')
+    expect(methodOf(next.refreshToken!, REFRESH_SECRET)).toBe('magic')
+  })
+
+  it('an unknown authMethod claim reads as magic', async () => {
+    const next = await rotateHandSigned(
+      jwt.sign({ sub: 'u1', jti: 'hand-signed', authMethod: 'saml' }, REFRESH_SECRET, {
+        algorithm: 'HS256',
+        ...IDENTITY,
+      }),
+    )
+
+    expect(methodOf(next.accessToken, ACCESS_SECRET)).toBe('magic')
+    expect(methodOf(next.refreshToken!, REFRESH_SECRET)).toBe('magic')
   })
 })

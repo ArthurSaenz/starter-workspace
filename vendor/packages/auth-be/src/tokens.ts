@@ -11,15 +11,19 @@ export const DEFAULT_ACCESS_TTL_SEC = 15 * 60
 export const DEFAULT_REFRESH_TTL_SEC = 7 * 24 * 60 * 60
 export const DEFAULT_REFRESH_GRACE_SEC = 30
 
+export type AuthMethod = 'magic' | 'google'
+
 export interface AccessTokenPayload {
   sub: string
   roles: string[]
-  authMethod: 'magic' | 'google'
+  authMethod: AuthMethod
 }
 
 export interface RefreshTokenPayload {
   sub: string
   jti: string
+  /** Absent on tokens minted before the claim existed; those read as `'magic'`. */
+  authMethod?: AuthMethod
 }
 
 /** Issuer + audience pin a token to the API that minted it, so one app's token never opens another. */
@@ -108,8 +112,11 @@ export const verifyRefreshToken = (
 ): RefreshTokenPayload => {
   try {
     const decoded = verify<RefreshTokenPayload>(token, secret, identity)
+    const { authMethod } = decoded
 
-    return { sub: decoded.sub, jti: decoded.jti }
+    return authMethod === 'magic' || authMethod === 'google'
+      ? { sub: decoded.sub, jti: decoded.jti, authMethod }
+      : { sub: decoded.sub, jti: decoded.jti }
   } catch (error) {
     throw createError({ message: 'Invalid refresh token', code: 'INVALID_REFRESH_TOKEN', status: 401, cause: error })
   }

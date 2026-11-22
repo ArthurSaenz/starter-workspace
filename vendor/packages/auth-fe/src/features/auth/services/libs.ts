@@ -1,3 +1,5 @@
+import type { AuthRedirectError } from '../types.js'
+
 const MAX_REDIRECT_LENGTH = 2048
 
 // A backslash reads as `/` in browsers (`/\evil.com` is `//evil.com`), and a `:` can start a scheme.
@@ -41,4 +43,23 @@ export const safeRedirect = (value?: unknown): string => {
     !isUnsafeDecodedPath(new URL(value, 'https://origin.invalid').pathname)
 
   return isInAppPath ? value : '/'
+}
+
+const AUTH_REDIRECT_ERRORS: Record<AuthRedirectError, true> = {
+  cancelled: true,
+  invalid_state: true,
+  not_allowed: true,
+  rate_limited: true,
+  failed: true,
+}
+
+/**
+ * Reads the `auth_error` search param the API appends after a failed Google sign-in.
+ *
+ * @example
+ *     parseAuthRedirectError('not_allowed') // 'not_allowed'
+ *     parseAuthRedirectError('toString') // null
+ */
+export const parseAuthRedirectError = (value: unknown): AuthRedirectError | null => {
+  return typeof value === 'string' && Object.hasOwn(AUTH_REDIRECT_ERRORS, value) ? (value as AuthRedirectError) : null
 }

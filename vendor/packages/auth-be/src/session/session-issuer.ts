@@ -3,7 +3,7 @@ import crypto from 'node:crypto'
 import type { ResolvedCookieOptions } from '../http/cookies.js'
 import { buildAccessCookie, buildRefreshCookie } from '../http/cookies.js'
 import type { AuthContext, AuthUser, NewSession, SessionStore, StoredSession } from '../ports.js'
-import type { JwtIdentity, SignedToken } from '../tokens.js'
+import type { AuthMethod, JwtIdentity, SignedToken } from '../tokens.js'
 import { hashToken, signAccessToken, signRefreshToken } from '../tokens.js'
 import type { AccessOnlyPair, RequestMeta, TokenPair } from './types.js'
 import { withMeta } from './types.js'
@@ -34,21 +34,26 @@ export const createSessionIssuer = <TUser extends AuthUser, TCtx extends AuthCon
     }
   }
 
-  const signAccess = (user: TUser): SignedToken => {
+  const signAccess = (user: TUser, method: AuthMethod): SignedToken => {
     return signAccessToken(
-      { sub: String(user.id), roles: deps.rolesOf(user), authMethod: 'magic' },
+      { sub: String(user.id), roles: deps.rolesOf(user), authMethod: method },
       deps.accessSecret,
       identity,
       deps.accessTtlSec,
     )
   }
 
-  const mintPair = (user: TUser, meta: Parameters<typeof withMeta>[0]) => {
+  const mintPair = (user: TUser, method: AuthMethod, meta: Parameters<typeof withMeta>[0]) => {
     const userId = String(user.id)
     const jti = crypto.randomUUID()
-    const access = signAccess(user)
+    const access = signAccess(user, method)
 
-    const refresh = signRefreshToken({ sub: userId, jti }, deps.refreshSecret, identity, deps.refreshTtlSec)
+    const refresh = signRefreshToken(
+      { sub: userId, jti, authMethod: method },
+      deps.refreshSecret,
+      identity,
+      deps.refreshTtlSec,
+    )
 
     const session: NewSession = {
       userId,
@@ -62,8 +67,13 @@ export const createSessionIssuer = <TUser extends AuthUser, TCtx extends AuthCon
   }
 
   /** Mint an access + refresh pair for `user` and persist the refresh session. */
-  const issue = async (user: TUser, meta?: RequestMeta, ctx?: TCtx): Promise<TokenPair> => {
-    const { access, refresh, session } = mintPair(user, meta)
+  const issue = async (
+    user: TUser,
+    meta?: RequestMeta,
+    ctx?: TCtx,
+    options?: { authMethod?: AuthMethod },
+  ): Promise<TokenPair> => {
+    const { access, refresh, session } = mintPair(user, options?.authMethod ?? 'magic', meta)
 
     await sessions.create(session, ctx)
 
@@ -71,15 +81,20 @@ export const createSessionIssuer = <TUser extends AuthUser, TCtx extends AuthCon
   }
 
   /** `null` when a concurrent caller won the rotation: nothing minted here may be handed out. */
-  const rotate = async (current: StoredSession, user: TUser, ctx?: TCtx): Promise<TokenPair | null> => {
-    const { access, refresh, session } = mintPair(user, current)
+  const rotate = async (
+    current: StoredSession,
+    user: TUser,
+    method: AuthMethod,
+    ctx?: TCtx,
+  ): Promise<TokenPair | null> => {
+    const { access, refresh, session } = mintPair(user, method, current)
     const rotated = await sessions.rotate(String(current.id), session, ctx)
 
     return rotated ? toPair(access, refresh) : null
   }
 
-  const grantAccess = (user: TUser): AccessOnlyPair => {
-    const access = signAccess(user)
+  const grantAccess = (user: TUser, method: AuthMethod): AccessOnlyPair => {
+    const access = signAccess(user, method)
 
     return { accessToken: access.token, accessCookie: buildAccessCookie(cookies, access.token, access.ttlSec) }
   }

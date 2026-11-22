@@ -1,11 +1,11 @@
 import { Buffer } from 'node:buffer'
 
-import type { MagicLinkAuth } from '../magic-link/magic-link-auth.js'
+import type { MagicLinkAuth } from '../create-auth.js'
 import type { AuthContext, AuthUser } from '../ports.js'
 import type { RequestMeta } from '../session/types.js'
 import type { ClientIpOptions } from './client-ip.js'
 import { createClientIpResolver, extractUserAgent } from './client-ip.js'
-import { guardCorsHeaders } from './cors-headers.js'
+import { createResponseHeaders } from './cors-headers.js'
 import type { AuthRoute, LambdaEvent, LambdaResult } from './types.js'
 
 export interface AuthRoutesOptions {
@@ -22,15 +22,16 @@ export interface AuthRoutesOptions {
 
 /**
  * The five auth endpoints as Lambda bodies: `POST magic-link`, `GET magic-link/verify?token=`,
- * `POST refresh`, `POST logout`, `GET me`. Each `handle` throws the engine's errors; wrap it with
- * the host's error envelope, honouring `fallbackResponse` / `clearCookiesOn401`, or use
- * {@link toLambdaHandler}.
+ * `POST refresh`, `POST logout`, `GET me`, plus `GET google/start?redirect=` and
+ * `GET google/callback` only when the engine has `google`. Each `handle` throws the engine's
+ * errors; wrap it with the host's error envelope, honouring `fallbackResponse` /
+ * `clearCookiesOn401`, or use {@link toLambdaHandler}.
  */
 export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthContext>(
   auth: MagicLinkAuth<TUser, TMe, TCtx>,
   options: AuthRoutesOptions,
 ) => {
-  const corsHeaders = guardCorsHeaders(options.corsHeaders)
+  const responseHeaders = createResponseHeaders(options.corsHeaders)
   const clientIp = createClientIpResolver<TCtx>(options.clientIp)
 
   const requestMeta = (event: LambdaEvent, ctx?: TCtx): RequestMeta => {
@@ -38,7 +39,7 @@ export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthC
   }
 
   const json = (statusCode: number, body: unknown): LambdaResult => {
-    return { statusCode, headers: corsHeaders(), body: JSON.stringify(body) }
+    return { statusCode, headers: responseHeaders(), body: JSON.stringify(body) }
   }
 
   const withCookies = (body: unknown, cookies: string[]): LambdaResult => {
@@ -54,7 +55,7 @@ export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthC
   const noContent = (): LambdaResult => {
     return {
       statusCode: 204,
-      headers: corsHeaders(),
+      headers: responseHeaders(),
       multiValueHeaders: { 'Set-Cookie': auth.clearCookies() },
       body: '',
     }
@@ -136,5 +137,47 @@ export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthC
     },
   }
 
-  return { requestMagicLink, verifyMagicLink, refresh, logout, me }
+  const redirect = (location: string, cookies: string[]): LambdaResult => {
+    return {
+      statusCode: 302,
+      headers: { ...responseHeaders(), Location: location },
+      ...(cookies.length > 0 ? { multiValueHeaders: { 'Set-Cookie': cookies } } : {}),
+      body: '',
+    }
+  }
+
+  // Both are full-page navigations, so a failure must land on the SPA's error page, never an envelope.
+  const googleRoutes = (google: NonNullable<MagicLinkAuth<TUser, TMe, TCtx>['google']>) => {
+    const googleStart: AuthRoute<TCtx> = {
+      handle: async (event) => {
+        const { redirect: redirectUrl } = event.queryStringParameters ?? {}
+        const started = google.start({ redirectUrl })
+
+        return redirect(started.location, [started.stateCookie])
+      },
+      fallbackResponse: () => {
+        return redirect(google.failureLocation('failed'), [])
+      },
+    }
+
+    const googleCallback: AuthRoute<TCtx> = {
+      handle: async (event, ctx) => {
+        const { code, state, error } = event.queryStringParameters ?? {}
+
+        const result = await google.complete(
+          { query: { code, state, error }, headers: event.headers, ...requestMeta(event, ctx) },
+          ctx,
+        )
+
+        return redirect(result.location, result.cookies)
+      },
+      fallbackResponse: () => {
+        return redirect(google.failureLocation('failed'), [google.clearStateCookie()])
+      },
+    }
+
+    return { googleStart, googleCallback }
+  }
+
+  return { requestMagicLink, verifyMagicLink, refresh, logout, me, ...(auth.google ? googleRoutes(auth.google) : {}) }
 }

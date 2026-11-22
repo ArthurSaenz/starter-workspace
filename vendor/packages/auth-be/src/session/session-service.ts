@@ -7,7 +7,7 @@ import type { AuthContext, AuthUser, SessionStore, StoredSession, UserStore } fr
 import type { RateGate } from '../rate-limit.js'
 import { ipBucket } from '../rate-limit.js'
 import { toMs } from '../time.js'
-import type { AccessTokenPayload, JwtIdentity } from '../tokens.js'
+import type { AccessTokenPayload, AuthMethod, JwtIdentity } from '../tokens.js'
 import { hashToken, verifyAccessToken, verifyRefreshToken } from '../tokens.js'
 import { createSessionIssuer } from './session-issuer.js'
 import type { AccessOnlyPair, RefreshResult, RefreshSessionInput } from './types.js'
@@ -58,6 +58,28 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
     return user
   }
 
+  // Revoke as well as refuse: the FE refreshes only on a 401, so after this 403 nothing else ends the
+  // rows, and a re-invite inside `refreshTtlSec` would revive them.
+  const loadAllowedUser = async (userId: string, ctx?: TCtx): Promise<TUser> => {
+    const user = await loadUser(userId, ctx)
+
+    if (deps.isAllowed(user)) return user
+
+    ctx?.logger?.warn('Authenticated request by a user who may no longer sign in; revoking every session', {
+      data: { userId: String(user.id) },
+    })
+
+    try {
+      await sessions.revokeAllForUser(String(user.id), ctx)
+    } catch (error) {
+      ctx?.logger?.error('Failed to revoke the sessions of a user who may no longer sign in', {
+        data: { name: errorName(error) },
+      })
+    }
+
+    throw fail(deps.notInvitedMessage, 'NOT_INVITED', 403)
+  }
+
   // An unparseable timestamp is expired, never "no expiry".
   const isExpired = (expiresAt: StoredSession['expiresAt']): boolean => {
     const expiresAtMs = toMs(expiresAt)
@@ -65,21 +87,28 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
     return !Number.isFinite(expiresAtMs) || expiresAtMs < Date.now()
   }
 
+  // Written so an unparseable `rotatedAt` (NaN) lands outside the window.
+  const withinGrace = (rotatedAt: Date | string): boolean => {
+    return Date.now() - toMs(rotatedAt) < deps.refreshGraceSec * 1000
+  }
+
   // Two tabs refreshing with one cookie: the later one presents a token the first rotated moments
   // ago. That is not theft, so inside the grace window it gets access to the successor session.
   const graceAccess = async (
     rotatedId: string,
-    rotatedAt: Date | string,
+    successor: StoredSession | null,
+    subject: string,
+    method: AuthMethod,
     ctx?: TCtx,
   ): Promise<AccessOnlyPair | null> => {
-    // Written so an unparseable `rotatedAt` (NaN) lands outside the window.
-    const withinGrace = Date.now() - toMs(rotatedAt) < deps.refreshGraceSec * 1000
-
-    if (!withinGrace) return null
-
-    const successor = await sessions.findSuccessor(rotatedId, ctx)
-
     if (!successor || successor.revokedAt || isExpired(successor.expiresAt)) return null
+
+    if (String(successor.userId) !== subject) {
+      ctx?.logger?.error('Refresh token subject does not match its session row', {
+        data: { sessionId: rotatedId, successorSessionId: String(successor.id) },
+      })
+      throw invalidSession()
+    }
 
     const user = await users.findById(successor.userId, ctx)
 
@@ -90,7 +119,35 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
       data: { userId: successor.userId, rotatedSessionId: rotatedId, successorSessionId: String(successor.id) },
     })
 
-    return issuer.grantAccess(user)
+    return issuer.grantAccess(user, method)
+  }
+
+  const refreshRevoked = async (
+    session: StoredSession,
+    revokedAt: Date | string,
+    subject: string,
+    method: AuthMethod,
+    ctx?: TCtx,
+  ): Promise<AccessOnlyPair> => {
+    const sessionId = String(session.id)
+    const successor = await sessions.findSuccessor(sessionId, ctx)
+    const grace = withinGrace(revokedAt) ? await graceAccess(sessionId, successor, subject, method, ctx) : null
+
+    if (grace) return grace
+
+    // Revoked by a logout or a revoke-all, not by rotation: no successor was handed out, so a
+    // replay of this token is not evidence of theft.
+    if (!successor) {
+      ctx?.logger?.warn('Refresh with a revoked, never-rotated token', { data: { userId: session.userId } })
+      throw invalidSession()
+    }
+
+    ctx?.logger?.warn('Refresh token reuse detected; revoking every session of the user', {
+      data: { userId: session.userId },
+    })
+    await sessions.revokeAllForUser(session.userId, ctx)
+
+    throw invalidSession()
   }
 
   const requireUser = (headers: HeaderBag): AccessTokenPayload => {
@@ -112,22 +169,19 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
     }
 
     const payload = verifyRefreshToken(refreshToken, deps.refreshSecret, identity, createError)
+    const method = payload.authMethod ?? 'magic'
     const session = await sessions.findByTokenHash(hashToken(refreshToken), ctx)
 
     if (!session) throw invalidSession()
 
-    if (session.revokedAt) {
-      const grace = await graceAccess(String(session.id), session.revokedAt, ctx)
+    const sessionId = String(session.id)
 
-      if (grace) return grace
-
-      ctx?.logger?.warn('Refresh token reuse detected; revoking every session of the user', {
-        data: { userId: session.userId },
-      })
-      await sessions.revokeAllForUser(session.userId, ctx)
-
+    if (String(session.userId) !== payload.sub) {
+      ctx?.logger?.error('Refresh token subject does not match its session row', { data: { sessionId } })
       throw invalidSession()
     }
+
+    if (session.revokedAt) return refreshRevoked(session, session.revokedAt, payload.sub, method, ctx)
 
     if (isExpired(session.expiresAt)) throw invalidSession()
 
@@ -146,13 +200,15 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
       throw fail(deps.notInvitedMessage, 'NOT_INVITED', 403)
     }
 
-    const rotated = await issuer.rotate(session, user, ctx)
+    const rotated = await issuer.rotate(session, user, method, ctx)
 
     if (rotated) return rotated
 
     // The `revokedAt` read above happens outside the rotation transaction, so two refreshes with one
     // live token both pass it and `rotate` settles the race under its row lock.
-    const grace = await graceAccess(String(session.id), new Date(), ctx)
+    const grace = withinGrace(new Date())
+      ? await graceAccess(sessionId, await sessions.findSuccessor(sessionId, ctx), payload.sub, method, ctx)
+      : null
 
     if (grace) return grace
 
@@ -181,11 +237,11 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
   ): Promise<{ payload: AccessTokenPayload; user: TUser }> => {
     const payload = requireUser(headers)
 
-    return { payload, user: await loadUser(payload.sub, ctx) }
+    return { payload, user: await loadAllowedUser(payload.sub, ctx) }
   }
 
   const getMe = async (payload: AccessTokenPayload, ctx?: TCtx): Promise<TMe> => {
-    return deps.toMe(await loadUser(payload.sub, ctx))
+    return deps.toMe(await loadAllowedUser(payload.sub, ctx))
   }
 
   return {
@@ -193,7 +249,11 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
     issueSession: issuer.issue,
     refreshSession,
     logout,
-    /** The verified access-token payload, or UNAUTHENTICATED / INVALID_ACCESS_TOKEN (401). */
+    /**
+     * The verified access-token payload, or UNAUTHENTICATED / INVALID_ACCESS_TOKEN (401). JWT only: a
+     * revoke reaches it when the access token expires (`accessTtlSec`); authorise from `authenticate`
+     * where that lag matters.
+     */
     requireUser,
     authenticate,
     getMe,

@@ -2,11 +2,11 @@ import { useEffect } from 'react'
 
 import { useAuth, useAuthStore } from '../../../lib/auth-context.js'
 import { useLatest } from '../../../lib/use-latest.js'
-import { safeRedirect } from '../services/libs.js'
+import { parseAuthRedirectError, safeRedirect } from '../services/libs.js'
 import type { AuthFormContainerProps } from '../types.js'
 
 export const AuthFormContainer = (props: AuthFormContainerProps) => {
-  const { redirect, onAuthenticated, render } = props
+  const { redirect, onAuthenticated, authError, render } = props
 
   const store = useAuthStore<unknown>()
 
@@ -32,5 +32,13 @@ export const AuthFormContainer = (props: AuthFormContainerProps) => {
       return store.submitEmail({ email: values.email, redirectUrl: safeRedirect(redirect) })
     },
     onUseDifferentEmail: store.resetSentEmail,
+    google: store.startGoogleSignIn
+      ? {
+          onStart: () => {
+            store.startGoogleSignIn!(safeRedirect(redirect))
+          },
+        }
+      : null,
+    authError: parseAuthRedirectError(authError),
   })
 }

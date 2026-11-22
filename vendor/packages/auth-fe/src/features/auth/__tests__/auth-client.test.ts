@@ -229,4 +229,41 @@ describe('createAuthClient', () => {
 
     await expect(createAuthClient({ paths: PATHS }).logout()).resolves.toBeUndefined()
   })
+
+  it('the client has no startGoogleSignIn without paths.googleStart', () => {
+    expect('startGoogleSignIn' in createAuthClient({ paths: PATHS })).toBe(false)
+  })
+
+  it('startGoogleSignIn navigates to the start path with a safe redirect', () => {
+    const navigate = vi.fn()
+
+    const client = createAuthClient({
+      paths: { ...PATHS, googleStart: '/api/v1/auth/google/start' },
+      baseUrl: 'https://api.example.com',
+      navigate,
+    })
+
+    client.startGoogleSignIn?.('/trips')
+    client.startGoogleSignIn?.('//evil.com')
+    client.startGoogleSignIn?.('/')
+    client.startGoogleSignIn?.()
+
+    expect(navigate.mock.calls).toEqual([
+      ['https://api.example.com/api/v1/auth/google/start?redirect=%2Ftrips'],
+      ['https://api.example.com/api/v1/auth/google/start'],
+      ['https://api.example.com/api/v1/auth/google/start'],
+      ['https://api.example.com/api/v1/auth/google/start'],
+    ])
+  })
+
+  it('startGoogleSignIn defaults to a full-page location.assign', () => {
+    const before = window.location.href
+
+    // A fragment-only target keeps the assign a same-document navigation, so the test page survives it.
+    createAuthClient({ paths: { ...PATHS, googleStart: '#google-start' } }).startGoogleSignIn?.('/')
+
+    expect(window.location.hash).toBe('#google-start')
+
+    window.history.replaceState(null, '', before)
+  })
 })

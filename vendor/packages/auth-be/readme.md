@@ -1,18 +1,19 @@
 # @wl/auth-be
 
-Passwordless (magic-link) authentication for a Lambda API: request a link → verify it → a
-15-minute access JWT + a 7-day rotating refresh JWT in `HttpOnly` cookies, refresh-token reuse
-detection, logout, `me`. It owns the flow and none of the storage: the host passes its user table,
+Passwordless authentication for a Lambda API: magic link (request a link → verify it) and, when the
+host configures it, Google sign-in. Either way the result is a 15-minute access JWT + a 7-day
+rotating refresh JWT in `HttpOnly` cookies, refresh-token reuse detection, logout, `me`. It owns the flow and none of the storage: the host passes its user table,
 token / session / rate-limit stores and mailer in as small interfaces (`src/ports.ts`). Frontend
 counterpart: `@wl/auth-fe`.
 
 A host can run several instances side by side (e.g. one over a customers table, one over a staff
-table); each host's wiring is one `createMagicLinkAuth(...)` call. A sibling API can call `verifySession` to
+table); each host's wiring is one `createMagicLinkAuth(...)` call. Google sign-in is optional
+(see [Google sign-in](#google-sign-in)). A sibling API can call `verifySession` to
 honour the same cookie.
 
 ## Portability contract
 
-- Runtime dependency: `jsonwebtoken`. No imports from `apps/*` or `packages/*`, no AWS SDK, no ORM.
+- Runtime dependency: `jsonwebtoken` (Google sign-in adds none: it uses `node:crypto` and the global `fetch`). No imports from `apps/*` or `packages/*`, no AWS SDK, no ORM.
   Copy `vendor/packages/auth-be` into another repo, `pnpm add jsonwebtoken`, build.
 - Errors are `AuthError { code, status }` unless the host passes `createError` to map them onto its
   own error class (e.g. a `ManagedError`, so the browser sees the same `type`).
@@ -21,35 +22,37 @@ honour the same cookie.
 
 ## Public API
 
-| Export                                                                                                                | What it is                                                                                                                                                                                                             |
-| --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `createMagicLinkAuth(config)`                                                                                         | The engine: `requestMagicLink`, `sendInviteLink`, `verifyMagicLink`, `refreshSession`, `logout`, `requireUser`, `authenticate`, `getMe`, `issueSession`, cookie helpers.                                               |
-| `createAuthRoutes(auth, { corsHeaders, clientIp, requestMagicLinkMessage? })`                                         | The five endpoints as Lambda bodies (`requestMagicLink`, `verifyMagicLink`, `refresh`, `logout`, `me`), each `{ handle, fallbackResponse?, clearCookiesOn401? }`. `clientIp` is required: see [Client IP](#client-ip). |
-| `extractSourceIp(event, trustedProxyHops = 0)`                                                                        | The rate-limit client IP: `sourceIp`, or the X-Forwarded-For entry `trustedProxyHops` from the right.                                                                                                                  |
-| `createAuthHandlers(auth, { corsHeaders, clientIp, requestMagicLinkMessage?, context?, toErrorResponse?, onError? })` | `createAuthRoutes` + `toLambdaHandler` in one call: the five endpoints as ready Lambda handlers.                                                                                                                       |
-| `toLambdaHandler(route, options)`                                                                                     | A complete handler for hosts without their own controller envelope (maps `AuthError`, honours fallback / clear-cookies).                                                                                               |
-| `verifySession(headers, { issuer, audience, accessSecret })`                                                          | For another service behind the same origin: the access-token payload or `null`. Fails closed.                                                                                                                          |
-| `signAccessToken` / `verifyAccessToken` / `signRefreshToken` / `verifyRefreshToken`                                   | HS256 with issuer + audience pinning. A signed token is `{ token, ttlSec }`, `ttlSec` being its lifetime in seconds.                                                                                                   |
-| `sanitizeRedirectUrl`, `extractAccessToken`, `extractRefreshToken`, `buildClearCookies`, …                            | The pure helpers the engine is built from.                                                                                                                                                                             |
+| Export                                                                                                                                                | What it is                                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createMagicLinkAuth(config)`                                                                                                                         | The engine: `requestMagicLink`, `sendInviteLink`, `verifyMagicLink`, `refreshSession`, `logout`, `requireUser`, `authenticate`, `getMe`, `issueSession`, cookie helpers, and `google` when configured.                                                                                                    |
+| `createAuthRoutes(auth, { corsHeaders, clientIp, requestMagicLinkMessage? })`                                                                         | The five endpoints as Lambda bodies (`requestMagicLink`, `verifyMagicLink`, `refresh`, `logout`, `me`), each `{ handle, fallbackResponse?, clearCookiesOn401? }`, plus the optional `googleStart` and `googleCallback` when the engine has `google`. `clientIp` is required: see [Client IP](#client-ip). |
+| `extractSourceIp(event, trustedProxyHops = 0)`                                                                                                        | The rate-limit client IP: `sourceIp`, or the X-Forwarded-For entry `trustedProxyHops` from the right.                                                                                                                                                                                                     |
+| `createAuthHandlers(auth, { corsHeaders, clientIp, requestMagicLinkMessage?, context?, toErrorResponse?, onError? })`                                 | `createAuthRoutes` + `toLambdaHandler` in one call: the five endpoints as ready Lambda handlers, plus `googleStart` and `googleCallback` when the engine has `google`.                                                                                                                                    |
+| `toLambdaHandler(route, options)`                                                                                                                     | A complete handler for hosts without their own controller envelope (maps `AuthError`, honours fallback / clear-cookies).                                                                                                                                                                                  |
+| `verifySession(headers, { issuer, audience, accessSecret })`                                                                                          | For another service behind the same origin: the access-token payload or `null`. Fails closed.                                                                                                                                                                                                             |
+| `signAccessToken` / `verifyAccessToken` / `signRefreshToken` / `verifyRefreshToken`                                                                   | HS256 with issuer + audience pinning. A signed token is `{ token, ttlSec }`, `ttlSec` being its lifetime in seconds.                                                                                                                                                                                      |
+| `sanitizeRedirectUrl`, `extractAccessToken`, `extractRefreshToken`, `buildClearCookies`, …                                                            | The pure helpers the engine is built from.                                                                                                                                                                                                                                                                |
+| Types `GoogleSignInConfig`, `GoogleIdentity`, `GoogleSignInError`, `GoogleSignIn`, `GoogleStartResult`, `GoogleCallbackInput`, `GoogleCallbackResult` | The Google config, the identity `resolveUser` receives, the `auth_error` reasons, and the shape of `auth.google`.                                                                                                                                                                                         |
 
 ### `createMagicLinkAuth` config
 
-| Key                                                                     | Required | Meaning                                                                                                                                                                                                                                                                                                                                               |
-| ----------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `users`                                                                 | yes      | `{ findByEmail, findById }` → a row with `id`, `email`, `invited?`, `roles?`. The engine never creates users.                                                                                                                                                                                                                                         |
-| `magicTokens`                                                           | yes      | `{ create, consumeByHash, release, invalidateByEmail }`. `consumeByHash` must be single-use (return and spend atomically); `release(tokenHash, record)` undoes a consume, never an invalidation: a store that deletes on consume re-inserts `record` only when no newer token exists for `record.email` (atomically). Only SHA-256 hashes are stored. |
-| `sessions`                                                              | yes      | `{ create, findByTokenHash, rotate, findSuccessor, revokeByTokenHash, revokeAllForUser }`. `rotate` must return `null` to the loser of a concurrent rotation; `findSuccessor(id)` returns the row `rotate(id, …)` inserted (e.g. via a `replaced_by` column), or `null`.                                                                              |
-| `rateLimiter`                                                           | yes      | `{ incrementAndCheck(key, limit, windowSec) }` → `{ allowed }`.                                                                                                                                                                                                                                                                                       |
-| `mailer`                                                                | yes      | `{ send({ to, subject, text, html }) }`. A throw invalidates the undelivered token.                                                                                                                                                                                                                                                                   |
-| `jwt`                                                                   | yes      | `{ accessSecret, refreshSecret, issuer, audience, accessTtlSec?, refreshTtlSec?, refreshGraceSec = 30 }`. Secrets ≥ 32 chars and different from each other, or construction throws.                                                                                                                                                                   |
-| `magicLink`                                                             | yes      | `{ baseUrl, verifyPath = '/auth/verify', ttlMin = 15, inviteTtlMin = 4320 }`.                                                                                                                                                                                                                                                                         |
-| `email`                                                                 | one of   | `{ subject, intro, linkLabel, expiryPrefix?, warning? }`: the copy for the built-in plain HTML email, HTML-escaped in its html part.                                                                                                                                                                                                                  |
-| `renderEmail`                                                           | one of   | `({ to, link, expMin, kind: 'sign-in' \| 'invite' }, ctx) => { to, subject, text, html }`, sync or async: host-owned templates (e.g. `@wl/auth-emails`).                                                                                                                                                                                              |
-| `toMe`                                                                  | yes      | Row → the `GET me` DTO.                                                                                                                                                                                                                                                                                                                               |
-| `uninvitedRequest`                                                      | no       | `'silent'` (default: public surface, same body for every address) or `'reject'` (NOT_INVITED 403, for internal tools). See "Timing" below.                                                                                                                                                                                                            |
-| `isAllowed`, `rolesOf`, `onSignIn`                                      | no       | Allowlist predicate (default `invited === true`), roles claim (default `roles ?? []`), sign-in side effects.                                                                                                                                                                                                                                          |
-| `minResponseMs`                                                         | no       | Floor on `requestMagicLink`'s response time, every outcome included (default 0). See "Timing" below.                                                                                                                                                                                                                                                  |
-| `cookies`, `rateLimits`, `validate`, `createError`, `notInvitedMessage` | no       | Cookie names/paths (default `access_token` `/`, `refresh_token` `/api/v1/auth`), budgets (5/email, 20/IP per hour…), validators, error mapping.                                                                                                                                                                                                       |
+| Key                                                                     | Required | Meaning                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users`                                                                 | yes      | `{ findByEmail, findById }` → a row with `id`, `email`, `invited?`, `roles?`. The engine never creates users.                                                                                                                                                                                                                                                                                                       |
+| `magicTokens`                                                           | yes      | `{ create, consumeByHash, release, invalidateByEmail }`. `consumeByHash` must be single-use (return and spend atomically); `release(tokenHash, record)` undoes a consume, never an invalidation: a store that deletes on consume re-inserts `record` only when no newer token exists for `record.email` (atomically). Only SHA-256 hashes are stored.                                                               |
+| `sessions`                                                              | yes      | `{ create, findByTokenHash, rotate, findSuccessor, revokeByTokenHash, revokeAllForUser }`. `findByTokenHash` returns the row whatever its state, revoked included; `rotate` must return `null` when the row is already rotated or revoked; `findSuccessor(id)` returns the row `rotate(id, …)` inserted (e.g. via a `replaced_by` column), or `null`. Run the [store contract kit](#store-contract-kit) against it. |
+| `rateLimiter`                                                           | yes      | `{ incrementAndCheck(key, limit, windowSec) }` → `{ allowed }`.                                                                                                                                                                                                                                                                                                                                                     |
+| `mailer`                                                                | yes      | `{ send({ to, subject, text, html }) }`. A throw invalidates the undelivered token.                                                                                                                                                                                                                                                                                                                                 |
+| `jwt`                                                                   | yes      | `{ accessSecret, refreshSecret, issuer, audience, accessTtlSec?, refreshTtlSec?, refreshGraceSec = 30 }`. Secrets ≥ 32 chars and different from each other, or construction throws.                                                                                                                                                                                                                                 |
+| `magicLink`                                                             | yes      | `{ baseUrl, verifyPath = '/auth/verify', ttlMin = 15, inviteTtlMin = 4320 }`.                                                                                                                                                                                                                                                                                                                                       |
+| `email`                                                                 | one of   | `{ subject, intro, linkLabel, expiryPrefix?, warning? }`: the copy for the built-in plain HTML email, HTML-escaped in its html part.                                                                                                                                                                                                                                                                                |
+| `renderEmail`                                                           | one of   | `({ to, link, expMin, kind: 'sign-in' \| 'invite' }, ctx) => { to, subject, text, html }`, sync or async: host-owned templates (e.g. `@wl/auth-emails`).                                                                                                                                                                                                                                                            |
+| `toMe`                                                                  | yes      | Row → the `GET me` DTO.                                                                                                                                                                                                                                                                                                                                                                                             |
+| `uninvitedRequest`                                                      | no       | `'silent'` (default: public surface, same body for every address) or `'reject'` (NOT_INVITED 403, for internal tools). See "Timing" below.                                                                                                                                                                                                                                                                          |
+| `isAllowed`, `rolesOf`, `onSignIn`                                      | no       | Allowlist predicate (default `invited === true`), roles claim (default `roles ?? []`), sign-in side effects.                                                                                                                                                                                                                                                                                                        |
+| `minResponseMs`                                                         | no       | Floor on `requestMagicLink`'s response time, every outcome included (default 0). See "Timing" below.                                                                                                                                                                                                                                                                                                                |
+| `google`                                                                | no       | `{ clientId, clientSecret, redirectUri, hostedDomains?, errorPath = '/auth/sign-in', resolveUser?, fetch? }`. Absent: the engine has no `google` member and no Google routes exist. See [Google sign-in](#google-sign-in).                                                                                                                                                                                          |
+| `cookies`, `rateLimits`, `validate`, `createError`, `notInvitedMessage` | no       | Cookie names/paths (default `access_token` `/`, `refresh_token` `/api/v1/auth`), budgets (5/email, 20/IP per hour…), validators, error mapping.                                                                                                                                                                                                                                                                     |
 
 `magicLink.baseUrl` must be an absolute http(s) URL and every TTL (`jwt.*TtlSec`, `magicLink.*TtlMin`) a
 positive integer, or construction throws: a bad TTL would otherwise fail only after verify spent the link.
@@ -61,8 +64,12 @@ Every flow takes its input object first and the host context second: `requestMag
 
 ### Invariants the engine keeps
 
-- No user row is ever created by auth; the allowlist is re-asked at request, verify **and** refresh,
-  and a refresh by a no-longer-allowed user revokes all their sessions.
+- No user row is ever created by auth; the allowlist is re-asked at request, verify, refresh,
+  `authenticate` **and** `getMe`. A refresh, `authenticate` or `getMe` by a no-longer-allowed user
+  answers `NOT_INVITED` 403 and revokes all their sessions, so a later re-invite starts clean. A
+  failed revoke is logged and the 403 stands. `requireUser` reads the JWT only, so a revoke reaches
+  it when the access token expires (`jwt.accessTtlSec`): authorise from `authenticate` where that
+  lag matters.
 - A replayed (already rotated) refresh token revokes every session of its user, unless it arrives
   within `jwt.refreshGraceSec` of its rotation while the successor session is still live: that is
   a second tab, and it gets an access token for the successor and no refresh cookie
@@ -74,6 +81,19 @@ Every flow takes its input object first and the host context second: `requestMag
   refresh inside the window answered with access to the thief's session, so theft is noticed only
   once the window closes. Every grace answer logs a warning
   (`Refresh answered from the grace window with a rotated token`, data `{ userId, rotatedSessionId, successorSessionId }`).
+- Only a rotated token counts as replayed. A token revoked by logout or a revoke-all has no
+  successor, so a refresh racing a logout fails alone (401, warning
+  `Refresh with a revoked, never-rotated token`) and the user's other sessions live on. Theft
+  detection therefore rests on `findSuccessor`: a store whose `findSuccessor` always returns `null`
+  turns every replay into a plain 401 and never revokes the thief's session. A store that prunes
+  rotated rows' successors loses reuse detection for those tokens, so prune only rows past their
+  `expiresAt`.
+- The session row must belong to the refresh token's subject (`String(session.userId) === sub`),
+  and so must a grace successor. A mismatch is a store bug: 401 `INVALID_REFRESH_TOKEN`, an error
+  log (`Refresh token subject does not match its session row`), no rotation and no revoke-all.
+  `String()` lets an adapter hand back a non-string id such as an `ObjectId`.
+- Every route response and every `toLambdaHandler` error carries `Cache-Control: no-store`, over
+  any value a host `corsHeaders` sets. See [Caching](#caching).
 - A verify that fails on a store or `onSignIn` error after consuming the link releases it, so the user can click again; an expired link or a refused address stays spent.
 - A released link re-runs `onSignIn` on the next click, so `onSignIn` must be idempotent.
 - `sendInviteLink` resolves `{ emailSent }`. `false` means the mailer or the template threw and the
@@ -123,6 +143,119 @@ honouring `fallbackResponse` and `clearCookiesOn401`:
 const routes = createAuthRoutes(auth, { corsHeaders, clientIp: { trustedProxyHops: 0 } })
 ```
 
+### Google sign-in
+
+Server-side authorization code flow with PKCE (S256), `state` and `nonce`: the browser only
+navigates, and the ID token never reaches it. A successful sign-in opens the same session as a magic
+link (same cookies, same session rows, same refresh and logout); its access token carries
+`authMethod: 'google'`, and that survives a refresh. No `google` key means one switch off: the engine
+has no `google` member and `createAuthRoutes` / `createAuthHandlers` return no Google routes.
+Before turning it on in a stage: an OAuth client for that stage in the Google console, its client ID
+and secret in the secret store, the exact callback URI registered, `__Secure-google_oauth` on the
+CloudFront cookie allowlist, and outbound HTTPS for the Lambdas (below).
+
+Wiring:
+
+```ts
+const auth = createMagicLinkAuth<Customer, Me, Options>({
+  // …as above…
+  google: {
+    clientId,
+    clientSecret, // from Doppler, never committed
+    redirectUri: 'https://app.example.com/api/v1/auth/google/callback',
+    // hostedDomains: ['example.com'], // staff tools: only these Workspace domains may sign in
+    // resolveUser: async (identity, ctx) => customers.findByGoogleSub(identity.sub, ctx),
+  },
+})
+
+const handlers = createAuthHandlers(auth, { corsHeaders, clientIp: { trustedProxyHops: 0 } })
+
+// The keys are optional, so narrow once; the config says Google is on.
+if (!handlers.googleStart || !handlers.googleCallback) throw new Error('google sign-in is not configured')
+
+export const googleStart = handlers.googleStart
+export const googleCallback = handlers.googleCallback
+```
+
+Two serverless routes, both `GET`, both answer a `302` with `Location` and `Cache-Control: no-store`:
+
+| Route            | Path (as you map it)                  | Reads                                        |
+| ---------------- | ------------------------------------- | -------------------------------------------- |
+| `googleStart`    | any, e.g. `/api/v1/auth/google/start` | `?redirect=` (sanitised like a magic link's) |
+| `googleCallback` | the path of `redirectUri`             | `code`, `state`, `error`                     |
+
+Because the keys are optional, `(typeof routes)[keyof typeof routes]` now includes `undefined`. A host
+that indexes the routes generically wraps it in `NonNullable<…>`.
+
+**Google console.** Register the redirect URI verbatim, one per stage: scheme, host, path, no
+trailing slash and no fragment. Google compares it byte for byte
+([Web server OAuth: redirect URI validation](https://developers.google.com/identity/protocols/oauth2/web-server)),
+and the same `redirectUri` goes to the authorization request and the code exchange. Construction
+throws unless `redirectUri` is absolute, `https:` (or `http:` on `localhost`, `127.0.0.1` or
+`*.localhost`), has no `#`, and is on the same origin as `magicLink.baseUrl`: the callback sets the
+session cookies, so it must answer on the origin the SPA reads them from. `errorPath` must survive
+`sanitizeRedirectUrl` unchanged and carry no `?` or `#`, and `hostedDomains`, when set, must be a non-empty list of non-empty
+strings (an empty list would refuse everyone, so it throws).
+
+**Outbound HTTPS.** The callback calls Google's token endpoint and fetches its signing keys
+(`https://www.googleapis.com/oauth2/v3/certs`, cached by `Cache-Control`; a failed refresh keeps the
+cached keys and retries after 60 s, logging `Google JWKS refresh failed`), with a 5 s timeout. A
+Lambda in a VPC needs a NAT gateway (or an equivalent egress) for that; without one every sign-in
+ends `failed` at step `token-exchange`.
+
+**The state cookie.** `start` sets `__Secure-google_oauth`: a signed JWT holding `state`, `nonce`, the
+PKCE verifier and the sanitised redirect, `HttpOnly; Secure; SameSite=Lax; Path=<the pathname of
+redirectUri>; Max-Age=600`. It is cleared on every outcome. `Lax` lets it ride the top-level GET back
+from Google; it binds the callback to the browser that started the flow (login CSRF). The
+CloudFront behaviour for the callback must forward this cookie name, or every sign-in ends
+`invalid_state`. There is one slot per browser: a second tab's start overwrites the first, whose
+callback then ends `invalid_state`; the user retries in one tab.
+
+**PKCE and leaked codes.** The authorization code reaches the callback in a query string, so it can
+land in CloudFront or API Gateway access logs. The code is useless without the PKCE verifier, which
+lives only in the signed cookie, and it is single-use and short-lived at Google.
+
+**Who is let in.** `email_verified` and `hostedDomains` are always enforced (the ID token's `hd`
+claim must be one of the domains, case-insensitive), and `isAllowed` always applies. No user is ever
+created. The ID token is verified against Google's JWKS with RS256 only: signature, `iss`
+(`https://accounts.google.com` or `accounts.google.com`), `aud` = `clientId`, `nonce`, `exp`, with
+numeric `exp` and `iat` and non-empty `sub` and `email`
+([OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect),
+[verify an ID token](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token)).
+
+- Default (no `resolveUser`): the email must be one Google is authoritative for, a `@gmail.com`
+  address or an ID token with an `hd` claim, and is matched through `users.findByEmail` (lower-cased).
+  Any other address, such as a personal Google account on a custom domain, is refused.
+- With `resolveUser(identity, ctx)`: its answer is final. `null` or `undefined` refuses, with no email
+  fallback. It receives `{ sub, email, emailVerified, emailAuthoritative, hostedDomain }` plus the host
+  context, after the `email_verified` and `hostedDomains` checks. Accepting an identity with
+  `emailAuthoritative: false` is the host's risk.
+- Gmail aliases are not normalised: `@googlemail.com`, dots in the local part and `+tags` do not match
+  a stored `@gmail.com` row, and only case is folded.
+
+**`sub` is the stable identifier, not the email.** Google documents that an address can be reassigned
+to a different person, while `sub` never is. The email default trusts the address, so a user row
+whose address Google later hands to someone else would admit that person. A host that cares links by
+`sub`: add a `googleSub` column to the user table, make `resolveUser` look the row up by
+`identity.sub` and, on first sign-in, bind it after matching the email (and the `hostedDomain`).
+
+**Failures.** Every failure is a `302` to `${baseUrl}${errorPath}?auth_error=<reason>`, with
+`&redirect=<encoded>` appended when the redirect is not `/` (`invalid_state` never carries one: the
+redirect is unknown until the cookie proves authentic). The reason is a closed list; the log `step`
+says where it broke, for log searches:
+
+| `auth_error`    | Means                                       | Log `step`                                                                            |
+| --------------- | ------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `cancelled`     | The user closed Google's consent screen.    | `provider-error` (logged at info)                                                     |
+| `invalid_state` | No, forged, expired or mismatched state.    | `missing-cookie`, `bad-signature`, `expired`, `mismatch`                              |
+| `not_allowed`   | Google answered, this user may not sign in. | `email`, `hosted-domain`, `user`                                                      |
+| `rate_limited`  | The per-IP budget is spent.                 | `rate-limit`                                                                          |
+| `failed`        | Anything else.                              | `provider-error` (other Google errors), `token-exchange`, `jwks`, `id-token`, `store` |
+
+The `Google sign-in failed` log carries `{ data: { reason, step } }` and never a token, code, email or
+Google `sub`; cancellations log at info, store errors at error, the rest at warn. The rate budget is
+`rateLimits.perIpVerify`, keyed `${keyPrefix}:google:ip:<ip>`.
+
 ### Client IP
 
 The per-IP rate limits key on the client IP. Everything left of the hops you trust in
@@ -145,21 +278,82 @@ With `0`, the routes log one warning per `createAuthRoutes` instance when the le
 `{ forwardedCount }`): that is what a CloudFront in front looks like. A spoofed header triggers it
 too.
 
+### Caching
+
+`/me`, verify and refresh answer per user, so no cache may keep them. The CloudFront behaviour in
+front of the auth routes must use the managed `CachingDisabled` cache policy, or a policy with
+MinTTL = 0: with MinTTL above 0, CloudFront caches a response despite `Cache-Control: no-store`
+([CloudFront: managing how long content stays in the cache](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Expiration.html)).
+The `no-store` the engine sets is defence in depth, not the control.
+
+A host with its own controller envelope (bare `createAuthRoutes`, no `toLambdaHandler`) gets
+`no-store` on every route response, and adds `Cache-Control: no-store` to its own error responses.
+
+### Store contract kit
+
+The types cannot say that a consume is single-use or a rotation atomic, and an in-memory fake cannot
+race. `@wl/auth-be/testing` exports those rules as cases that need no test runner: each is
+`{ name, securityCritical, run(makeStore) }`, and `run` rejects with `Store contract: …` when the
+store breaks the rule. Every case uses fresh random emails, ids and keys, so it can run against a
+shared dev database. Run them in the host's suite against the real adapter and database:
+
+```ts
+import { magicTokenStoreContract, rateLimiterContract, sessionStoreContract } from '@wl/auth-be/testing'
+
+describe('session store', () => {
+  for (const c of sessionStoreContract) it(c.name, () => c.run(makeMongoSessions))
+})
+```
+
+The security-critical cases (`securityCritical: true`); a store that fails one lets a stolen or
+replayed token through:
+
+| Case                                                                                | What a failure means                                                                |
+| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `10 concurrent consumes return the token exactly once`                              | One link signs in more than once.                                                   |
+| `release after a newer token for the same email leaves the old one dead`            | A superseded link comes back to life after a failed sign-in.                        |
+| `10 concurrent rotates of one id: exactly one wins and one successor row exists`    | One refresh token forks into several live sessions.                                 |
+| `findByTokenHash returns a revoked row with revokedAt set`                          | A replayed token reads as unknown, and reuse goes unnoticed.                        |
+| `after rotate, the old row is returned with revokedAt set`                          | A rotated token still refreshes.                                                    |
+| `findSuccessor returns the successor while findByTokenHash(old) still returns old`  | A replay is a plain 401 and the thief's session lives on.                           |
+| `findSuccessor returns a successor that has since been rotated, with revokedAt set` | A replay two or more rotations old is a plain 401 and the thief's session lives on. |
+
+## Known residual risks
+
+Accepted on purpose; each has what a host does about it.
+
+| Risk                                                                                                                                                                                                                                    | What the host does                                                                                                                                                                                                       |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Cookies are fixed at `HttpOnly; Secure; SameSite=Lax`, host-only. Safari refuses a `Secure` cookie on `http://localhost`; Chrome and Firefox accept it there.                                                                           | Develop locally in Chrome or Firefox, or over https.                                                                                                                                                                     |
+| Anyone can spend a victim's per-email budget (5 links/hour): in `silent` mode the caller sees OK and the victim gets nothing. Keying by email + IP would reopen mail bombing from rotating IPs.                                         | Tune `rateLimits` if it bites; staff can sign in with Google meanwhile, which has no per-email budget. Rate-limit warnings log the raw client IP, on purpose.                                                            |
+| Login CSRF on verify: an attacker can make a victim's browser redeem the attacker's link and land in the attacker's account. Low impact on invite-only tools: it needs an allowed account, and the victim sees the attacker's identity. | Nothing: accepted for invite-only tools. Google sign-in does not have this half: the state cookie binds the callback to the browser that started it.                                                                     |
+| The raw link token rides in a GET query string (to the SPA, then `GET verify`), so it can land in CloudFront or API Gateway access logs. It is single-use, hashed at rest, and dies in 15 min (72 h for an invite).                     | Keep query strings out of CloudFront standard logs, or restrict who reads them. A Google `code` in a log is useless: see [Google sign-in](#google-sign-in).                                                              |
+| FE: a `/me` failure that is not a 401 (5xx, network) settles `unauthenticated`, so a blip sends the user to sign-in with valid cookies. Fail-closed by design.                                                                          | Nothing: the cookies are still valid, so a reload once the API answers restores the session.                                                                                                                             |
+| Email matching: the engine lower-cases the address, then calls `findByEmail(lowercased)`. A row stored as `Ada@example.com` never matches.                                                                                              | Store emails lower-cased, or look them up case-insensitively; migrate existing rows. The same holds for Google, and Gmail aliases (`@googlemail.com`, dots, `+tags`) are separate strings the engine does not normalise. |
+| The Lambda adapter reads API Gateway REST (v1) events only.                                                                                                                                                                             | For HTTP API (v2), call the engine directly (see [Extending](#extending)).                                                                                                                                               |
+| `rateLimits.keyPrefix` defaults to `'magic'` and also namespaces the refresh budget. The name is historical; renaming it would re-key live budgets.                                                                                     | Keep it.                                                                                                                                                                                                                 |
+| A de-invited user's open tab hits `authenticate` on every request until the access token expires, and each one repeats `revokeAllForUser`.                                                                                              | Make `revokeAllForUser` a single conditional update (`UPDATE … SET revoked_at = now() WHERE user_id = ? AND revoked_at IS NULL`, Mongo `updateMany({ userId, revokedAt: null }, …)`), so the repeats stay cheap.         |
+| Google's `sub`, not the address, is the stable identity; the default email match trusts an address Google may reassign.                                                                                                                 | Link by `sub`: `resolveUser` and a `googleSub` column (see [Google sign-in](#google-sign-in)).                                                                                                                           |
+| One Google sign-in per browser at a time: a second tab's start overwrites the state cookie and the first tab ends `invalid_state`.                                                                                                      | Nothing: the user retries in one tab.                                                                                                                                                                                    |
+
 ## Layout
 
-One folder per concern; `src/index.ts` is the only public entry, so files can move without touching
-a host.
+One folder per concern; `src/index.ts` is the only public entry (plus `src/testing/index.ts` for the
+store contract kit), so files can move without touching a host.
 
-| Path                     | Owns                                                                                                                                                                                   |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ports.ts`               | What the host implements: user / token / session stores, rate limiter, mailer, logger.                                                                                                 |
-| `errors.ts`, `tokens.ts` | `AuthError` and its codes; JWT signing and verifying, raw link tokens.                                                                                                                 |
-| `rate-limit.ts`          | Budgets, their defaults, and the gate every flow counts against.                                                                                                                       |
-| `http/`                  | Framework-free request helpers: `headers.ts`, `cookies.ts`, `redirect.ts`.                                                                                                             |
-| `session/`               | What a session does whichever way it was opened: `session-issuer.ts` (mint, rotate), `session-service.ts` (refresh, logout, request readers), `verify-session.ts` (for a sibling API). |
-| `magic-link/`            | The sign-in method: `config.ts`, `validation.ts`, `email.ts` (built-in template), `sender.ts` (mint + mail), `magic-link-auth.ts` (the engine that wires it to `session/`).            |
-| `lambda/`                | The API Gateway adapter: `client-ip.ts`, `cors-headers.ts`, `routes.ts`, `handler.ts`. Nothing outside it knows about Lambda.                                                          |
-| `e2e-login.ts`           | The test-only sign-in, built on `issueSession`.                                                                                                                                        |
+| Path                               | Owns                                                                                                                                                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `create-auth.ts`, `auth-config.ts` | The composition root: the host config and `createMagicLinkAuth`, which wires `session/` and the sign-in method from it.                                                                                |
+| `ports.ts`                         | What the host implements: user / token / session stores, rate limiter, mailer, logger.                                                                                                                 |
+| `errors.ts`, `tokens.ts`           | `AuthError` and its codes; JWT signing and verifying, raw link tokens.                                                                                                                                 |
+| `rate-limit.ts`                    | Budgets, their defaults, and the gate every flow counts against.                                                                                                                                       |
+| `http/`                            | Framework-free request helpers: `headers.ts`, `cookies.ts`, `redirect.ts`.                                                                                                                             |
+| `session/`                         | What a session does whichever way it was opened: `session-issuer.ts` (mint, rotate), `session-service.ts` (refresh, logout, request readers), `verify-session.ts` (for a sibling API).                 |
+| `google/`                          | The Google sign-in method: `config.ts` (the config and its checks), `google-sign-in.ts` (start, callback, user resolution), `id-token.ts` (JWKS, ID-token verification), `state-cookie.ts`, `pkce.ts`. |
+| `magic-link/`                      | The sign-in method: `config.ts`, `validation.ts`, `email.ts` (built-in template), `sender.ts` (mint + mail), `magic-link-flows.ts` (request, invite, verify).                                          |
+| `lambda/`                          | The API Gateway adapter: `client-ip.ts`, `cors-headers.ts`, `routes.ts`, `handler.ts`. Nothing outside it knows about Lambda.                                                                          |
+| `testing/`                         | The store contract kit (`@wl/auth-be/testing`): no runner, no dependency.                                                                                                                              |
+| `e2e-login.ts`                     | The test-only sign-in, built on `issueSession`.                                                                                                                                                        |
 
 Tests sit in the `__tests__/` beside the code they cover; the in-memory stores and the sign-in round
 trip they share are in `src/__tests__/helpers/`. `pnpm run test-report` enforces 100% coverage.
@@ -169,7 +363,7 @@ trip they share are in `src/__tests__/helpers/`. `pnpm run test-report` enforces
 - Another storage, mailer or rate limiter: implement the interface in `ports.ts`; nothing else changes.
 - Another transport (Express, Fastify, API Gateway v2): call the engine's methods directly, the way
   `lambda/routes.ts` does. Only `lambda/` reads a Lambda event.
-- Another way to sign in: resolve the user your own way, then call `auth.issueSession(user, meta, ctx)`
+- Another way to sign in (Google is one, built this way): resolve the user your own way, then call `auth.issueSession(user, meta, ctx)`
   for the same cookies and session row. `e2e-login.ts` is the worked example.
 - Host-specific behaviour goes through config (`isAllowed`, `rolesOf`, `onSignIn`, `validate`,
   `renderEmail`, `createError`), never through a fork of the engine.
