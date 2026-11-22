@@ -1,7 +1,7 @@
 # @wl/auth-fe
 
-Headless magic-link authentication for React: the API client, the session store, the single-flight
-`fetchMe` with a silent refresh-then-retry on 401, verify, logout, `safeRedirect`, a provider with
+Headless magic-link and (optional) Google authentication for React: the API client, the session store, the single-flight
+`fetchMe` with a silent refresh-then-retry on 401, verify, logout, the Google sign-in redirect, `safeRedirect`, a provider with
 hooks, and render-prop containers for the sign-in form, the verify page, the user menu and an auth
 guard. It renders no markup of its own — every visible piece (form, spinner, menu, access-denied
 screen) is the host's, passed in through `render` props, and navigation reaches the host only as
@@ -19,6 +19,9 @@ Root barrel (`src/index.ts`, re-exporting `src/features/auth/index.ts`):
 - `createAuthClient<TUser>(options)` → `AuthClient<TUser>` (`services/api.ts`). Plain `fetch`,
   JSON bodies, `credentials: 'same-origin'` by default. Options:
   - `paths: { requestMagicLink, verifyMagicLink, me, refresh, logout }` — required.
+  - `paths.googleStart` — optional: the API's Google start route. Unset means Google sign-in is off.
+  - `navigate(url)` — performs the full-page Google redirect; default `window.location.assign`,
+    looked up at call time (a test passes a stub).
   - `baseUrl` (default `''`), `fetch` (default the global, looked up at call time so a stub installed
     later is still used), `credentials`.
   - `refresh` — replaces the client's own `POST paths.refresh`. A host that refreshes from more than
@@ -31,7 +34,9 @@ Root barrel (`src/index.ts`, re-exporting `src/features/auth/index.ts`):
   GET `${paths.verifyMagicLink}?token=…`, `errorCode` is the body's `type` on a non-2xx (or on a 2xx
   without `ok: true`). A JSON body is read only when the response says `application/json`; a `me`
   body that is not a JSON object rejects with `type: 'INVALID_RESPONSE'` (no refresh). GETs send no
-  `content-type`; POSTs always send `application/json`.
+  `content-type`; POSTs always send `application/json`. `startGoogleSignIn(redirect?)` exists only
+  when `paths.googleStart` is set: it navigates to `${baseUrl}${paths.googleStart}`, adding
+  `?redirect=<encoded safeRedirect(redirect)>` unless that is `/`. See [Google sign-in](#google-sign-in).
 
 - `createAuthStore<TUser>(client, options?)` → `AuthStore<TUser>` (`services/main.ts`). A
   framework-agnostic external store: `getState()`, `subscribe(listener)`, and the actions
@@ -51,6 +56,7 @@ Root barrel (`src/index.ts`, re-exporting `src/features/auth/index.ts`):
   - `logout()` — always ends `unauthenticated` + `null`, even when the request fails; a `/me` sent
     before it never publishes.
   - `refresh()` — the client's refresh.
+  - `startGoogleSignIn?(redirect?)` — the client's, present only when `paths.googleStart` is set.
 
   `options.initialState` seeds any part of `AuthState` (tests, SSR hydration).
 
@@ -60,10 +66,13 @@ Root barrel (`src/index.ts`, re-exporting `src/features/auth/index.ts`):
   outside a provider) and `useAuth(selector?)` (`useSyncExternalStore` over the store; the server
   snapshot is the same read). Return a primitive or a stored reference from `selector`.
 - Containers (`containers/`), all render-prop and headless:
-  - `AuthFormContainer({ redirect?, onAuthenticated, render })` — resolves an `unknown` session with
+  - `AuthFormContainer({ redirect?, onAuthenticated, authError?, render })` — resolves an `unknown` session with
     `fetchMe`; once `authenticated`, calls `onAuthenticated(safeRedirect(redirect))`. `render` gets
-    `{ status, loading, sentToEmail, error, onSubmit({ email }), onUseDifferentEmail }`; `onSubmit`
-    sends `redirectUrl: safeRedirect(redirect)` and resolves `{ ok, email }` (toast it in the host).
+    `{ status, loading, sentToEmail, error, onSubmit({ email }), onUseDifferentEmail, google, authError }`;
+    `onSubmit` sends `redirectUrl: safeRedirect(redirect)` and resolves `{ ok, email }` (toast it in the
+    host). `google` is `{ onStart }` when the store has `startGoogleSignIn`, else `null`; `authError`
+    is the parsed `authError` prop (below). The container also takes `authError?`: the router's
+    `auth_error` search param.
   - `AuthVerifyContainer({ token?, redirect?, onVerified, render })` — no token → `error`; otherwise
     `loading` → `verify` (which loads the user) → `onVerified(safeRedirect(response.redirect ?? redirect))`,
     or `error` when the token fails or no user was loaded. `render(state)` with `'idle' | 'loading' | 'error'`.
@@ -79,10 +88,12 @@ Root barrel (`src/index.ts`, re-exporting `src/features/auth/index.ts`):
 
 - `safeRedirect(value?)` — the value when it is a string and an in-app path (`/…`, not `//…`, no backslash,
   `:` or control character, no dot segments that resolve to `//…`, no percent-decoded path that starts with `//` or holds a backslash or fails to decode, at most 2048 characters), else `'/'`. Browsers read `/\evil.com` as `//evil.com`.
+- `parseAuthRedirectError(value)` — the `auth_error` value as an `AuthRedirectError`, or `null` for
+  anything else (unknown text, a non-string).
 - `AuthHttpError`, `isUnauthorized(error)` (duck-typed on `status === 401`, so a custom `AuthClient`
   only has to throw something carrying `status`), `DEFAULT_REQUEST_ERROR_TEXT`.
 - Types: `AuthClient`, `AuthClientOptions`, `AuthPaths`, `AuthStore`, `AuthStoreOptions`, `AuthState`,
-  `AuthStatus`, `AuthProviderProps`, `AuthFormContainerProps`, `AuthFormRenderProps`,
+  `AuthStatus`, `AuthRedirectError`, `AuthProviderProps`, `AuthFormContainerProps`, `AuthFormRenderProps`,
   `AuthVerifyContainerProps`, `AuthVerifyState`, `UserMenuContainerProps`,
   `RequireAuthContainerProps`, `SessionRenderProps`, `MagicLinkRequest`, `MagicLinkResult`,
   `VerifyMagicLinkResult`.
@@ -103,6 +114,53 @@ const authStore = createAuthStore(createAuthClient<User>({ paths: AUTH_PATHS }))
 />
 ```
 
+## Google sign-in
+
+Off until the host sets `paths.googleStart`; with it unset nothing about Google appears (`form.google`
+is `null`). The flow is a full-page navigation: the button calls `form.google.onStart`, the API
+redirects to Google and back, sets the same session cookies as a magic link and lands the browser on
+the page named by `redirect`. On failure it lands on the API's `errorPath` (default `/auth/sign-in`)
+with `?auth_error=<reason>`, plus `&redirect=…` when there was one.
+
+```tsx
+const authStore = createAuthStore(
+  createAuthClient<User>({ paths: { ...AUTH_PATHS, googleStart: '/api/v1/auth/google/start' } }),
+)
+
+// sign-in page: `auth_error` is the router's search param
+;<AuthFormContainer
+  redirect={redirect}
+  authError={auth_error}
+  onAuthenticated={(to) => navigate({ to, replace: true })}
+  render={(form) => (
+    <>
+      {form.authError && <p>{AUTH_ERROR_TEXT[form.authError]}</p>}
+      <SignInForm {...form} />
+      {form.google && <button onClick={form.google.onStart}>Continue with Google</button>}
+    </>
+  )}
+/>
+```
+
+`authError` is one of five reasons, the same list the API appends (see the `@wl/auth-be` readme):
+
+| `AuthRedirectError` | Show                                                     |
+| ------------------- | -------------------------------------------------------- |
+| `cancelled`         | The user closed Google's screen: usually nothing.        |
+| `invalid_state`     | The attempt expired or came from another tab: try again. |
+| `not_allowed`       | This Google account may not sign in here.                |
+| `rate_limited`      | Too many attempts: wait a little.                        |
+| `failed`            | Something went wrong: try again, or use the email link.  |
+
+The copy is the host's. Once the message is shown, the host should drop `auth_error` from the URL
+(`navigate({ replace: true })` without it), or a reload shows it again. An unknown value renders as
+`authError: null`.
+
+**Native apps.** Google refuses OAuth in embedded user agents, so a Capacitor or other WebView build
+cannot use this flow: the sign-in ends on a Google error page. Do not render the button there (leave
+`googleStart` unset in the native build, or skip `form.google`); use the magic link, or a
+system-browser flow of the host's own.
+
 ## Portability contract
 
 - No runtime `dependencies`; `react` (>= 19: the provider renders `<Context value>`) is the only peer.
@@ -113,7 +171,9 @@ const authStore = createAuthStore(createAuthClient<User>({ paths: AUTH_PATHS }))
 - No styles and no class names — a host needs no stylesheet import and no Tailwind `@source`.
 - The API it expects: cookie sessions (no tokens in JS), `POST requestMagicLink { email, redirectUrl? }`,
   `GET verifyMagicLink?token=` → `{ ok: true, redirect? }` (sets the cookies), `GET me` → the user
-  object unwrapped, `POST refresh`, `POST logout`; error bodies `{ type, message }`.
+  object unwrapped, `POST refresh`, `POST logout`; error bodies `{ type, message }`. With Google on:
+  `GET googleStart?redirect=` answers a 302 to Google and a failed sign-in comes back as
+  `?auth_error=<reason>` on the sign-in page.
 - Relative imports carry `.js`, so `tsc -b` output runs under Node ESM as well
   as a bundler.
 
@@ -126,7 +186,7 @@ To verify a copy (not automated):
 
 ## Layout
 
-- `src/features/auth/services/` — `api.ts` (the client), `main.ts` (the store), `libs.ts` (`safeRedirect`).
+- `src/features/auth/services/` — `api.ts` (the client), `main.ts` (the store), `libs.ts` (`safeRedirect`, `parseAuthRedirectError`).
 - `src/lib/` — `auth-context.ts` (context + hooks), `use-latest.ts`, `use-logout.ts` (the `onLogout` the
   session containers share), and `auth-types.ts`, the types the hooks need (re-exported from
   `features/auth/types.ts`).

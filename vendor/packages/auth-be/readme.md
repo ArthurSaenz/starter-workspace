@@ -1,18 +1,19 @@
 # @wl/auth-be
 
-Passwordless (magic-link) authentication for a Lambda API: request a link → verify it → a
-15-minute access JWT + a 7-day rotating refresh JWT in `HttpOnly` cookies, refresh-token reuse
-detection, logout, `me`. It owns the flow and none of the storage: the host passes its user table,
+Passwordless authentication for a Lambda API: magic link (request a link → verify it) and, when the
+host configures it, Google sign-in. Either way the result is a 15-minute access JWT + a 7-day
+rotating refresh JWT in `HttpOnly` cookies, refresh-token reuse detection, logout, `me`. It owns the flow and none of the storage: the host passes its user table,
 token / session / rate-limit stores and mailer in as small interfaces (`src/ports.ts`). Frontend
 counterpart: `@wl/auth-fe`.
 
 A host can run several instances side by side (e.g. one over a customers table, one over a staff
-table); each host's wiring is one `createMagicLinkAuth(...)` call. A sibling API can call `verifySession` to
+table); each host's wiring is one `createMagicLinkAuth(...)` call. Google sign-in is optional
+(see [Google sign-in](#google-sign-in)). A sibling API can call `verifySession` to
 honour the same cookie.
 
 ## Portability contract
 
-- Runtime dependency: `jsonwebtoken`. No imports from `apps/*` or `packages/*`, no AWS SDK, no ORM.
+- Runtime dependency: `jsonwebtoken` (Google sign-in adds none: it uses `node:crypto` and the global `fetch`). No imports from `apps/*` or `packages/*`, no AWS SDK, no ORM.
   Copy `vendor/packages/auth-be` into another repo, `pnpm add jsonwebtoken`, build.
 - Errors are `AuthError { code, status }` unless the host passes `createError` to map them onto its
   own error class (e.g. a `ManagedError`, so the browser sees the same `type`).
@@ -21,16 +22,17 @@ honour the same cookie.
 
 ## Public API
 
-| Export                                                                                                                | What it is                                                                                                                                                                                                             |
-| --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `createMagicLinkAuth(config)`                                                                                         | The engine: `requestMagicLink`, `sendInviteLink`, `verifyMagicLink`, `refreshSession`, `logout`, `requireUser`, `authenticate`, `getMe`, `issueSession`, cookie helpers.                                               |
-| `createAuthRoutes(auth, { corsHeaders, clientIp, requestMagicLinkMessage? })`                                         | The five endpoints as Lambda bodies (`requestMagicLink`, `verifyMagicLink`, `refresh`, `logout`, `me`), each `{ handle, fallbackResponse?, clearCookiesOn401? }`. `clientIp` is required: see [Client IP](#client-ip). |
-| `extractSourceIp(event, trustedProxyHops = 0)`                                                                        | The rate-limit client IP: `sourceIp`, or the X-Forwarded-For entry `trustedProxyHops` from the right.                                                                                                                  |
-| `createAuthHandlers(auth, { corsHeaders, clientIp, requestMagicLinkMessage?, context?, toErrorResponse?, onError? })` | `createAuthRoutes` + `toLambdaHandler` in one call: the five endpoints as ready Lambda handlers.                                                                                                                       |
-| `toLambdaHandler(route, options)`                                                                                     | A complete handler for hosts without their own controller envelope (maps `AuthError`, honours fallback / clear-cookies).                                                                                               |
-| `verifySession(headers, { issuer, audience, accessSecret })`                                                          | For another service behind the same origin: the access-token payload or `null`. Fails closed.                                                                                                                          |
-| `signAccessToken` / `verifyAccessToken` / `signRefreshToken` / `verifyRefreshToken`                                   | HS256 with issuer + audience pinning. A signed token is `{ token, ttlSec }`, `ttlSec` being its lifetime in seconds.                                                                                                   |
-| `sanitizeRedirectUrl`, `extractAccessToken`, `extractRefreshToken`, `buildClearCookies`, …                            | The pure helpers the engine is built from.                                                                                                                                                                             |
+| Export                                                                                                                                                | What it is                                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createMagicLinkAuth(config)`                                                                                                                         | The engine: `requestMagicLink`, `sendInviteLink`, `verifyMagicLink`, `refreshSession`, `logout`, `requireUser`, `authenticate`, `getMe`, `issueSession`, cookie helpers, and `google` when configured.                                                                                                    |
+| `createAuthRoutes(auth, { corsHeaders, clientIp, requestMagicLinkMessage? })`                                                                         | The five endpoints as Lambda bodies (`requestMagicLink`, `verifyMagicLink`, `refresh`, `logout`, `me`), each `{ handle, fallbackResponse?, clearCookiesOn401? }`, plus the optional `googleStart` and `googleCallback` when the engine has `google`. `clientIp` is required: see [Client IP](#client-ip). |
+| `extractSourceIp(event, trustedProxyHops = 0)`                                                                                                        | The rate-limit client IP: `sourceIp`, or the X-Forwarded-For entry `trustedProxyHops` from the right.                                                                                                                                                                                                     |
+| `createAuthHandlers(auth, { corsHeaders, clientIp, requestMagicLinkMessage?, context?, toErrorResponse?, onError? })`                                 | `createAuthRoutes` + `toLambdaHandler` in one call: the five endpoints as ready Lambda handlers, plus `googleStart` and `googleCallback` when the engine has `google`.                                                                                                                                    |
+| `toLambdaHandler(route, options)`                                                                                                                     | A complete handler for hosts without their own controller envelope (maps `AuthError`, honours fallback / clear-cookies).                                                                                                                                                                                  |
+| `verifySession(headers, { issuer, audience, accessSecret })`                                                                                          | For another service behind the same origin: the access-token payload or `null`. Fails closed.                                                                                                                                                                                                             |
+| `signAccessToken` / `verifyAccessToken` / `signRefreshToken` / `verifyRefreshToken`                                                                   | HS256 with issuer + audience pinning. A signed token is `{ token, ttlSec }`, `ttlSec` being its lifetime in seconds.                                                                                                                                                                                      |
+| `sanitizeRedirectUrl`, `extractAccessToken`, `extractRefreshToken`, `buildClearCookies`, …                                                            | The pure helpers the engine is built from.                                                                                                                                                                                                                                                                |
+| Types `GoogleSignInConfig`, `GoogleIdentity`, `GoogleSignInError`, `GoogleSignIn`, `GoogleStartResult`, `GoogleCallbackInput`, `GoogleCallbackResult` | The Google config, the identity `resolveUser` receives, the `auth_error` reasons, and the shape of `auth.google`.                                                                                                                                                                                         |
 
 ### `createMagicLinkAuth` config
 
@@ -49,6 +51,7 @@ honour the same cookie.
 | `uninvitedRequest`                                                      | no       | `'silent'` (default: public surface, same body for every address) or `'reject'` (NOT_INVITED 403, for internal tools). See "Timing" below.                                                                                                                                                                                                                                                                          |
 | `isAllowed`, `rolesOf`, `onSignIn`                                      | no       | Allowlist predicate (default `invited === true`), roles claim (default `roles ?? []`), sign-in side effects.                                                                                                                                                                                                                                                                                                        |
 | `minResponseMs`                                                         | no       | Floor on `requestMagicLink`'s response time, every outcome included (default 0). See "Timing" below.                                                                                                                                                                                                                                                                                                                |
+| `google`                                                                | no       | `{ clientId, clientSecret, redirectUri, hostedDomains?, errorPath = '/auth/sign-in', resolveUser?, fetch? }`. Absent: the engine has no `google` member and no Google routes exist. See [Google sign-in](#google-sign-in).                                                                                                                                                                                          |
 | `cookies`, `rateLimits`, `validate`, `createError`, `notInvitedMessage` | no       | Cookie names/paths (default `access_token` `/`, `refresh_token` `/api/v1/auth`), budgets (5/email, 20/IP per hour…), validators, error mapping.                                                                                                                                                                                                                                                                     |
 
 `magicLink.baseUrl` must be an absolute http(s) URL and every TTL (`jwt.*TtlSec`, `magicLink.*TtlMin`) a
@@ -140,6 +143,118 @@ honouring `fallbackResponse` and `clearCookiesOn401`:
 const routes = createAuthRoutes(auth, { corsHeaders, clientIp: { trustedProxyHops: 0 } })
 ```
 
+### Google sign-in
+
+Server-side authorization code flow with PKCE (S256), `state` and `nonce`: the browser only
+navigates, and the ID token never reaches it. A successful sign-in opens the same session as a magic
+link (same cookies, same session rows, same refresh and logout); its access token carries
+`authMethod: 'google'`, and that survives a refresh. No `google` key means one switch off: the engine
+has no `google` member and `createAuthRoutes` / `createAuthHandlers` return no Google routes.
+Before turning it on in a stage: an OAuth client for that stage in the Google console, its client ID
+and secret in the secret store, the exact callback URI registered, `__Secure-google_oauth` on the
+CloudFront cookie allowlist, and outbound HTTPS for the Lambdas (below).
+
+Wiring:
+
+```ts
+const auth = createMagicLinkAuth<Customer, Me, Options>({
+  // …as above…
+  google: {
+    clientId,
+    clientSecret, // from Doppler, never committed
+    redirectUri: 'https://app.example.com/api/v1/auth/google/callback',
+    // hostedDomains: ['example.com'], // staff tools: only these Workspace domains may sign in
+    // resolveUser: async (identity, ctx) => customers.findByGoogleSub(identity.sub, ctx),
+  },
+})
+
+const handlers = createAuthHandlers(auth, { corsHeaders, clientIp: { trustedProxyHops: 0 } })
+
+// The keys are optional, so narrow once; the config says Google is on.
+if (!handlers.googleStart || !handlers.googleCallback) throw new Error('google sign-in is not configured')
+
+export const googleStart = handlers.googleStart
+export const googleCallback = handlers.googleCallback
+```
+
+Two serverless routes, both `GET`, both answer a `302` with `Location` and `Cache-Control: no-store`:
+
+| Route            | Path (as you map it)                  | Reads                                        |
+| ---------------- | ------------------------------------- | -------------------------------------------- |
+| `googleStart`    | any, e.g. `/api/v1/auth/google/start` | `?redirect=` (sanitised like a magic link's) |
+| `googleCallback` | the path of `redirectUri`             | `code`, `state`, `error`                     |
+
+Because the keys are optional, `(typeof routes)[keyof typeof routes]` now includes `undefined`. A host
+that indexes the routes generically wraps it in `NonNullable<…>`.
+
+**Google console.** Register the redirect URI verbatim, one per stage: scheme, host, path, no
+trailing slash and no fragment. Google compares it byte for byte
+([Web server OAuth: redirect URI validation](https://developers.google.com/identity/protocols/oauth2/web-server)),
+and the same `redirectUri` goes to the authorization request and the code exchange. Construction
+throws unless `redirectUri` is absolute, `https:` (or `http:` on `localhost`, `127.0.0.1` or
+`*.localhost`), has no `#`, and is on the same origin as `magicLink.baseUrl`: the callback sets the
+session cookies, so it must answer on the origin the SPA reads them from. `errorPath` must survive
+`sanitizeRedirectUrl` unchanged, and `hostedDomains`, when set, must be a non-empty list of non-empty
+strings (an empty list would refuse everyone, so it throws).
+
+**Outbound HTTPS.** The callback calls Google's token endpoint and fetches its signing keys
+(`https://www.googleapis.com/oauth2/v3/certs`, cached by `Cache-Control`), with a 5 s timeout. A
+Lambda in a VPC needs a NAT gateway (or an equivalent egress) for that; without one every sign-in
+ends `failed` at step `token-exchange`.
+
+**The state cookie.** `start` sets `__Secure-google_oauth`: a signed JWT holding `state`, `nonce`, the
+PKCE verifier and the sanitised redirect, `HttpOnly; Secure; SameSite=Lax; Path=<the pathname of
+redirectUri>; Max-Age=600`. It is cleared on every outcome. `Lax` lets it ride the top-level GET back
+from Google; it binds the callback to the browser that started the flow (login CSRF). The
+CloudFront behaviour for the callback must forward this cookie name, or every sign-in ends
+`invalid_state`. There is one slot per browser: a second tab's start overwrites the first, whose
+callback then ends `invalid_state`; the user retries in one tab.
+
+**PKCE and leaked codes.** The authorization code reaches the callback in a query string, so it can
+land in CloudFront or API Gateway access logs. The code is useless without the PKCE verifier, which
+lives only in the signed cookie, and it is single-use and short-lived at Google.
+
+**Who is let in.** `email_verified` and `hostedDomains` are always enforced (the ID token's `hd`
+claim must be one of the domains, case-insensitive), and `isAllowed` always applies. No user is ever
+created. The ID token is verified against Google's JWKS with RS256 only: signature, `iss`
+(`https://accounts.google.com` or `accounts.google.com`), `aud` = `clientId`, `nonce`, `exp`, with
+numeric `exp` and `iat` and non-empty `sub` and `email`
+([OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect),
+[verify an ID token](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token)).
+
+- Default (no `resolveUser`): the email must be one Google is authoritative for, a `@gmail.com`
+  address or an ID token with an `hd` claim, and is matched through `users.findByEmail` (lower-cased).
+  Any other address, such as a personal Google account on a custom domain, is refused.
+- With `resolveUser(identity, ctx)`: its answer is final. `null` or `undefined` refuses, with no email
+  fallback. It receives `{ sub, email, emailVerified, emailAuthoritative, hostedDomain }` plus the host
+  context, after the `email_verified` and `hostedDomains` checks. Accepting an identity with
+  `emailAuthoritative: false` is the host's risk.
+- Gmail aliases are not normalised: `@googlemail.com`, dots in the local part and `+tags` do not match
+  a stored `@gmail.com` row, and only case is folded.
+
+**`sub` is the stable identifier, not the email.** Google documents that an address can be reassigned
+to a different person, while `sub` never is. The email default trusts the address, so a user row
+whose address Google later hands to someone else would admit that person. A host that cares links by
+`sub`: add a `googleSub` column to the user table, make `resolveUser` look the row up by
+`identity.sub` and, on first sign-in, bind it after matching the email (and the `hostedDomain`).
+
+**Failures.** Every failure is a `302` to `${baseUrl}${errorPath}?auth_error=<reason>`, with
+`&redirect=<encoded>` appended when the redirect is not `/` (`invalid_state` never carries one: the
+redirect is unknown until the cookie proves authentic). The reason is a closed list; the log `step`
+says where it broke, for log searches:
+
+| `auth_error`    | Means                                       | Log `step`                                                                            |
+| --------------- | ------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `cancelled`     | The user closed Google's consent screen.    | `provider-error` (logged at info)                                                     |
+| `invalid_state` | No, forged, expired or mismatched state.    | `missing-cookie`, `bad-signature`, `expired`, `mismatch`                              |
+| `not_allowed`   | Google answered, this user may not sign in. | `email`, `hosted-domain`, `user`                                                      |
+| `rate_limited`  | The per-IP budget is spent.                 | `rate-limit`                                                                          |
+| `failed`        | Anything else.                              | `provider-error` (other Google errors), `token-exchange`, `jwks`, `id-token`, `store` |
+
+The `Google sign-in failed` log carries `{ data: { reason, step } }` and never a token, code, email or
+Google `sub`; cancellations log at info, store errors at error, the rest at warn. The rate budget is
+`rateLimits.perIpVerify`, keyed `${keyPrefix}:google:ip:<ip>`.
+
 ### Client IP
 
 The per-IP rate limits key on the client IP. Everything left of the hops you trust in
@@ -205,35 +320,38 @@ replayed token through:
 
 Accepted on purpose; each has what a host does about it.
 
-| Risk                                                                                                                                                                                                                                    | What the host does                                                                                                                                                                                               |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cookies are fixed at `HttpOnly; Secure; SameSite=Lax`, host-only. Safari refuses a `Secure` cookie on `http://localhost`; Chrome and Firefox accept it there.                                                                           | Develop locally in Chrome or Firefox, or over https.                                                                                                                                                             |
-| Anyone can spend a victim's per-email budget (5 links/hour): in `silent` mode the caller sees OK and the victim gets nothing. Keying by email + IP would reopen mail bombing from rotating IPs.                                         | Tune `rateLimits` if it bites. Rate-limit warnings log the raw client IP, on purpose.                                                                                                                            |
-| Login CSRF on verify: an attacker can make a victim's browser redeem the attacker's link and land in the attacker's account. Low impact on invite-only tools: it needs an allowed account, and the victim sees the attacker's identity. | Nothing: accepted for invite-only tools.                                                                                                                                                                         |
-| The raw link token rides in a GET query string (to the SPA, then `GET verify`), so it can land in CloudFront or API Gateway access logs. It is single-use, hashed at rest, and dies in 15 min (72 h for an invite).                     | Keep query strings out of CloudFront standard logs, or restrict who reads them.                                                                                                                                  |
-| FE: a `/me` failure that is not a 401 (5xx, network) settles `unauthenticated`, so a blip sends the user to sign-in with valid cookies. Fail-closed by design.                                                                          | Nothing: the cookies are still valid, so a reload once the API answers restores the session.                                                                                                                     |
-| Email matching: the engine lower-cases the address, then calls `findByEmail(lowercased)`. A row stored as `Ada@example.com` never matches.                                                                                              | Store emails lower-cased, or look them up case-insensitively; migrate existing rows.                                                                                                                             |
-| The Lambda adapter reads API Gateway REST (v1) events only.                                                                                                                                                                             | For HTTP API (v2), call the engine directly (see [Extending](#extending)).                                                                                                                                       |
-| `rateLimits.keyPrefix` defaults to `'magic'` and also namespaces the refresh budget. The name is historical; renaming it would re-key live budgets.                                                                                     | Keep it.                                                                                                                                                                                                         |
-| A de-invited user's open tab hits `authenticate` on every request until the access token expires, and each one repeats `revokeAllForUser`.                                                                                              | Make `revokeAllForUser` a single conditional update (`UPDATE … SET revoked_at = now() WHERE user_id = ? AND revoked_at IS NULL`, Mongo `updateMany({ userId, revokedAt: null }, …)`), so the repeats stay cheap. |
+| Risk                                                                                                                                                                                                                                    | What the host does                                                                                                                                                                                                       |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Cookies are fixed at `HttpOnly; Secure; SameSite=Lax`, host-only. Safari refuses a `Secure` cookie on `http://localhost`; Chrome and Firefox accept it there.                                                                           | Develop locally in Chrome or Firefox, or over https.                                                                                                                                                                     |
+| Anyone can spend a victim's per-email budget (5 links/hour): in `silent` mode the caller sees OK and the victim gets nothing. Keying by email + IP would reopen mail bombing from rotating IPs.                                         | Tune `rateLimits` if it bites; staff can sign in with Google meanwhile, which has no per-email budget. Rate-limit warnings log the raw client IP, on purpose.                                                            |
+| Login CSRF on verify: an attacker can make a victim's browser redeem the attacker's link and land in the attacker's account. Low impact on invite-only tools: it needs an allowed account, and the victim sees the attacker's identity. | Nothing: accepted for invite-only tools. Google sign-in does not have this half: the state cookie binds the callback to the browser that started it.                                                                     |
+| The raw link token rides in a GET query string (to the SPA, then `GET verify`), so it can land in CloudFront or API Gateway access logs. It is single-use, hashed at rest, and dies in 15 min (72 h for an invite).                     | Keep query strings out of CloudFront standard logs, or restrict who reads them. A Google `code` in a log is useless: see [Google sign-in](#google-sign-in).                                                              |
+| FE: a `/me` failure that is not a 401 (5xx, network) settles `unauthenticated`, so a blip sends the user to sign-in with valid cookies. Fail-closed by design.                                                                          | Nothing: the cookies are still valid, so a reload once the API answers restores the session.                                                                                                                             |
+| Email matching: the engine lower-cases the address, then calls `findByEmail(lowercased)`. A row stored as `Ada@example.com` never matches.                                                                                              | Store emails lower-cased, or look them up case-insensitively; migrate existing rows. The same holds for Google, and Gmail aliases (`@googlemail.com`, dots, `+tags`) are separate strings the engine does not normalise. |
+| The Lambda adapter reads API Gateway REST (v1) events only.                                                                                                                                                                             | For HTTP API (v2), call the engine directly (see [Extending](#extending)).                                                                                                                                               |
+| `rateLimits.keyPrefix` defaults to `'magic'` and also namespaces the refresh budget. The name is historical; renaming it would re-key live budgets.                                                                                     | Keep it.                                                                                                                                                                                                                 |
+| A de-invited user's open tab hits `authenticate` on every request until the access token expires, and each one repeats `revokeAllForUser`.                                                                                              | Make `revokeAllForUser` a single conditional update (`UPDATE … SET revoked_at = now() WHERE user_id = ? AND revoked_at IS NULL`, Mongo `updateMany({ userId, revokedAt: null }, …)`), so the repeats stay cheap.         |
+| Google's `sub`, not the address, is the stable identity; the default email match trusts an address Google may reassign.                                                                                                                 | Link by `sub`: `resolveUser` and a `googleSub` column (see [Google sign-in](#google-sign-in)).                                                                                                                           |
+| One Google sign-in per browser at a time: a second tab's start overwrites the state cookie and the first tab ends `invalid_state`.                                                                                                      | Nothing: the user retries in one tab.                                                                                                                                                                                    |
 
 ## Layout
 
 One folder per concern; `src/index.ts` is the only public entry (plus `src/testing/index.ts` for the
 store contract kit), so files can move without touching a host.
 
-| Path                               | Owns                                                                                                                                                                                   |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `create-auth.ts`, `auth-config.ts` | The composition root: the host config and `createMagicLinkAuth`, which wires `session/` and the sign-in method from it.                                                                |
-| `ports.ts`                         | What the host implements: user / token / session stores, rate limiter, mailer, logger.                                                                                                 |
-| `errors.ts`, `tokens.ts`           | `AuthError` and its codes; JWT signing and verifying, raw link tokens.                                                                                                                 |
-| `rate-limit.ts`                    | Budgets, their defaults, and the gate every flow counts against.                                                                                                                       |
-| `http/`                            | Framework-free request helpers: `headers.ts`, `cookies.ts`, `redirect.ts`.                                                                                                             |
-| `session/`                         | What a session does whichever way it was opened: `session-issuer.ts` (mint, rotate), `session-service.ts` (refresh, logout, request readers), `verify-session.ts` (for a sibling API). |
-| `magic-link/`                      | The sign-in method: `config.ts`, `validation.ts`, `email.ts` (built-in template), `sender.ts` (mint + mail), `magic-link-flows.ts` (request, invite, verify).                          |
-| `lambda/`                          | The API Gateway adapter: `client-ip.ts`, `cors-headers.ts`, `routes.ts`, `handler.ts`. Nothing outside it knows about Lambda.                                                          |
-| `testing/`                         | The store contract kit (`@wl/auth-be/testing`): no runner, no dependency.                                                                                                              |
-| `e2e-login.ts`                     | The test-only sign-in, built on `issueSession`.                                                                                                                                        |
+| Path                               | Owns                                                                                                                                                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `create-auth.ts`, `auth-config.ts` | The composition root: the host config and `createMagicLinkAuth`, which wires `session/` and the sign-in method from it.                                                                                |
+| `ports.ts`                         | What the host implements: user / token / session stores, rate limiter, mailer, logger.                                                                                                                 |
+| `errors.ts`, `tokens.ts`           | `AuthError` and its codes; JWT signing and verifying, raw link tokens.                                                                                                                                 |
+| `rate-limit.ts`                    | Budgets, their defaults, and the gate every flow counts against.                                                                                                                                       |
+| `http/`                            | Framework-free request helpers: `headers.ts`, `cookies.ts`, `redirect.ts`.                                                                                                                             |
+| `session/`                         | What a session does whichever way it was opened: `session-issuer.ts` (mint, rotate), `session-service.ts` (refresh, logout, request readers), `verify-session.ts` (for a sibling API).                 |
+| `google/`                          | The Google sign-in method: `config.ts` (the config and its checks), `google-sign-in.ts` (start, callback, user resolution), `id-token.ts` (JWKS, ID-token verification), `state-cookie.ts`, `pkce.ts`. |
+| `magic-link/`                      | The sign-in method: `config.ts`, `validation.ts`, `email.ts` (built-in template), `sender.ts` (mint + mail), `magic-link-flows.ts` (request, invite, verify).                                          |
+| `lambda/`                          | The API Gateway adapter: `client-ip.ts`, `cors-headers.ts`, `routes.ts`, `handler.ts`. Nothing outside it knows about Lambda.                                                                          |
+| `testing/`                         | The store contract kit (`@wl/auth-be/testing`): no runner, no dependency.                                                                                                                              |
+| `e2e-login.ts`                     | The test-only sign-in, built on `issueSession`.                                                                                                                                                        |
 
 Tests sit in the `__tests__/` beside the code they cover; the in-memory stores and the sign-in round
 trip they share are in `src/__tests__/helpers/`. `pnpm run test-report` enforces 100% coverage.
@@ -243,7 +361,7 @@ trip they share are in `src/__tests__/helpers/`. `pnpm run test-report` enforces
 - Another storage, mailer or rate limiter: implement the interface in `ports.ts`; nothing else changes.
 - Another transport (Express, Fastify, API Gateway v2): call the engine's methods directly, the way
   `lambda/routes.ts` does. Only `lambda/` reads a Lambda event.
-- Another way to sign in: resolve the user your own way, then call `auth.issueSession(user, meta, ctx)`
+- Another way to sign in (Google is one, built this way): resolve the user your own way, then call `auth.issueSession(user, meta, ctx)`
   for the same cookies and session row. `e2e-login.ts` is the worked example.
 - Host-specific behaviour goes through config (`isAllowed`, `rolesOf`, `onSignIn`, `validate`,
   `renderEmail`, `createError`), never through a fork of the engine.
