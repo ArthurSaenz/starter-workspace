@@ -1,3 +1,6 @@
+export type { MagicLinkAuthConfig } from './auth-config.js'
+export { createMagicLinkAuth } from './create-auth.js'
+export type { MagicLinkAuth } from './create-auth.js'
 export { createE2eLogin, parseAllowedEmails, safeSecretEqual } from './e2e-login.js'
 export type { E2eLoginConfig, E2eLoginInput } from './e2e-login.js'
 export { AuthError, defaultCreateAuthError } from './errors.js'
@@ -23,12 +26,7 @@ export { createAuthRoutes } from './lambda/routes.js'
 export type { AuthRoutesOptions } from './lambda/routes.js'
 export type { AuthRoute, LambdaEvent, LambdaResult } from './lambda/types.js'
 export { DEFAULT_INVITE_TOKEN_TTL_MIN, DEFAULT_MAGIC_TOKEN_TTL_MIN } from './magic-link/config.js'
-export type {
-  MagicLinkAuthConfig,
-  RequestMagicLinkInput,
-  VerifyMagicLinkInput,
-  VerifyMagicLinkResult,
-} from './magic-link/config.js'
+export type { RequestMagicLinkInput, VerifyMagicLinkInput, VerifyMagicLinkResult } from './magic-link/config.js'
 export { buildMagicLinkUrl, formatExpiry, renderMagicLinkEmail } from './magic-link/email.js'
 export type {
   MagicLinkEmailInput,
@@ -36,8 +34,6 @@ export type {
   MagicLinkEmailText,
   RenderMagicLinkEmail,
 } from './magic-link/email.js'
-export { createMagicLinkAuth } from './magic-link/magic-link-auth.js'
-export type { MagicLinkAuth } from './magic-link/magic-link-auth.js'
 export type { RequestValidationInput } from './magic-link/validation.js'
 export type {
   AuthContext,

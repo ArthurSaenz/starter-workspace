@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer'
 
-import type { MagicLinkAuth } from '../magic-link/magic-link-auth.js'
+import type { MagicLinkAuth } from '../create-auth.js'
 import type { AuthContext, AuthUser } from '../ports.js'
 import type { RequestMeta } from '../session/types.js'
 import type { ClientIpOptions } from './client-ip.js'

@@ -11,9 +11,9 @@ import {
   invitedUser,
   tokenFromEmail,
 } from '../../__tests__/helpers/fakes.js'
+import { createMagicLinkAuth } from '../../create-auth.js'
 import { AuthError } from '../../errors.js'
 import type { HeaderBag } from '../../http/headers.js'
-import { createMagicLinkAuth } from '../../magic-link/magic-link-auth.js'
 import type { SessionStore } from '../../ports.js'
 import { signRefreshToken } from '../../tokens.js'
 

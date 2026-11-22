@@ -1,31 +1,42 @@
-import type { AuthErrorCode } from '../errors.js'
-import { defaultCreateAuthError, errorName } from '../errors.js'
-import { resolveCookieOptions } from '../http/cookies.js'
+import type { AuthErrorCode, CreateAuthError } from '../errors.js'
+import { errorName } from '../errors.js'
 import { sanitizeRedirectUrl } from '../http/redirect.js'
-import type { AuthContext, AuthUser } from '../ports.js'
-import { createRateGate, ipBucket, resolveRateLimits } from '../rate-limit.js'
-import { createSessionService } from '../session/session-service.js'
-import { DEFAULT_ACCESS_TTL_SEC, DEFAULT_REFRESH_GRACE_SEC, DEFAULT_REFRESH_TTL_SEC, hashToken } from '../tokens.js'
-import type {
-  MagicLinkAuthConfig,
-  RequestMagicLinkInput,
-  VerifyMagicLinkInput,
-  VerifyMagicLinkResult,
-} from './config.js'
-import {
-  DEFAULT_INVITE_TOKEN_TTL_MIN,
-  DEFAULT_MAGIC_TOKEN_TTL_MIN,
-  assertMagicLinkConfig,
-  defaultIsAllowed,
-  defaultRolesOf,
-} from './config.js'
+import type { AuthContext, AuthUser, MagicTokenStore, Mailer, UserStore } from '../ports.js'
+import type { RateGate, RateLimitConfig } from '../rate-limit.js'
+import { ipBucket } from '../rate-limit.js'
+import type { RequestMeta, TokenPair } from '../session/types.js'
+import { hashToken } from '../tokens.js'
+import type { RequestMagicLinkInput, VerifyMagicLinkInput, VerifyMagicLinkResult } from './config.js'
+import { DEFAULT_INVITE_TOKEN_TTL_MIN, DEFAULT_MAGIC_TOKEN_TTL_MIN } from './config.js'
+import type { MagicLinkEmailText, RenderMagicLinkEmail } from './email.js'
 import { createMagicLinkSender } from './sender.js'
 import type { RequestValidationInput } from './validation.js'
 import { createDefaultVerifyValidator, defaultValidateRequest, isTokenRecordLive } from './validation.js'
 
-export type MagicLinkAuth<TUser extends AuthUser, TMe, TCtx extends AuthContext> = ReturnType<
-  typeof createMagicLinkAuth<TUser, TMe, TCtx>
->
+export interface MagicLinkFlowsDeps<TUser extends AuthUser, TCtx extends AuthContext> {
+  users: UserStore<TUser, TCtx>
+  magicTokens: MagicTokenStore<TCtx>
+  mailer: Mailer<TCtx>
+  email: MagicLinkEmailText | undefined
+  renderEmail: RenderMagicLinkEmail<TCtx> | undefined
+  /** `baseUrl` arrives normalised (no trailing `/`). */
+  magicLink: { baseUrl: string; verifyPath?: string; ttlMin?: number; inviteTtlMin?: number }
+  checkRate: RateGate<TCtx>
+  limits: RateLimitConfig
+  issueSession: (user: TUser, meta?: RequestMeta, ctx?: TCtx) => Promise<TokenPair>
+  isAllowed: (user: TUser) => boolean
+  createError: CreateAuthError
+  notInvitedMessage: string
+  uninvitedRequest: 'silent' | 'reject'
+  minResponseMs: number
+  onSignIn: ((user: TUser, ctx?: TCtx) => Promise<void>) | undefined
+  validate:
+    | {
+        requestMagicLink?: (input: RequestValidationInput, ctx?: TCtx) => void
+        verifyMagicLink?: (input: { rawToken: string }, ctx?: TCtx) => void
+      }
+    | undefined
+}
 
 const delay = async (ms: number): Promise<void> => {
   if (ms <= 0) return
@@ -35,68 +46,32 @@ const delay = async (ms: number): Promise<void> => {
   })
 }
 
-/**
- * The engine: the magic-link sign-in (request, invite, verify) on top of the session service
- * (refresh, logout, the request readers), wired from one host config.
- */
-export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends AuthContext = AuthContext>(
-  config: MagicLinkAuthConfig<TUser, TMe, TCtx>,
+/** The magic-link sign-in: request, invite and verify; the session it opens comes from `issueSession`. */
+export const createMagicLinkFlows = <TUser extends AuthUser, TCtx extends AuthContext>(
+  deps: MagicLinkFlowsDeps<TUser, TCtx>,
 ) => {
-  assertMagicLinkConfig(config)
-
-  const { users, magicTokens } = config
-  const identity = { issuer: config.jwt.issuer, audience: config.jwt.audience }
-  const cookies = resolveCookieOptions(config.cookies)
-  const signInTtlMin = config.magicLink.ttlMin ?? DEFAULT_MAGIC_TOKEN_TTL_MIN
-  const inviteTtlMin = config.magicLink.inviteTtlMin ?? DEFAULT_INVITE_TOKEN_TTL_MIN
+  const { users, magicTokens, checkRate, limits, isAllowed, createError, notInvitedMessage } = deps
+  const signInTtlMin = deps.magicLink.ttlMin ?? DEFAULT_MAGIC_TOKEN_TTL_MIN
+  const inviteTtlMin = deps.magicLink.inviteTtlMin ?? DEFAULT_INVITE_TOKEN_TTL_MIN
   const maxTokenAgeMs = Math.max(signInTtlMin, inviteTtlMin) * 60 * 1000
-  const limits = resolveRateLimits(config.rateLimits)
-  const checkRate = createRateGate(config.rateLimiter, limits)
-  const createError = config.createError ?? defaultCreateAuthError
-  const notInvitedMessage = config.notInvitedMessage ?? 'This email is not invited.'
-  const uninvitedRequest = config.uninvitedRequest ?? 'silent'
-  const minResponseMs = config.minResponseMs ?? 0
-  const isAllowed: (user: TUser) => boolean = config.isAllowed ?? defaultIsAllowed
 
   const validateRequest: (input: RequestValidationInput, ctx?: TCtx) => void =
-    config.validate?.requestMagicLink ?? defaultValidateRequest
+    deps.validate?.requestMagicLink ?? defaultValidateRequest
 
-  const validateVerify = config.validate?.verifyMagicLink ?? createDefaultVerifyValidator(createError)
+  const validateVerify = deps.validate?.verifyMagicLink ?? createDefaultVerifyValidator(createError)
 
   const fail = (message: string, code: AuthErrorCode, status: number): Error => {
     return createError({ message, code, status })
   }
 
-  const { baseUrl } = config.magicLink
-
   const sendMagicLink = createMagicLinkSender<TCtx>({
     magicTokens,
-    mailer: config.mailer,
-    email: config.email,
-    renderEmail: config.renderEmail,
-    // `https://app.test/` + `/auth/verify` would mail a `//auth/verify` link no SPA route matches.
-    magicLink: { ...config.magicLink, baseUrl: baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl },
+    mailer: deps.mailer,
+    email: deps.email,
+    renderEmail: deps.renderEmail,
+    magicLink: deps.magicLink,
     signInTtlMin,
     inviteTtlMin,
-  })
-
-  const session = createSessionService<TUser, TMe, TCtx>({
-    users,
-    sessions: config.sessions,
-    accessSecret: config.jwt.accessSecret,
-    refreshSecret: config.jwt.refreshSecret,
-    identity,
-    accessTtlSec: config.jwt.accessTtlSec ?? DEFAULT_ACCESS_TTL_SEC,
-    refreshTtlSec: config.jwt.refreshTtlSec ?? DEFAULT_REFRESH_TTL_SEC,
-    refreshGraceSec: config.jwt.refreshGraceSec ?? DEFAULT_REFRESH_GRACE_SEC,
-    cookies,
-    isAllowed,
-    rolesOf: config.rolesOf ?? defaultRolesOf,
-    toMe: config.toMe,
-    checkRate,
-    refreshLimit: limits.perIpRefresh,
-    createError,
-    notInvitedMessage,
   })
 
   const handleLinkRequest = async (input: RequestMagicLinkInput, ctx?: TCtx): Promise<void> => {
@@ -131,7 +106,7 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
         data: { exists: Boolean(user) },
       })
 
-      if (uninvitedRequest === 'reject') throw fail(notInvitedMessage, 'NOT_INVITED', 403)
+      if (deps.uninvitedRequest === 'reject') throw fail(notInvitedMessage, 'NOT_INVITED', 403)
 
       return
     }
@@ -146,7 +121,7 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
     try {
       return await handleLinkRequest(input, ctx)
     } finally {
-      await delay(minResponseMs - (Date.now() - startedAt))
+      await delay(deps.minResponseMs - (Date.now() - startedAt))
     }
   }
 
@@ -211,21 +186,13 @@ export const createMagicLinkAuth = <TUser extends AuthUser, TMe, TCtx extends Au
     }
 
     const pair = await releaseOnFailure(async () => {
-      await config.onSignIn?.(user, ctx)
+      await deps.onSignIn?.(user, ctx)
 
-      return session.issueSession(user, input, ctx)
+      return deps.issueSession(user, input, ctx)
     })
 
     return { ...pair, redirectUrl: sanitizeRedirectUrl(record.redirectUrl) }
   }
 
-  return {
-    cookies,
-    identity,
-    uninvitedRequest,
-    requestMagicLink,
-    sendInviteLink,
-    verifyMagicLink,
-    ...session,
-  }
+  return { requestMagicLink, sendInviteLink, verifyMagicLink }
 }

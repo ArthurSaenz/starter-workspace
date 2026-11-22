@@ -1,7 +1,7 @@
 import { expect } from 'vitest'
 
+import { createMagicLinkAuth } from '../../create-auth.js'
 import { AuthError } from '../../errors.js'
-import { createMagicLinkAuth } from '../../magic-link/magic-link-auth.js'
 import type { createFakes } from './fakes.js'
 import { tokenFromEmail } from './fakes.js'
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { createFakes, invitedUser, tokenFromEmail } from '../../__tests__/helpers/fakes.js'
-import { createMagicLinkAuth } from '../../magic-link/magic-link-auth.js'
+import { createMagicLinkAuth } from '../../create-auth.js'
 import { createAuthHandlers, toLambdaHandler } from '../handler.js'
 
 const CORS = { 'Access-Control-Allow-Origin': 'https://app.test' }
