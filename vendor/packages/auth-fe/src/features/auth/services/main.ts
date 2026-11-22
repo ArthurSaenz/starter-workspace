@@ -132,6 +132,8 @@ export const createAuthStore = <TUser>(
     return result
   }
 
+  const startGoogleSignIn = client.startGoogleSignIn?.bind(client)
+
   return {
     getState: () => {
       return state
@@ -187,5 +189,6 @@ export const createAuthStore = <TUser>(
     refresh: () => {
       return client.refresh()
     },
+    ...(startGoogleSignIn ? { startGoogleSignIn } : {}),
   }
 }

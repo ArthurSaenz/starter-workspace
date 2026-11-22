@@ -650,4 +650,57 @@ describe('refresh and subscribe', () => {
     store.resetSentEmail()
     expect(listener).toHaveBeenCalledOnce()
   })
+
+  it('the store forwards startGoogleSignIn only when the client has it', () => {
+    const startGoogleSignIn = vi.fn()
+
+    expect('startGoogleSignIn' in createAuthStore(fakeClient())).toBe(false)
+
+    createAuthStore(fakeClient({ startGoogleSignIn })).startGoogleSignIn?.('/trips')
+
+    expect(startGoogleSignIn).toHaveBeenCalledWith('/trips')
+  })
+
+  it('a hand-written AuthClient and AuthStore without the Google members still type-check', () => {
+    // The assertion is ts-check: hosts' own clients and store mocks predate the optional members.
+    const client: AuthClient<TestUser> = {
+      requestMagicLink: async () => {},
+      verifyMagicLink: async () => {
+        return { ok: true }
+      },
+      me: async () => {
+        return USER
+      },
+      refresh: async () => {
+        return true
+      },
+      logout: async () => {},
+    }
+
+    const store: AuthStore<TestUser> = {
+      getState: () => {
+        return { ...newStore().getState() }
+      },
+      subscribe: () => {
+        return () => {}
+      },
+      submitEmail: async (request) => {
+        return { ok: true, email: request.email }
+      },
+      resetSentEmail: () => {},
+      fetchMe: async () => {
+        return USER
+      },
+      verify: async () => {
+        return { ok: true }
+      },
+      logout: async () => {},
+      refresh: async () => {
+        return true
+      },
+    }
+
+    expect(createAuthStore(client).startGoogleSignIn).toBeUndefined()
+    expect(store.startGoogleSignIn).toBeUndefined()
+  })
 })

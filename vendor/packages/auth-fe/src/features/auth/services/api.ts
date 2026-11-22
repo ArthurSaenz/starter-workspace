@@ -1,4 +1,5 @@
 import type { AuthClient, AuthClientOptions, MagicLinkRequest, VerifyMagicLinkResult } from '../types.js'
+import { safeRedirect } from './libs.js'
 
 /** A non-2xx response; `type` is the error body's `type`, when it has one. */
 export class AuthHttpError extends Error {
@@ -52,6 +53,15 @@ export const createAuthClient = <TUser>(options: AuthClientOptions): AuthClient<
       // eslint-disable-next-line no-restricted-globals -- auth-fe is the transport itself; apps inject theirs via `options.fetch`
       return fetch(input, init)
     })
+
+  const navigate =
+    options.navigate ??
+    ((url: string) => {
+      // eslint-disable-next-line no-restricted-syntax -- full-page redirect to the API's OAuth start
+      window.location.assign(url)
+    })
+
+  const { googleStart } = paths
 
   const send = async (path: string, init: { method: string; body?: unknown }): Promise<Response> => {
     const url = `${baseUrl}${path}`
@@ -114,5 +124,15 @@ export const createAuthClient = <TUser>(options: AuthClientOptions): AuthClient<
     logout: async () => {
       await send(paths.logout, { method: 'POST' })
     },
+    ...(googleStart
+      ? {
+          startGoogleSignIn: (redirect?: string) => {
+            const target = safeRedirect(redirect)
+            const query = target === '/' ? '' : `?redirect=${encodeURIComponent(target)}`
+
+            navigate(`${baseUrl}${googleStart}${query}`)
+          },
+        }
+      : {}),
   }
 }

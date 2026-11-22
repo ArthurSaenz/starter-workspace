@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
 import type {
+  AuthRedirectError,
   AuthState,
   AuthStatus,
   AuthStore,
@@ -10,6 +11,7 @@ import type {
 } from '../../lib/auth-types.js'
 
 export type {
+  AuthRedirectError,
   AuthState,
   AuthStatus,
   AuthStore,
@@ -29,6 +31,8 @@ export interface AuthPaths {
   refresh: string
   /** POST — ends the session. */
   logout: string
+  /** GET `?redirect=` — the API's Google OAuth start; Google sign-in is off when unset. */
+  googleStart?: string
 }
 
 export interface AuthClientOptions {
@@ -44,6 +48,8 @@ export interface AuthClientOptions {
    * twice, and a backend with reuse detection revokes the session.
    */
   refresh?: () => Promise<boolean>
+  /** Performs the full-page Google redirect; defaults to `location.assign`, looked up at call time. */
+  navigate?: (url: string) => void
 }
 
 export interface AuthClient<TUser> {
@@ -60,6 +66,8 @@ export interface AuthClient<TUser> {
   refresh: () => Promise<boolean>
   /** Rejects on any non-2xx or network failure. */
   logout: () => Promise<void>
+  /** Defined only when `paths.googleStart` is set. Navigates away; `redirect` goes through `safeRedirect`. */
+  startGoogleSignIn?: (redirect?: string) => void
 }
 
 export interface AuthStoreOptions<TUser> {
@@ -82,6 +90,9 @@ export interface AuthFormRenderProps {
   error: string | null
   onSubmit: (values: { email: string }) => Promise<MagicLinkResult>
   onUseDifferentEmail: () => void
+  /** `null` unless the client has `startGoogleSignIn`. */
+  google: { onStart: () => void } | null
+  authError: AuthRedirectError | null
 }
 
 export interface AuthFormContainerProps {
@@ -89,6 +100,8 @@ export interface AuthFormContainerProps {
   redirect?: string
   /** Fired when the session is (or becomes) authenticated, with the safe redirect target. */
   onAuthenticated: (target: string) => void
+  /** The router's `auth_error` search param; an unknown value renders as `null`. */
+  authError?: string | null
   render: (props: AuthFormRenderProps) => ReactNode
 }
 

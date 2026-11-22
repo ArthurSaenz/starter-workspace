@@ -8,7 +8,7 @@ import { AuthVerifyContainer } from '../containers/auth-verify-container.js'
 import { RequireAuthContainer } from '../containers/require-auth-container.js'
 import { UserMenuContainer } from '../containers/user-menu-container.js'
 import { createAuthStore } from '../services/main.js'
-import type { AuthClient, AuthState } from '../types.js'
+import type { AuthClient, AuthFormContainerProps, AuthFormRenderProps, AuthState } from '../types.js'
 import { USER } from './fixtures.js'
 import type { TestUser } from './fixtures.js'
 
@@ -127,6 +127,61 @@ describe('authFormContainer', () => {
 
     await screen.getByRole('button', { name: 'reset' }).click()
     await expect.element(screen.getByTestId('sent')).toHaveTextContent('none')
+  })
+
+  const renderFormProps = async (client: AuthClient<TestUser>, props: Partial<AuthFormContainerProps> = {}) => {
+    const seen: AuthFormRenderProps[] = []
+
+    await render(
+      <AuthProvider store={storeWith({ status: 'unauthenticated' }, client)}>
+        <AuthFormContainer
+          onAuthenticated={vi.fn()}
+          render={(renderProps) => {
+            seen.push(renderProps)
+
+            return <div data-testid="form" />
+          }}
+          {...props}
+        />
+      </AuthProvider>,
+    )
+
+    return seen.at(-1)!
+  }
+
+  it('renders google: null and authError: null when Google is off', async () => {
+    const props = await renderFormProps(fakeClient())
+
+    expect(Object.keys(props).sort()).toEqual([
+      'authError',
+      'error',
+      'google',
+      'loading',
+      'onSubmit',
+      'onUseDifferentEmail',
+      'sentToEmail',
+      'status',
+    ])
+    expect(props.google).toBeNull()
+    expect(props.authError).toBeNull()
+  })
+
+  it('onStart starts Google with the safe redirect', async () => {
+    const startGoogleSignIn = vi.fn()
+    const client = fakeClient({ startGoogleSignIn })
+
+    const inApp = await renderFormProps(client, { redirect: '/trips' })
+    const offSite = await renderFormProps(client, { redirect: '//evil.com' })
+
+    inApp.google?.onStart()
+    offSite.google?.onStart()
+
+    expect(startGoogleSignIn.mock.calls).toEqual([['/trips'], ['/']])
+  })
+
+  it('passes a known authError through and drops an unknown one', async () => {
+    expect((await renderFormProps(fakeClient(), { authError: 'not_allowed' })).authError).toBe('not_allowed')
+    expect((await renderFormProps(fakeClient(), { authError: 'nope' })).authError).toBeNull()
   })
 })
 

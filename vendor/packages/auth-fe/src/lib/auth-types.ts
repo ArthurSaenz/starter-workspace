@@ -1,6 +1,9 @@
 // The hooks in src/lib/ need these, and a feature's private files are off-limits to them.
 export type AuthStatus = 'unknown' | 'authenticated' | 'unauthenticated'
 
+/** The API's `auth_error` reason after a Google sign-in redirect. */
+export type AuthRedirectError = 'cancelled' | 'invalid_state' | 'not_allowed' | 'rate_limited' | 'failed'
+
 export interface MagicLinkRequest {
   email: string
   redirectUrl?: string
@@ -47,4 +50,6 @@ export interface AuthStore<TUser> {
   /** Clears the local session even when the request fails; a `/me` still in flight is discarded. */
   logout: () => Promise<void>
   refresh: () => Promise<boolean>
+  /** Present only when the client has it (`paths.googleStart` set). */
+  startGoogleSignIn?: (redirect?: string) => void
 }
