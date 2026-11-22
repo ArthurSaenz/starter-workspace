@@ -12,6 +12,7 @@ import {
   tokenFromEmail,
 } from '../../__tests__/helpers/fakes.js'
 import { AuthError } from '../../errors.js'
+import type { HeaderBag } from '../../http/headers.js'
 import { createMagicLinkAuth } from '../../magic-link/magic-link-auth.js'
 import type { SessionStore } from '../../ports.js'
 import { signRefreshToken } from '../../tokens.js'
@@ -296,6 +297,61 @@ describe('session reads', () => {
 
     fakes.users.delete('u1')
     await expectAuthError(auth.authenticate(headers), 'USER_NOT_FOUND', 401)
+  })
+
+  it.each<[string, (auth: Awaited<ReturnType<typeof signIn>>['auth'], headers: HeaderBag) => Promise<unknown>]>([
+    [
+      'authenticate',
+      (auth, headers) => {
+        return auth.authenticate(headers)
+      },
+    ],
+    [
+      'getMe',
+      (auth, headers) => {
+        return auth.getMe(auth.requireUser(headers))
+      },
+    ],
+  ])('%s refuses a signed-in user whose invite was revoked and ends their sessions', async (_label, read) => {
+    const fakes = createFakes([invitedUser()])
+    const first = await signIn(fakes)
+    const second = await signIn(fakes)
+
+    fakes.users.get('u1')!.invited = false
+
+    await expectAuthError(read(first.auth, { cookie: `access_token=${first.result.accessToken}` }), 'NOT_INVITED', 403)
+    expect(fakes.sessions).toHaveLength(2)
+    expect(
+      fakes.sessions.every((session) => {
+        return session.revokedAt
+      }),
+    ).toBe(true)
+
+    for (const { auth, result } of [first, second]) {
+      await expectAuthError(auth.refreshSession({ refreshToken: result.refreshToken }), 'INVALID_REFRESH_TOKEN', 401)
+    }
+  })
+
+  it('a failed revoke still answers NOT_INVITED', async () => {
+    const fakes = createFakes([invitedUser()])
+    const { auth, result } = await signIn(fakes)
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+
+    fakes.users.get('u1')!.invited = false
+    fakes.sessionStore.revokeAllForUser.mockRejectedValueOnce(new Error('db down'))
+
+    await expectAuthError(
+      auth.authenticate({ cookie: `access_token=${result.accessToken}` }, { logger }),
+      'NOT_INVITED',
+      403,
+    )
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Authenticated request by a user who may no longer sign in; revoking every session',
+      { data: { userId: 'u1' } },
+    )
+    expect(logger.error).toHaveBeenCalledWith('Failed to revoke the sessions of a user who may no longer sign in', {
+      data: { name: 'Error' },
+    })
   })
 
   it('logout revokes the session and never throws', async () => {

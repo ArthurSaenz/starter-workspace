@@ -144,6 +144,17 @@ describe('auth routes', () => {
     expect((await wrap(routes.me)({ headers: {} })).statusCode).toBe(401)
   })
 
+  it('me answers 403 NOT_INVITED for a de-invited user', async () => {
+    const { routes, wrap, cookie, fakes } = await signedIn()
+
+    fakes.users.get('u1')!.invited = false
+
+    const me = await wrap(routes.me)({ headers: { Cookie: cookie } })
+
+    expect(me.statusCode).toBe(403)
+    expect(JSON.parse(me.body)).toMatchObject({ type: 'NOT_INVITED' })
+  })
+
   it('refresh rotates the cookies, and clears them on a 401', async () => {
     const { routes, wrap, cookie, fakes } = await signedIn()
 

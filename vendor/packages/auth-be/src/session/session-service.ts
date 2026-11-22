@@ -58,6 +58,28 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
     return user
   }
 
+  // Revoke as well as refuse: the FE refreshes only on a 401, so after this 403 nothing else ends the
+  // rows, and a re-invite inside `refreshTtlSec` would revive them.
+  const loadAllowedUser = async (userId: string, ctx?: TCtx): Promise<TUser> => {
+    const user = await loadUser(userId, ctx)
+
+    if (deps.isAllowed(user)) return user
+
+    ctx?.logger?.warn('Authenticated request by a user who may no longer sign in; revoking every session', {
+      data: { userId: String(user.id) },
+    })
+
+    try {
+      await sessions.revokeAllForUser(String(user.id), ctx)
+    } catch (error) {
+      ctx?.logger?.error('Failed to revoke the sessions of a user who may no longer sign in', {
+        data: { name: errorName(error) },
+      })
+    }
+
+    throw fail(deps.notInvitedMessage, 'NOT_INVITED', 403)
+  }
+
   // An unparseable timestamp is expired, never "no expiry".
   const isExpired = (expiresAt: StoredSession['expiresAt']): boolean => {
     const expiresAtMs = toMs(expiresAt)
@@ -181,11 +203,11 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
   ): Promise<{ payload: AccessTokenPayload; user: TUser }> => {
     const payload = requireUser(headers)
 
-    return { payload, user: await loadUser(payload.sub, ctx) }
+    return { payload, user: await loadAllowedUser(payload.sub, ctx) }
   }
 
   const getMe = async (payload: AccessTokenPayload, ctx?: TCtx): Promise<TMe> => {
-    return deps.toMe(await loadUser(payload.sub, ctx))
+    return deps.toMe(await loadAllowedUser(payload.sub, ctx))
   }
 
   return {
@@ -193,7 +215,11 @@ export const createSessionService = <TUser extends AuthUser, TMe, TCtx extends A
     issueSession: issuer.issue,
     refreshSession,
     logout,
-    /** The verified access-token payload, or UNAUTHENTICATED / INVALID_ACCESS_TOKEN (401). */
+    /**
+     * The verified access-token payload, or UNAUTHENTICATED / INVALID_ACCESS_TOKEN (401). JWT only: a
+     * revoke reaches it when the access token expires (`accessTtlSec`); authorise from `authenticate`
+     * where that lag matters.
+     */
     requireUser,
     authenticate,
     getMe,
