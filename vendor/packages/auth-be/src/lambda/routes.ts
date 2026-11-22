@@ -5,7 +5,7 @@ import type { AuthContext, AuthUser } from '../ports.js'
 import type { RequestMeta } from '../session/types.js'
 import type { ClientIpOptions } from './client-ip.js'
 import { createClientIpResolver, extractUserAgent } from './client-ip.js'
-import { guardCorsHeaders } from './cors-headers.js'
+import { createResponseHeaders } from './cors-headers.js'
 import type { AuthRoute, LambdaEvent, LambdaResult } from './types.js'
 
 export interface AuthRoutesOptions {
@@ -30,7 +30,7 @@ export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthC
   auth: MagicLinkAuth<TUser, TMe, TCtx>,
   options: AuthRoutesOptions,
 ) => {
-  const corsHeaders = guardCorsHeaders(options.corsHeaders)
+  const responseHeaders = createResponseHeaders(options.corsHeaders)
   const clientIp = createClientIpResolver<TCtx>(options.clientIp)
 
   const requestMeta = (event: LambdaEvent, ctx?: TCtx): RequestMeta => {
@@ -38,7 +38,7 @@ export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthC
   }
 
   const json = (statusCode: number, body: unknown): LambdaResult => {
-    return { statusCode, headers: corsHeaders(), body: JSON.stringify(body) }
+    return { statusCode, headers: responseHeaders(), body: JSON.stringify(body) }
   }
 
   const withCookies = (body: unknown, cookies: string[]): LambdaResult => {
@@ -54,7 +54,7 @@ export const createAuthRoutes = <TUser extends AuthUser, TMe, TCtx extends AuthC
   const noContent = (): LambdaResult => {
     return {
       statusCode: 204,
-      headers: corsHeaders(),
+      headers: responseHeaders(),
       multiValueHeaders: { 'Set-Cookie': auth.clearCookies() },
       body: '',
     }

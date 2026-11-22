@@ -2,9 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { createFakes, invitedUser, tokenFromEmail } from '../../__tests__/helpers/fakes.js'
 import { createMagicLinkAuth } from '../../magic-link/magic-link-auth.js'
-import { createAuthHandlers } from '../handler.js'
+import { createAuthHandlers, toLambdaHandler } from '../handler.js'
 
 const CORS = { 'Access-Control-Allow-Origin': 'https://app.test' }
+const NO_STORE = { 'Cache-Control': 'no-store' }
 
 const setup = (options: Partial<Parameters<typeof createAuthHandlers>[1]> = {}) => {
   const fakes = createFakes([invitedUser()])
@@ -54,7 +55,8 @@ describe('createAuthHandlers', () => {
     const me = await handlers.me({})
     const refresh = await handlers.refresh({})
 
-    expect(me).toMatchObject({ statusCode: 401, headers: CORS })
+    expect(me).toMatchObject({ statusCode: 401 })
+    expect(me.headers).toEqual({ ...CORS, ...NO_STORE })
     expect(JSON.parse(me.body)).toEqual({ type: 'UNAUTHENTICATED', message: 'Missing access token' })
     expect(me.multiValueHeaders).toBeUndefined()
     expect(refresh.statusCode).toBe(401)
@@ -139,10 +141,40 @@ describe('createAuthHandlers', () => {
       queryStringParameters: { token: tokenFromEmail(fakes.sent[0]!) },
     })
 
-    expect(verified).toMatchObject({ statusCode: 200, headers: {} })
+    expect(verified).toMatchObject({ statusCode: 200 })
+    expect(verified.headers).toEqual(NO_STORE)
     expect(verified.multiValueHeaders!['Set-Cookie']).toHaveLength(2)
-    expect(await handlers.me({})).toMatchObject({ statusCode: 401, headers: {} })
-    expect(await handlers.logout({})).toMatchObject({ statusCode: 204, headers: {} })
+    expect((await handlers.me({})).headers).toEqual(NO_STORE)
+    expect(await handlers.logout({})).toMatchObject({ statusCode: 204, headers: NO_STORE })
     expect(onError).toHaveBeenCalledTimes(1)
+  })
+
+  it('toLambdaHandler error responses carry Cache-Control: no-store', async () => {
+    const boom = {
+      handle: vi.fn().mockRejectedValue(new Error('boom')),
+      clearCookiesOn401: true,
+    }
+
+    const handler = (toErrorResponse?: () => { statusCode: number; body: unknown }) => {
+      return toLambdaHandler(boom, {
+        corsHeaders: () => {
+          return { ...CORS, 'Cache-Control': 'public, max-age=600' }
+        },
+        clearCookies: () => {
+          return ['access_token=; Max-Age=0']
+        },
+        ...(toErrorResponse ? { toErrorResponse } : {}),
+      })
+    }
+
+    const unknown = await handler()({})
+
+    const unauthenticated = await handler(() => {
+      return { statusCode: 401, body: { type: 'UNAUTHENTICATED' } }
+    })({})
+
+    expect(unknown).toMatchObject({ statusCode: 500, headers: { ...CORS, ...NO_STORE } })
+    expect(unauthenticated).toMatchObject({ statusCode: 401, headers: { ...CORS, ...NO_STORE } })
+    expect(unauthenticated.multiValueHeaders!['Set-Cookie']).toEqual(['access_token=; Max-Age=0'])
   })
 })

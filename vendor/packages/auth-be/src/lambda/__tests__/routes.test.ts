@@ -8,6 +8,7 @@ import { toLambdaHandler } from '../handler.js'
 import { createAuthRoutes } from '../routes.js'
 
 const CORS = { 'Access-Control-Allow-Origin': 'https://app.test', 'Access-Control-Allow-Credentials': 'true' }
+const NO_STORE = { 'Cache-Control': 'no-store' }
 
 const setup = (uninvitedRequest: 'silent' | 'reject' = 'silent') => {
   const fakes = createFakes([invitedUser()])
@@ -124,7 +125,7 @@ describe('auth routes', () => {
 
     expect(verified.statusCode).toBe(200)
     expect(JSON.parse(verified.body)).toEqual({ ok: true, redirect: '/' })
-    expect(verified.headers).toEqual(CORS)
+    expect(verified.headers).toEqual({ ...CORS, ...NO_STORE })
   })
 
   it('verifyMagicLink maps a bad token to the error envelope', async () => {
@@ -192,6 +193,38 @@ describe('auth routes', () => {
       expect(result.statusCode).toBe(204)
       expect(result.multiValueHeaders!['Set-Cookie']).toHaveLength(2)
     }
+  })
+
+  it('every route answers Cache-Control: no-store, over a host corsHeaders value', async () => {
+    const { auth, fakes } = setup()
+
+    const routes = createAuthRoutes(auth, {
+      corsHeaders: () => {
+        return { ...CORS, 'Cache-Control': 'public, max-age=600' }
+      },
+      clientIp: { trustedProxyHops: 0 },
+    })
+
+    await routes.requestMagicLink.handle({ body: '{"email":"ada@example.com"}' })
+
+    const verified = await routes.verifyMagicLink.handle({
+      queryStringParameters: { token: tokenFromEmail(fakes.sent[0]!) },
+    })
+
+    const [accessCookie, refreshCookie] = verified.multiValueHeaders!['Set-Cookie']!
+    const cookie = `${accessCookie!.split(';')[0]}; ${refreshCookie!.split(';')[0]}`
+
+    const results = [
+      await routes.requestMagicLink.handle({ body: '{"email":"ada@example.com"}' }),
+      routes.requestMagicLink.fallbackResponse!(),
+      verified,
+      await routes.me.handle({ headers: { cookie } }),
+      await routes.refresh.handle({ headers: { cookie } }),
+      await routes.logout.handle({ headers: { cookie } }),
+      routes.logout.fallbackResponse!(),
+    ]
+
+    for (const result of results) expect(result.headers).toEqual({ ...CORS, ...NO_STORE })
   })
 
   it('toLambdaHandler hands unknown errors to onError and answers 500, or the host mapping', async () => {

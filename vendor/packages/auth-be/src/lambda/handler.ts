@@ -1,7 +1,7 @@
 import { AuthError } from '../errors.js'
 import type { MagicLinkAuth } from '../magic-link/magic-link-auth.js'
 import type { AuthContext, AuthUser } from '../ports.js'
-import { guardCorsHeaders } from './cors-headers.js'
+import { createResponseHeaders } from './cors-headers.js'
 import type { AuthRoutesOptions } from './routes.js'
 import { createAuthRoutes } from './routes.js'
 import type { AuthRoute, LambdaEvent, LambdaResult } from './types.js'
@@ -26,7 +26,7 @@ const defaultErrorResponse = (error: unknown): { statusCode: number; body: unkno
 
 /** A ready Lambda handler for hosts without their own controller envelope. */
 export const toLambdaHandler = <TCtx>(route: AuthRoute<TCtx>, options: ToLambdaHandlerOptions<TCtx>) => {
-  const corsHeaders = guardCorsHeaders(options.corsHeaders)
+  const responseHeaders = createResponseHeaders(options.corsHeaders)
 
   return async (event: LambdaEvent): Promise<LambdaResult> => {
     try {
@@ -41,7 +41,7 @@ export const toLambdaHandler = <TCtx>(route: AuthRoute<TCtx>, options: ToLambdaH
       if (route.fallbackResponse) return route.fallbackResponse()
 
       const { statusCode, body } = (options.toErrorResponse ?? defaultErrorResponse)(error)
-      const result: LambdaResult = { statusCode, headers: corsHeaders(), body: JSON.stringify(body) }
+      const result: LambdaResult = { statusCode, headers: responseHeaders(), body: JSON.stringify(body) }
 
       if (route.clearCookiesOn401 && statusCode === 401) {
         return { ...result, multiValueHeaders: { 'Set-Cookie': options.clearCookies() } }
