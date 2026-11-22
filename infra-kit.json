@@ -8,9 +8,7 @@
   "vendorSource": {
     "copy": [
       { "path": ".claude" },
-      { "path": ".cursor/mcp.json" },
       { "path": ".mcp.json" },
-      { "path": ".cursor/rules" },
       { "path": "vendor/packages/web-toolkit", "module": "web-toolkit" },
       { "path": ".prettierrc.mjs" },
       { "path": ".prettierignore" },

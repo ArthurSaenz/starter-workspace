@@ -103,22 +103,10 @@ const COPY_CONFIG = [
     type: 'directory',
   },
   {
-    name: 'MCPs for Cursor',
-    source: '.cursor/mcp.json',
-    target: '.cursor/mcp.json',
-    type: 'file',
-  },
-  {
     name: 'MCPs for Claude',
     source: '.mcp.json',
     target: '.mcp.json',
     type: 'file',
-  },
-  {
-    name: 'Cursor rules',
-    source: '.cursor/rules',
-    target: '.cursor/rules',
-    type: 'directory',
   },
   {
     name: 'Web-toolkit',
