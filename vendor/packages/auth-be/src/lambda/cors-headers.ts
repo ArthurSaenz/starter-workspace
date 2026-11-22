@@ -17,6 +17,10 @@ export const createResponseHeaders = (corsHeaders: () => Record<string, string>)
   const guardedCorsHeaders = guardCorsHeaders(corsHeaders)
 
   return (): Record<string, string> => {
-    return { ...guardedCorsHeaders(), 'Cache-Control': 'no-store' }
+    const hostHeaders = Object.entries(guardedCorsHeaders()).filter(([name]) => {
+      return name.toLowerCase() !== 'cache-control'
+    })
+
+    return { ...Object.fromEntries(hostHeaders), 'Cache-Control': 'no-store' }
   }
 }

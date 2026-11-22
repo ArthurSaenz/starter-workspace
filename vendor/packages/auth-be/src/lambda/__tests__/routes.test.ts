@@ -227,6 +227,22 @@ describe('auth routes', () => {
     for (const result of results) expect(result.headers).toEqual({ ...CORS, ...NO_STORE })
   })
 
+  it('a host cache-control in any case is replaced by no-store', async () => {
+    const { auth } = setup()
+
+    for (const name of ['cache-control', 'CACHE-CONTROL', 'Cache-control']) {
+      const corsHeaders = () => {
+        return { ...CORS, [name]: 'public, max-age=600' }
+      }
+
+      const routes = createAuthRoutes(auth, { corsHeaders, clientIp: { trustedProxyHops: 0 } })
+      const handler = toLambdaHandler(routes.me, { corsHeaders, clearCookies: auth.clearCookies })
+
+      expect((await routes.logout.handle({ headers: {} })).headers).toEqual({ ...CORS, ...NO_STORE })
+      expect((await handler({ headers: {} })).headers).toEqual({ ...CORS, ...NO_STORE })
+    }
+  })
+
   it('toLambdaHandler hands unknown errors to onError and answers 500, or the host mapping', async () => {
     const { routes, auth } = setup()
     const onError = vi.fn()
