@@ -1,0 +1,125 @@
+{
+  "src/features/ai-chat/__stories__/kit/trip-plan-confirmation.tsx": {
+    "@wl/max-components-per-file": {
+      "count": 1
+    }
+  },
+  "src/features/ai-chat/__tests__/errors.test.tsx": {
+    "@wl/max-components-per-file": {
+      "count": 1
+    }
+  },
+  "src/features/ai-chat/components/agent-progress-line.tsx": {
+    "@wl/component-name-matches-file": {
+      "count": 1
+    }
+  },
+  "src/features/ai-chat/components/safe-markdown-renderer.tsx": {
+    "@wl/component-name-matches-file": {
+      "count": 1
+    }
+  },
+  "src/features/ai-chat/components/tool-call-line.tsx": {
+    "@wl/component-name-matches-file": {
+      "count": 1
+    }
+  },
+  "src/features/ai-chat/containers/ai-chat-container.tsx": {
+    "@wl/component-name-matches-file": {
+      "count": 1
+    }
+  },
+  "src/features/ai-chat/containers/ai-chat-root-container.tsx": {
+    "@wl/component-name-matches-file": {
+      "count": 1
+    },
+    "@wl/max-components-per-file": {
+      "count": 1
+    },
+    "react-hooks/rules-of-hooks": {
+      "count": 1
+    }
+  },
+  "src/features/ai-chat/services/agent-progress-renderers.ts": {
+    "@wl/feature-files": {
+      "count": 1
+    }
+  },
+  "src/features/ai-chat/services/awaiting-interrupt.ts": {
+    "@wl/feature-files": {
+      "count": 1
+    },
+    "@wl/no-hooks-in-services": {
+      "count": 1
+    }
+  },
+  "src/features/ai-chat/services/awaiting-tool-call.ts": {
+    "@wl/feature-files": {
+      "count": 1
+    },
+    "@wl/no-hooks-in-services": {
+      "count": 1
+    }
+  },
+  "src/features/ai-chat/services/chat-failure.ts": {
+    "@wl/feature-files": {
+      "count": 1
+    }
+  },
+  "src/features/ai-chat/services/config.ts": {
+    "@wl/feature-files": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/features/ai-chat/services/theme.ts": {
+    "@wl/feature-files": {
+      "count": 1
+    }
+  },
+  "src/features/ai-chat/services/tool-call-renderers.ts": {
+    "@wl/feature-files": {
+      "count": 1
+    }
+  },
+  "src/features/ai-chat/types.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/features/catalogue/services/areas.ts": {
+    "@wl/feature-files": {
+      "count": 1
+    }
+  },
+  "src/features/catalogue/services/feature-docs.ts": {
+    "@wl/feature-files": {
+      "count": 1
+    }
+  },
+  "src/features/catalogue/services/registry.ts": {
+    "@wl/feature-files": {
+      "count": 1
+    },
+    "sonarjs/max-lines": {
+      "count": 1
+    }
+  },
+  "src/features/catalogue/services/render-markdown.ts": {
+    "@wl/feature-files": {
+      "count": 1
+    }
+  },
+  "src/features/catalogue/services/story-title.ts": {
+    "@wl/feature-files": {
+      "count": 1
+    }
+  },
+  "src/markdown/safe-markdown.tsx": {
+    "react-refresh/only-export-components": {
+      "count": 4
+    }
+  }
+}

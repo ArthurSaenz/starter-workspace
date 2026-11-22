@@ -1,0 +1,205 @@
+{
+  "src/__tests__/backgroundWrites.test.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/__tests__/customerChatsRunner.test.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/__tests__/customerSession.test.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/__tests__/deepseekReasoning.test.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/__tests__/geminiTranscription.test.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/__tests__/helpers/testDb.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/__tests__/historySummary.test.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/__tests__/inProcessAgent.interrupts.test.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/__tests__/inProcessAgent.test.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/__tests__/messageConversion.test.ts": {
+    "eslint-comments/require-description": {
+      "count": 1
+    },
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/__tests__/modelIdentity.test.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/__tests__/providerBilling.test.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/__tests__/serverToolTypes.test.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/__tests__/suggestHistory.test.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/__tests__/traceMasking.test.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/__tests__/traceRunId.test.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/__tests__/trustedHistory.test.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/copilotkit/__tests__/inProcessAgent.failures.test.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/copilotkit/__tests__/inProcessAgent.reconcile.test.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/copilotkit/__tests__/programSummaryMarker.contract.test.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/copilotkit/customerChatsRunner.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/copilotkit/historySummary.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/copilotkit/inProcessAgent.ts": {
+    "eslint-comments/require-description": {
+      "count": 1
+    },
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/copilotkit/messageConversion.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/copilotkit/programSummaryMarker.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/copilotkit/requestContext.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/copilotkit/traceRunId.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/copilotkit/trustedHistory.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/lambda/cors.ts": {
+    "eslint-comments/require-description": {
+      "count": 3
+    }
+  },
+  "src/lambda/customerSession.ts": {
+    "eslint-comments/require-description": {
+      "count": 2
+    },
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/lambda/suggestHistory.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/langgraph/deepseekReasoning.ts": {
+    "eslint-comments/require-description": {
+      "count": 1
+    },
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/langgraph/modelIdentity.ts": {
+    "eslint-comments/require-description": {
+      "count": 4
+    },
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/langgraph/providerBilling.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/langgraph/traceMasking.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/tools/backgroundWrites.ts": {
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  },
+  "src/transcription/geminiTranscription.ts": {
+    "eslint-comments/require-description": {
+      "count": 3
+    },
+    "unicorn/filename-case": {
+      "count": 1
+    }
+  }
+}

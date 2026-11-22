@@ -1,0 +1,3 @@
+/* Storybook-only entry: the client scans `packages/ai-chat-fe/src` from its own globals.css. */
+@import 'tailwindcss' source(none);
+@source '../src';

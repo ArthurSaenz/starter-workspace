@@ -1,0 +1,32 @@
+/* Structural chrome only — the chat has a height without Tailwind. Cosmetics stay in utilities. */
+[data-ai-chat] {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+/* A2UI's basic catalog styles itself inline; this variable is its one colour hook (primary Button). */
+[data-ai-chat] [data-copilotkit] {
+  --a2ui-primary-color: var(--primary);
+}
+
+/*
+ * streamdown 1.6 spreads the wrapper's props onto the <table>, so it carries
+ * `data-streamdown="table-wrapper"` and CopilotKit's `display: flex` for the wrapper: the head and
+ * body then lay out as two blocks and the header stops lining up with its columns.
+ */
+[data-copilotkit] table[data-streamdown] {
+  display: table;
+}
+
+/* The prose plugin zeroes the outer cells' inline padding for borderless tables; this one has a border. */
+[data-copilotkit] table[data-streamdown] :is(th, td) {
+  padding-inline: 0.75rem;
+}
+
+/* Descendant, not child: CopilotChat wraps its root in a `display: contents` div. */
+[data-ai-chat] [data-testid='copilot-chat'] {
+  flex: 1;
+  min-height: 0;
+}

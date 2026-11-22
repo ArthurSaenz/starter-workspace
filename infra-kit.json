@@ -24,6 +24,8 @@
       { "path": "vendor/packages/auth-be", "module": "auth" },
       { "path": "vendor/packages/auth-fe", "module": "auth" },
       { "path": "vendor/packages/auth-emails", "module": "auth" },
+      { "path": "vendor/packages/ai-chat-fe", "module": "ai-chat" },
+      { "path": "vendor/packages/ai-chat-be", "module": "ai-chat" },
       { "path": "vendor/packages/data-table", "module": "data-table" },
       { "path": "vendor/packages/site-index", "module": "site-index" },
       { "path": "vendor/packages/mobile-native-build", "module": "mobile-native-build" },

@@ -1,0 +1,80 @@
+{
+  "name": "@wl/ai-chat-fe",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./copilotkit": {
+      "types": "./dist/copilotkit/index.d.ts",
+      "import": "./dist/copilotkit/index.js"
+    },
+    "./markdown": {
+      "types": "./dist/markdown/index.d.ts",
+      "import": "./dist/markdown/index.js"
+    },
+    "./preset": {
+      "types": "./dist/preset/index.d.ts",
+      "import": "./dist/preset/index.js"
+    },
+    "./styles.css": "./dist/styles.css"
+  },
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm exec tsc -b tsconfig.build.json && cp src/styles.css dist/styles.css",
+    "catalogue": "pnpm run build && node scripts/render-catalogue.mjs",
+    "clean-cache": "rm -rf node_modules/.cache .eslintcache tsconfig.tsbuildinfo tsconfig.build.tsbuildinfo .turbo .swc",
+    "clean-artifacts": "rm -rf dist storybook-static tsconfig.tsbuildinfo tsconfig.build.tsbuildinfo",
+    "ts-check": "tsc --noEmit",
+    "prettier-check": "pnpm exec prettier --check * --no-error-on-unmatched-pattern --log-level silent --ignore-path ../../../.prettierignore",
+    "prettier-fix": "pnpm exec prettier --write * --no-error-on-unmatched-pattern --log-level silent --ignore-path ../../../.prettierignore",
+    "storybook": "storybook dev -p 3003",
+    "storybook-build": "storybook build",
+    "storybook-check": "pnpm run build && node scripts/check-storybook-index.mjs",
+    "eslint-check": "pnpm exec eslint --cache --quiet --report-unused-disable-directives ./src",
+    "eslint-fix": "pnpm exec eslint --cache --quiet --report-unused-disable-directives ./src --fix",
+    "test": "pnpm exec vitest run --reporter=minimal",
+    "test-watch": "pnpm exec vitest --watch --silent passed-only",
+    "test-ui": "pnpm exec vitest --ui --silent passed-only",
+    "test-report": "pnpm exec vitest run --coverage --silent passed-only",
+    "infra-kit-check": "infra-kit audit"
+  },
+  "dependencies": {
+    "@copilotkit/a2ui-renderer": "catalog:copilotkit",
+    "@copilotkit/react-core": "catalog:copilotkit",
+    "clsx": "catalog:",
+    "streamdown": "catalog:",
+    "tailwind-merge": "catalog:",
+    "zod": "catalog:agui",
+    "zod-v3": "npm:zod@3.25.76"
+  },
+  "peerDependencies": {
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "@vitest/browser": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "@wl/eslint-config": "workspace:*",
+    "@wl/storybook-config": "workspace:*",
+    "@wl/vitest-config": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "vitest-browser-react": "catalog:"
+  },
+  "engines": {
+    "node": ">=24.x"
+  }
+}

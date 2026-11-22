@@ -20,8 +20,24 @@ packageExtensions:
       '@storybook/react-vite': { optional: true }
       '@storybook/addon-docs': { optional: true }
       '@storybook/addon-links': { optional: true }
+  # langium (transitively from @wl/ai-chat-fe → streamdown → mermaid → @mermaid-js/parser) imports
+  # vscode-languageserver-protocol and vscode-languageserver-types directly but only declares the
+  # vscode-languageserver meta-package. Under enableGlobalVirtualStore those sub-packages sit in the CAS
+  # without node_modules adjacency to langium; optional peers make pnpm symlink them next to it.
+  langium:
+    peerDependencies:
+      vscode-jsonrpc: '*'
+      vscode-languageserver-protocol: '*'
+      vscode-languageserver-types: '*'
+    peerDependenciesMeta:
+      vscode-jsonrpc: { optional: true }
+      vscode-languageserver-protocol: { optional: true }
+      vscode-languageserver-types: { optional: true }
 
 catalog:
+  '@ag-ui/client': 1.0.5
+  '@langchain/core': ^1.5.0
+  '@langchain/langgraph': ^1.7.5
   '@playwright/test': ^1.59.1
   '@tailwindcss/vite': ^4.3.5
 
@@ -30,6 +46,7 @@ catalog:
   '@tanstack/router-plugin': ^1.167.12
   '@tanstack/router-vite-plugin': 1.166.27
   '@types/aws-lambda': ^8.10.162
+  '@types/jsonwebtoken': ^9.0.10
   '@types/node': ^26.6.6
   '@types/react': 19.3.0
   '@types/react-dom': 19.3.0
@@ -43,12 +60,15 @@ catalog:
   date-fns: ^4.1.0
 
   jotai: 3.0.2
+  jsonwebtoken: ^9.0.3
   lucide-react: ^1.75.0
   playwright: ^1.65.1
   react: 19.3.1
   react-dom: 19.3.1
   rollup-plugin-visualizer: ^7.0.0
+  rxjs: 7.8.1
   sass-embedded: ^1.99.0
+  streamdown: 1.6.11
   tailwind-merge: ^3.7.0
 
   tailwindcss: ^4.3.5
@@ -63,6 +83,43 @@ catalog:
   vitest-browser-react: ^2.3.0
   vite-tsconfig-paths: ^6.1.1
   zod: 3.25.76
+  zod-v4: npm:zod@4.5.4
+
+catalogs:
+  # @copilotkit/* must be exact AND identical on both sides of the wire (react-core in
+  # @wl/ai-chat-fe, runtime in @wl/ai-chat-be) — version skew drops AG-UI events silently.
+  copilotkit:
+    '@copilotkit/a2ui-renderer': 1.90.0
+    '@copilotkit/react-core': 1.90.0
+    '@copilotkit/runtime': 1.90.0
+  # The zod that @ag-ui/client and @ag-ui/core take as a peer, on both sides of the wire. @copilotkit/core
+  # and @copilotkit/runtime depend on zod 3 themselves; a package offering zod 4 got a second AG-UI
+  # instance, and two AbstractAgent classes do not type-check against each other (private `_threadId`).
+  agui:
+    zod: 3.25.76
+
+overrides:
+  # One AG-UI and one CopilotKit core: @copilotkit/runtime 1.90.0 still depends on @copilotkit/channels-*
+  # 0.12.0, which pin @ag-ui/client and @ag-ui/core at exactly 1.0.2 and resolve @copilotkit/core and
+  # shared to the older release. Drop these when a channels release matches the runtime.
+  '@ag-ui/client': 1.0.5
+  '@ag-ui/core': 1.0.5
+  '@copilotkit/core': 1.90.0
+  '@copilotkit/shared': 1.90.0
+  # One copy of the LangGraph family: @ag-ui/langgraph (via @copilotkit/runtime) asks for `langchain >=1.2.0`
+  # with no ceiling, and langchain 1.4.x resolves an older @langchain/langgraph than @wl/ai-chat-be's.
+  # Bump them with the family, to the newest 1.x whose ranges accept the pins.
+  langchain: 1.6.7
+  '@langchain/langgraph': 1.7.5
+  '@langchain/langgraph-checkpoint': 1.2.3
+  '@langchain/langgraph-sdk': 1.17.0
+  '@langchain/protocol': 0.0.21
+  # @langchain/core and langsmith peer on openai, so each openai copy is another core instance.
+  openai@>=7.0.0 <7.62.0: 7.62.0
+  # One copy each: @copilotkit/runtime accepts @langchain/openai >=0.4.2 and @cfworker/json-schema ^4.1.1
+  # but keeps its older resolutions beside the ones @langchain/core 1.5 pulls.
+  '@langchain/openai': 1.8.5
+  '@cfworker/json-schema@>=4.0.0 <4.1.6': 4.1.6
 
 supportedArchitectures:
   cpu:
@@ -91,6 +148,8 @@ publicHoistPattern:
 
 allowBuilds:
   '@parcel/watcher': true
+  # CopilotKit's install-time telemetry: listed so pnpm stops warning, never run.
+  '@scarf/scarf': false
   esbuild: true
   msw: true
 
