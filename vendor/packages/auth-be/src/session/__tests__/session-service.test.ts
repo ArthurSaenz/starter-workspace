@@ -156,6 +156,23 @@ describe('refreshSession', () => {
     expect(fakes.sessionStore.revokeAllForUser).toHaveBeenCalledWith('u1', undefined)
   })
 
+  it('a replayed token two rotations old still revokes every session', async () => {
+    const fakes = createFakes([invitedUser()])
+    const { auth, result } = await signIn(fakes)
+    const next = await auth.refreshSession({ refreshToken: result.refreshToken })
+
+    await auth.refreshSession({ refreshToken: next.refreshToken! })
+    fakes.sessions[0]!.revokedAt = new Date(Date.now() - 31_000)
+
+    await expectAuthError(auth.refreshSession({ refreshToken: result.refreshToken }), 'INVALID_REFRESH_TOKEN', 401)
+    expect(fakes.sessionStore.revokeAllForUser).toHaveBeenCalledWith('u1', undefined)
+    expect(
+      fakes.sessions.every((session) => {
+        return Boolean(session.revokedAt)
+      }),
+    ).toBe(true)
+  })
+
   it("a refresh racing a logout fails alone and leaves the user's other sessions alive", async () => {
     const fakes = createFakes([invitedUser()])
     const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }

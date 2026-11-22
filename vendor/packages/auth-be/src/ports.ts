@@ -90,7 +90,8 @@ export interface SessionStore<TCtx extends AuthContext = AuthContext> {
    */
   rotate: (oldId: string, next: NewSession, ctx?: TCtx) => Promise<StoredSession | null>
   /**
-   * The row `rotate(id, …)` inserted, whatever its state now; `null` if `id` was never rotated.
+   * The row `rotate(id, …)` inserted, whatever its state now, revoked or rotated in turn included;
+   * `null` only if `id` was never rotated.
    * Security-critical: reuse detection depends on it. An implementation that always returns `null`
    * turns every replayed token into a plain 401 and stops revoking the thief's session.
    */

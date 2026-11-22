@@ -247,6 +247,26 @@ export const sessionStoreContract: StoreContractCase<Sessions>[] = [
     },
   },
   {
+    name: 'findSuccessor returns a successor that has since been rotated, with revokedAt set',
+    securityCritical: true,
+    run: async (makeStore) => {
+      const store = await makeStore()
+      const data = newSession()
+      const firstId = await createSession(store, data)
+      const second = await store.rotate(firstId, newSession(data.userId))
+
+      check(second !== null, 'rotate resolves the successor')
+      check((await store.rotate(String(second!.id), newSession(data.userId))) !== null, 'the successor rotates')
+
+      const found = await store.findSuccessor(firstId)
+
+      check(
+        found !== null && String(found.id) === String(second!.id) && Boolean(found.revokedAt),
+        'findSuccessor returns a revoked successor with revokedAt',
+      )
+    },
+  },
+  {
     name: 'findSuccessor of a never-rotated id returns null',
     securityCritical: false,
     run: async (makeStore) => {

@@ -166,4 +166,39 @@ describe('broken stores', () => {
       }),
     ).rejects.toThrow('Store contract: findSuccessor returns the rotated-in row')
   })
+
+  it('catches a findSuccessor that hides revoked successors', async () => {
+    const { sessionStore } = createFakes()
+
+    const broken = {
+      ...sessionStore,
+      findSuccessor: async (id: string): Promise<StoredSession | null> => {
+        const row = await sessionStore.findSuccessor(id)
+
+        return row?.revokedAt ? null : row
+      },
+    }
+
+    const failed: string[] = []
+
+    for (const contractCase of sessionStoreContract) {
+      await contractCase
+        .run(() => {
+          return broken
+        })
+        .catch(() => {
+          failed.push(contractCase.name)
+        })
+    }
+
+    expect(failed).toEqual(['findSuccessor returns a successor that has since been rotated, with revokedAt set'])
+    await expect(
+      caseNamed(
+        sessionStoreContract,
+        'findSuccessor returns a successor that has since been rotated, with revokedAt set',
+      ).run(() => {
+        return broken
+      }),
+    ).rejects.toThrow('Store contract: findSuccessor returns a revoked successor with revokedAt')
+  })
 })

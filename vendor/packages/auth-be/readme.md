@@ -307,14 +307,15 @@ describe('session store', () => {
 The security-critical cases (`securityCritical: true`); a store that fails one lets a stolen or
 replayed token through:
 
-| Case                                                                               | What a failure means                                         |
-| ---------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `10 concurrent consumes return the token exactly once`                             | One link signs in more than once.                            |
-| `release after a newer token for the same email leaves the old one dead`           | A superseded link comes back to life after a failed sign-in. |
-| `10 concurrent rotates of one id: exactly one wins and one successor row exists`   | One refresh token forks into several live sessions.          |
-| `findByTokenHash returns a revoked row with revokedAt set`                         | A replayed token reads as unknown, and reuse goes unnoticed. |
-| `after rotate, the old row is returned with revokedAt set`                         | A rotated token still refreshes.                             |
-| `findSuccessor returns the successor while findByTokenHash(old) still returns old` | A replay is a plain 401 and the thief's session lives on.    |
+| Case                                                                                | What a failure means                                                                |
+| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `10 concurrent consumes return the token exactly once`                              | One link signs in more than once.                                                   |
+| `release after a newer token for the same email leaves the old one dead`            | A superseded link comes back to life after a failed sign-in.                        |
+| `10 concurrent rotates of one id: exactly one wins and one successor row exists`    | One refresh token forks into several live sessions.                                 |
+| `findByTokenHash returns a revoked row with revokedAt set`                          | A replayed token reads as unknown, and reuse goes unnoticed.                        |
+| `after rotate, the old row is returned with revokedAt set`                          | A rotated token still refreshes.                                                    |
+| `findSuccessor returns the successor while findByTokenHash(old) still returns old`  | A replay is a plain 401 and the thief's session lives on.                           |
+| `findSuccessor returns a successor that has since been rotated, with revokedAt set` | A replay two or more rotations old is a plain 401 and the thief's session lives on. |
 
 ## Known residual risks
 
