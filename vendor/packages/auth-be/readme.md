@@ -82,7 +82,9 @@ Every flow takes its input object first and the host context second: `requestMag
   successor, so a refresh racing a logout fails alone (401, warning
   `Refresh with a revoked, never-rotated token`) and the user's other sessions live on. Theft
   detection therefore rests on `findSuccessor`: a store whose `findSuccessor` always returns `null`
-  turns every replay into a plain 401 and never revokes the thief's session.
+  turns every replay into a plain 401 and never revokes the thief's session. A store that prunes
+  rotated rows' successors loses reuse detection for those tokens, so prune only rows past their
+  `expiresAt`.
 - The session row must belong to the refresh token's subject (`String(session.userId) === sub`),
   and so must a grace successor. A mismatch is a store bug: 401 `INVALID_REFRESH_TOKEN`, an error
   log (`Refresh token subject does not match its session row`), no rotation and no revoke-all.

@@ -174,6 +174,23 @@ describe('refreshSession', () => {
     expect(logger.warn).toHaveBeenCalledWith('Refresh with a revoked, never-rotated token', { data: { userId: 'u1' } })
   })
 
+  it('a replayed rotated token whose successor row was pruned fails alone', async () => {
+    const fakes = createFakes([invitedUser()])
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    const { auth, result } = await signIn(fakes)
+
+    await auth.refreshSession({ refreshToken: result.refreshToken })
+    fakes.sessions.splice(1, 1)
+
+    await expectAuthError(
+      auth.refreshSession({ refreshToken: result.refreshToken }, { logger }),
+      'INVALID_REFRESH_TOKEN',
+      401,
+    )
+    expect(fakes.sessionStore.revokeAllForUser).not.toHaveBeenCalled()
+    expect(logger.warn).toHaveBeenCalledWith('Refresh with a revoked, never-rotated token', { data: { userId: 'u1' } })
+  })
+
   it('refuses a session row whose userId differs from the token subject', async () => {
     const fakes = createFakes([invitedUser(), invitedUser({ id: 'u2', email: 'bob@example.com' })])
     const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
