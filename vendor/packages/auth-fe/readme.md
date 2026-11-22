@@ -47,8 +47,8 @@ Root barrel (`src/index.ts`, re-exporting `src/features/auth/index.ts`):
     so a double click mails one link.
   - `resetSentEmail()`.
   - `fetchMe()` — concurrent callers share one in-flight request; on a 401 it calls
-    `client.refresh()` once and retries `/me` once; ends `authenticated` + `user`, or `unauthenticated`
-    - `null`; `isSessionLoading` is true while it runs.
+    `client.refresh()` once and retries `/me` once; ends `authenticated` with the user, or `unauthenticated`
+    with `null`; `isSessionLoading` is true while it runs.
   - `verify(token)` — on success loads the user through `fetchMe` before resolving (a `/me` already
     in flight is awaited, then repeated with the new cookies; a `logout` meanwhile skips the load), so
     `authenticated` is never published without a user; returns the client's result. Concurrent calls

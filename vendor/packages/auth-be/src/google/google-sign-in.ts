@@ -157,7 +157,7 @@ export const createGoogleSignIn = <TUser extends AuthUser, TCtx extends AuthCont
     }
   }
 
-  // Step 1: the cookie binds this callback to the browser that started it (login CSRF).
+  // The cookie binds this callback to the browser that started it (login CSRF).
   const readState = (input: GoogleCallbackInput): Outcome<GoogleState> => {
     const raw = parseCookieHeader(readHeader(input.headers, 'cookie'))[STATE_COOKIE_NAME]
 
@@ -172,7 +172,7 @@ export const createGoogleSignIn = <TUser extends AuthUser, TCtx extends AuthCont
     return { ok: true, value: checked.state }
   }
 
-  // Step 4. Any failure, a timeout included, is one outcome: no ID token.
+  // Any failure, a timeout included, is one outcome: no ID token.
   const exchangeCode = async (code: string | undefined, verifier: string): Promise<string | null> => {
     if (!code) return null
 
@@ -202,7 +202,7 @@ export const createGoogleSignIn = <TUser extends AuthUser, TCtx extends AuthCont
     }
   }
 
-  // Steps 7–9. `hostedDomains` binds `resolveUser` too; `resolveUser`'s answer is final.
+  // `hostedDomains` binds `resolveUser` too; `resolveUser`'s answer is final.
   const resolveUser = async (googleIdentity: GoogleIdentity, ctx?: TCtx): Promise<Outcome<TUser>> => {
     if (!googleIdentity.emailVerified) return refuse('not_allowed', 'email')
 
@@ -224,7 +224,6 @@ export const createGoogleSignIn = <TUser extends AuthUser, TCtx extends AuthCont
     return { ok: true, value: user }
   }
 
-  // Steps 3–10.
   const signIn = async (
     input: GoogleCallbackInput,
     state: GoogleState,
