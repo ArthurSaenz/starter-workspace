@@ -189,6 +189,8 @@ export const architecture = (extraRestrictedSyntax: RestrictedSyntax[]): TypedFl
         '@wl/layer-imports',
         '@wl/feature-public-api',
         '@wl/no-feature-self-import',
+        '@wl/service-files',
+        '@wl/service-public-api',
       ],
       'eslint-comments/require-description': 'error',
     } as ConfigRules,
