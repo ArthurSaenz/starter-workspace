@@ -9,7 +9,7 @@ import { StartRun } from '../kit/start-run.js'
 const meta: Meta<typeof AIChatContainer> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Suggestions/Static pills',
+  title: 'features/ai-chat/Suggestions/Static pills',
   tags: ['autodocs', 'status:on'],
   // The client surface itself, not the preset through `AIChat`: this is what apps/client ships.
   ...defineFeatureMeta<AIChatContainerProps>(featureById('suggestions.static'), {

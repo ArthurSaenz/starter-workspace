@@ -12,7 +12,7 @@ notes: `apps/ai/ARCHITECTURE.md`.
 
 **Where the feature catalogue lives.** Every CopilotKit v2 capability the package exposes, wraps,
 blocks or leaves out is a row of `src/features/catalogue/services/registry.ts` — the single source
-of truth. It feeds three views: the Storybook sidebar (`ai-chat/Catalogue` page + one
+of truth. It feeds three views: the Storybook sidebar (`features/catalogue/Catalogue` page + one
 `ai-chat/<Area>/<Feature>` entry per row), the generated block under "Feature catalogue" below, and
 the per-file guards (`features.test.ts`, `storybook-check`). To browse it:
 `pnpm --filter @wl/ai-chat-fe storybook` → http://localhost:3003 → sidebar `ai-chat/<Area>/<Feature>`.
@@ -258,7 +258,7 @@ src/
     ├── services/                 # main.ts (CopilotKit-free barrel), registry.ts, areas.ts, story-title.ts,
     │                             # render-markdown.ts; feature-docs.ts (react-core) is barrel-only
     ├── components/               # feature-catalogue-component.tsx, feature-card-component.tsx
-    ├── __stories__/              # both titled `ai-chat/Catalogue` (same-title CSF files merge)
+    ├── __stories__/              # both titled `features/catalogue/Catalogue` (same-title CSF files merge)
     └── __tests__/                # features.test.ts, catalogue-readme.test.ts, component tests
 scripts/
 ├── render-catalogue.mjs          # `catalogue`: rewrites the README block from dist/…/services/main.js
@@ -267,7 +267,7 @@ scripts/
 ```
 
 - `chat-failure-component.stories.tsx` stays at the feature root although its title is
-  `ai-chat/Errors and observability/Traveller error line`: the `@wl/require-component-stories` lint
+  `features/ai-chat/Errors and observability/Traveller error line`: the `@wl/require-component-stories` lint
   wants exactly `__stories__/<component>.stories.tsx` per dumb component. (The plan had it moving
   under an area folder; the lint won.)
 - `components/default` and `components/ui` hold only a `.gitkeep` each; the first real shared component
@@ -310,7 +310,7 @@ catalogue card.
   `parameters.runtime` scenario decides what comes back. Area helpers sit next to it in `kit/`.
 - `pnpm --filter @wl/ai-chat-fe storybook` — dev server on port 3003 (3002 is the client, 3012 the
   backoffice). `storybook-build` writes `storybook-static/`.
-- **Hierarchy.** `ai-chat/Catalogue` (the registry table, `features/catalogue/__stories__`), then
+- **Hierarchy.** `features/catalogue/Catalogue` (the registry table, `features/catalogue/__stories__`), then
   `ai-chat/<Area>/<Feature>` — one file per registry row at
   `src/features/ai-chat/__stories__/<area>/<feature-id>.stories.tsx`, area folders in registry order
   (`.storybook/preview.tsx` `storySort` is a literal list, not `AREAS.map(…)`: Storybook evaluates
@@ -380,7 +380,7 @@ featureDocs(feature)`, `catalogue.featureId`. `title` and `tags` are literals in
 ## Feature catalogue
 
 Every CopilotKit v2 capability the package exposes, wraps, blocks or leaves out, as a typed registry
-(`src/features/catalogue/services/registry.ts`). Storybook renders it at `ai-chat/Catalogue`; each
+(`src/features/catalogue/services/registry.ts`). Storybook renders it at `features/catalogue/Catalogue`; each
 feature's own stories live at `ai-chat/<Area>/<Feature>`. `pnpm --filter @wl/ai-chat-fe catalogue`
 regenerates the block below from the registry and `catalogue-readme.test.ts` fails when they drift;
 `pnpm --filter @wl/ai-chat-fe storybook-check` diffs the built Storybook index against the registry.

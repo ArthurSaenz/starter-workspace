@@ -9,7 +9,7 @@ const feature = featureById('composer.submit')
 const meta: Meta<typeof AIChat> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Composer/Custom submit',
+  title: 'features/ai-chat/Composer/Custom submit',
   tags: ['autodocs', 'status:out-of-scope'],
   ...defineFeatureMeta(feature),
 }

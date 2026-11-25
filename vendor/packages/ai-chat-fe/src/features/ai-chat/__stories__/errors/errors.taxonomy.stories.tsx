@@ -19,7 +19,7 @@ const feature = featureById('errors.taxonomy')
 const meta: Meta<typeof AIChat> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Errors and observability/Failure taxonomy',
+  title: 'features/ai-chat/Errors and observability/Failure taxonomy',
   tags: ['autodocs', 'status:on'],
   ...defineFeatureMeta(feature, { parameters: { layout: 'padded' } }),
 }

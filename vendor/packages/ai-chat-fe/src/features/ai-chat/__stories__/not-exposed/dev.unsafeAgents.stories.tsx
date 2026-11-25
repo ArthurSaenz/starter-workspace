@@ -9,7 +9,7 @@ const feature = featureById('dev.unsafeAgents')
 const meta: Meta<typeof AIChat> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Not exposed/In-browser agents',
+  title: 'features/ai-chat/Not exposed/In-browser agents',
   tags: ['autodocs', 'status:out-of-scope'],
   ...defineFeatureMeta(feature),
 }

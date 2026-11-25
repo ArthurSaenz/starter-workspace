@@ -9,7 +9,7 @@ const feature = featureById('genui.hashbrown')
 const meta: Meta<typeof AIChat> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Tools and generative UI/Hashbrown',
+  title: 'features/ai-chat/Tools and generative UI/Hashbrown',
   tags: ['autodocs', 'status:out-of-scope'],
   ...defineFeatureMeta(feature),
 }

@@ -9,7 +9,7 @@ import { runtimeOf } from '../kit/story-kit.js'
 const meta: Meta<typeof AIChat> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Runtime and auth/Runtime handshake',
+  title: 'features/ai-chat/Runtime and auth/Runtime handshake',
   tags: ['autodocs', 'status:on'],
   ...defineFeatureMeta(featureById('runtime.info'), {
     render: (args, { loaded }) => {

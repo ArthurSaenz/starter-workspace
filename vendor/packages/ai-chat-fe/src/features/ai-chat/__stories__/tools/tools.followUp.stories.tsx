@@ -10,7 +10,7 @@ import { showHotelCardTool } from '../kit/tools.js'
 const meta: Meta<typeof AIChat> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Tools and generative UI/Follow-up run',
+  title: 'features/ai-chat/Tools and generative UI/Follow-up run',
   tags: ['autodocs', 'status:on'],
   ...defineFeatureMeta(featureById('tools.followUp')),
 }

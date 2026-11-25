@@ -9,7 +9,7 @@ import { defineFeatureMeta, featureById } from '../kit/define-feature-meta.js'
 const meta: Meta<typeof AIChat> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Threads/Auto thread id',
+  title: 'features/ai-chat/Threads/Auto thread id',
   tags: ['autodocs', 'status:on'],
   ...defineFeatureMeta(featureById('threads.mint')),
 }

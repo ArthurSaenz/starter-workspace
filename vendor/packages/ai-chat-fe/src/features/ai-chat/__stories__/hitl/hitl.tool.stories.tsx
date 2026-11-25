@@ -10,7 +10,7 @@ import { StartRun } from '../kit/start-run.js'
 const meta: Meta<typeof AIChat> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Human in the loop/Approval tool',
+  title: 'features/ai-chat/Human in the loop/Approval tool',
   tags: ['autodocs', 'status:on-with-caveat'],
   ...defineFeatureMeta(featureById('hitl.tool')),
 }

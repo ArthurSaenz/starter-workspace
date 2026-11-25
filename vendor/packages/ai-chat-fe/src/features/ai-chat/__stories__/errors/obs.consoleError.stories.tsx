@@ -9,7 +9,7 @@ import { StartRun } from '../kit/start-run.js'
 const meta: Meta<typeof AIChat> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Errors and observability/Console re-emit',
+  title: 'features/ai-chat/Errors and observability/Console re-emit',
   tags: ['autodocs', 'status:on'],
   ...defineFeatureMeta(featureById('obs.consoleError'), {
     render: (args) => {

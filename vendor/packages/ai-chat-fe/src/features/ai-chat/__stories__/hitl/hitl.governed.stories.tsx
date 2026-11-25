@@ -9,7 +9,7 @@ const feature = featureById('hitl.governed')
 const meta: Meta<typeof AIChat> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Human in the loop/Governed action approval',
+  title: 'features/ai-chat/Human in the loop/Governed action approval',
   tags: ['autodocs', 'status:out-of-scope'],
   ...defineFeatureMeta(feature),
 }

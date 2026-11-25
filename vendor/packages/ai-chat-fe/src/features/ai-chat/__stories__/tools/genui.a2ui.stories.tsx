@@ -10,7 +10,7 @@ import { runtimeOf } from '../kit/story-kit.js'
 const meta: Meta<typeof AIChat> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Tools and generative UI/A2UI',
+  title: 'features/ai-chat/Tools and generative UI/A2UI',
   tags: ['autodocs', 'status:on-with-caveat'],
   ...defineFeatureMeta(featureById('genui.a2ui')),
 }

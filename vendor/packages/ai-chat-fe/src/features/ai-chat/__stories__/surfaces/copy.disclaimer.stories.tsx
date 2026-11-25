@@ -9,7 +9,7 @@ import { defineFeatureMeta, featureById } from '../kit/define-feature-meta.js'
 const meta: Meta<typeof AIChatContainer> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Surfaces and copy/Disclaimer',
+  title: 'features/ai-chat/Surfaces and copy/Disclaimer',
   tags: ['autodocs', 'status:on'],
   // The client surface itself, not the preset through `AIChat`: what apps/client ships.
   ...defineFeatureMeta<AIChatContainerProps>(featureById('copy.disclaimer'), {

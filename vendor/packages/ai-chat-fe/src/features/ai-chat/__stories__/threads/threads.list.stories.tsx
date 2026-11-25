@@ -10,7 +10,7 @@ import { LONG_EXCHANGE, SHORT_EXCHANGE } from '../kit/transcripts.js'
 const meta: Meta<typeof AIChat> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Threads/Thread list',
+  title: 'features/ai-chat/Threads/Thread list',
   tags: ['autodocs', 'status:on-with-caveat'],
   ...defineFeatureMeta(featureById('threads.list')),
 }

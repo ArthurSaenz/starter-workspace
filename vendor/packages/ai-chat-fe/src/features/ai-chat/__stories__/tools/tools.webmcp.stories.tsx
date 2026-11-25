@@ -9,7 +9,7 @@ const feature = featureById('tools.webmcp')
 const meta: Meta<typeof AIChat> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Tools and generative UI/WebMCP exposure',
+  title: 'features/ai-chat/Tools and generative UI/WebMCP exposure',
   tags: ['autodocs', 'status:off-by-default'],
   ...defineFeatureMeta(feature),
 }

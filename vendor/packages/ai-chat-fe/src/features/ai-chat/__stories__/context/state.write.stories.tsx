@@ -12,7 +12,7 @@ import { TripPlanPanel } from '../kit/trip-plan.js'
 const meta: Meta<typeof AIChat> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Context and state/Shared state write',
+  title: 'features/ai-chat/Context and state/Shared state write',
   tags: ['autodocs', 'status:on'],
   ...defineFeatureMeta(featureById('state.write')),
 }

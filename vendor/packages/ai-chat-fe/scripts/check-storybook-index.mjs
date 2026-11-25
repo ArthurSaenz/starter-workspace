@@ -1,5 +1,5 @@
 // Compares the built Storybook index (`storybook-static/index.json`) with the titles the registry
-// expects: `ai-chat/Catalogue`, one `ai-chat/<Area>/<Feature>` per feature that has a stories file,
+// expects: `features/catalogue/Catalogue`, one `features/ai-chat/<Area>/<Feature>` per feature that has a stories file,
 // and the legacy titles until Phase 3 folds them. Exits 1 on any difference — until Phase 4.12 lands
 // the last per-feature file this is the completeness reporter, and the diff is expected.
 import { existsSync, readFileSync } from 'node:fs'

@@ -18,7 +18,7 @@ const featureById = (id: string) => {
 const meta: Meta<typeof FeatureCardComponent> = {
   // A literal, not `CATALOGUE_STORY_TITLE`: the CSF indexer reads titles statically and crashes on an
   // imported constant ("Cannot read properties of null (reading 'loc')"); features.test.ts pins the two.
-  title: 'ai-chat/Catalogue',
+  title: 'features/catalogue/Catalogue',
   component: FeatureCardComponent,
   parameters: { layout: 'padded' },
 }

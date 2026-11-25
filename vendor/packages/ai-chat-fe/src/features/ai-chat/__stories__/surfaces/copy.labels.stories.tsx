@@ -8,7 +8,7 @@ import { defineFeatureMeta, featureById } from '../kit/define-feature-meta.js'
 const meta: Meta<typeof AIChatContainer> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Surfaces and copy/Labels',
+  title: 'features/ai-chat/Surfaces and copy/Labels',
   tags: ['autodocs', 'status:on'],
   // The container, not the preset through `AIChat`: `chat.labels` is deep-merged over the preset's
   // resolved `chat` here.

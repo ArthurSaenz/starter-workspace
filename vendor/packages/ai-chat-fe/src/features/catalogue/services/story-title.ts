@@ -1,7 +1,7 @@
 import type { Feature } from '../types.js'
 import { areaById } from './areas.js'
 
-export const CATALOGUE_STORY_TITLE = 'ai-chat/Catalogue'
+export const CATALOGUE_STORY_TITLE = 'features/catalogue/Catalogue'
 
 // Empty since the pre-catalogue `ai-chat/AIChatContainer` and `ai-chat/ChatFailureComponent` files
 // were folded into the per-feature files; kept so a future one-off title has a declared home.
@@ -17,7 +17,7 @@ export const hasStoriesFile = (feature: Feature): boolean => {
 }
 
 export const storyTitle = (feature: Feature): string => {
-  return `ai-chat/${areaById(feature.area).title}/${feature.title}`
+  return `features/ai-chat/${areaById(feature.area).title}/${feature.title}`
 }
 
 export const expectedStoryTitles = (features: readonly Feature[]): ReadonlySet<string> => {

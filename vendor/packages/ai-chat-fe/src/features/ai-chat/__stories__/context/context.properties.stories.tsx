@@ -7,7 +7,7 @@ import { StartRun } from '../kit/start-run.js'
 const meta: Meta<typeof AIChat> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Context and state/Forwarded properties',
+  title: 'features/ai-chat/Context and state/Forwarded properties',
   tags: ['autodocs', 'status:off-by-default'],
   ...defineFeatureMeta(featureById('context.properties')),
 }

@@ -8,7 +8,7 @@ import { StartRun } from '../kit/start-run.js'
 const meta: Meta<typeof AIChat> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Suggestions/Availability',
+  title: 'features/ai-chat/Suggestions/Availability',
   tags: ['autodocs', 'status:on'],
   // Every state here is "after the first reply" — the moment the three settings differ.
   ...defineFeatureMeta(featureById('suggestions.availability'), {

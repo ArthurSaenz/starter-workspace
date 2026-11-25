@@ -12,7 +12,7 @@ const TRACE_HEADER = 'x-story-trace'
 const meta: Meta<typeof AIChat> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Runtime and auth/Headers',
+  title: 'features/ai-chat/Runtime and auth/Headers',
   tags: ['autodocs', 'status:off-by-default'],
   ...defineFeatureMeta(featureById('runtime.headers'), {
     render: (args, { loaded }) => {

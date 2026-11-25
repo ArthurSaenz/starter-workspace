@@ -14,7 +14,7 @@ import { SESSION_EXPIRED_TEXT, UNAVAILABLE_TEXT } from './kit/story-kit.js'
 const meta: Meta<typeof AIChat> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Errors and observability/Traveller error line',
+  title: 'features/ai-chat/Errors and observability/Traveller error line',
   tags: ['autodocs', 'status:on'],
   ...defineFeatureMeta(featureById('errors.line')),
 }

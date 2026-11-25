@@ -9,7 +9,7 @@ const feature = featureById('errors.chatOnError')
 const meta: Meta<typeof AIChat> = {
   // Literals, not `storyTitle(feature)` / `status:${feature.status}`: the CSF indexer reads title and
   // tags statically; features.test.ts pins both to the registry.
-  title: 'ai-chat/Errors and observability/Chat-scoped onError',
+  title: 'features/ai-chat/Errors and observability/Chat-scoped onError',
   tags: ['autodocs', 'status:out-of-scope'],
   ...defineFeatureMeta(feature),
 }
