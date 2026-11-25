@@ -121,7 +121,7 @@ describe('copilotkit identity headers', () => {
   beforeEach(() => {
     vi.stubEnv('CUSTOMER_JWT_ACCESS_SECRET', TEST_JWT_SECRET)
     vi.stubEnv('DEEPSEEK_API_KEY', TEST_API_KEY)
-    vi.stubEnv('LLM_PROVIDER', undefined)
+    vi.stubEnv('LLM_PROVIDER', 'anthropic')
     vi.stubEnv('LANGGRAPH_MODEL_ID', undefined)
     respond = () => {
       return streamingResponse()
@@ -242,6 +242,15 @@ describe('copilotkit identity headers', () => {
 
     expect(result.statusCode).toBe(404)
     expect(identityOf(result).model).toBe('openai/unknown')
+  })
+
+  it('keeps a 404 a 404 with no provider set', async () => {
+    vi.stubEnv('LLM_PROVIDER', undefined)
+
+    const result = await handler(forbiddenEvent, CONTEXT)
+
+    expect(result.statusCode).toBe(404)
+    expect(identityOf(result).model).toBe('unset/unknown')
   })
 
   it('names the bundled research-corpus snapshot on a success and on a rejection', async () => {

@@ -15,13 +15,28 @@ describe('modelIdentity', () => {
     vi.unstubAllEnvs()
   })
 
-  it('defaults to Anthropic on claude-opus-5-5', () => {
-    vi.stubEnv('LLM_PROVIDER', undefined)
+  it('resolves Anthropic to claude-opus-5-5', () => {
+    vi.stubEnv('LLM_PROVIDER', 'anthropic')
     vi.stubEnv('LANGGRAPH_MODEL_ID', undefined)
 
     expect(readLlmProvider()).toBe('anthropic')
     expect(readModelId(readLlmProvider())).toBe('claude-opus-5-5')
     expect(modelIdentityLabel()).toBe('anthropic/claude-opus-5-5')
+  })
+
+  it.each([undefined, ''])('fails fast on LLM_PROVIDER=%j instead of picking a provider', (value) => {
+    vi.stubEnv('LLM_PROVIDER', value)
+
+    expect(() => {
+      return readLlmProvider()
+    }).toThrow('LLM_PROVIDER is not set; expected one of deepseek, gemini, anthropic')
+  })
+
+  it.each([undefined, ''])('labels LLM_PROVIDER=%j as unset instead of throwing', (value) => {
+    vi.stubEnv('LLM_PROVIDER', value)
+    vi.stubEnv('LANGGRAPH_MODEL_ID', undefined)
+
+    expect(modelIdentityLabel()).toBe('unset/unknown')
   })
 
   it('follows LLM_PROVIDER to the other provider default', () => {

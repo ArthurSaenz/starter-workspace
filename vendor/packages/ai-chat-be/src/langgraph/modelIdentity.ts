@@ -26,13 +26,21 @@ const isLlmProvider = (value: string): value is LlmProvider => {
   return value in LLM_PROVIDERS
 }
 
+// Reported in place of a provider in the response label when LLM_PROVIDER is unset or empty.
+const UNSET_PROVIDER = 'unset'
+
 const readConfiguredProvider = (): string => {
   // eslint-disable-next-line dot-notation
-  return process.env['LLM_PROVIDER'] || LLM_PROVIDERS.anthropic
+  return process.env['LLM_PROVIDER'] ?? ''
 }
 
+// No default provider: a missing LLM_PROVIDER once sent every request to Anthropic silently.
 export const readLlmProvider = (): LlmProvider => {
   const configured = readConfiguredProvider()
+
+  if (configured === '') {
+    throw new Error(`LLM_PROVIDER is not set; expected one of ${Object.keys(LLM_PROVIDERS).join(', ')}`)
+  }
 
   if (!isLlmProvider(configured)) {
     throw new Error(`Unknown LLM_PROVIDER "${configured}"; expected one of ${Object.keys(LLM_PROVIDERS).join(', ')}`)
@@ -46,15 +54,16 @@ export const readModelId = (provider: LlmProvider): string => {
   return process.env['LANGGRAPH_MODEL_ID'] || DEFAULT_MODEL_IDS[provider]
 }
 
-// `<provider>/<modelId>`, e.g. `anthropic/claude-opus-5-5`. Never throws: an unrecognised
-// LLM_PROVIDER already fails the graph's own module load, and labelling a response must not
-// turn a route rejection into a 500 — the raw configured value is reported instead. Read per
-// call rather than at module load so the label follows a redeployed environment.
+// `<provider>/<modelId>`, e.g. `anthropic/claude-opus-5-5`. Never throws: an unset or
+// unrecognised LLM_PROVIDER already fails `readLlmProvider` where the graph resolves its model,
+// and labelling a response must not turn a route rejection into a 500 — the raw configured value
+// (or `unset`) is reported instead. Read per call rather than at module load so the label
+// follows a redeployed environment.
 export const modelIdentityLabel = (): string => {
   const configured = readConfiguredProvider()
   const fallback = isLlmProvider(configured) ? DEFAULT_MODEL_IDS[configured] : UNKNOWN_MODEL_ID
   // eslint-disable-next-line dot-notation
   const modelId = process.env['LANGGRAPH_MODEL_ID'] || fallback
 
-  return `${configured}/${modelId}`
+  return `${configured || UNSET_PROVIDER}/${modelId}`
 }
