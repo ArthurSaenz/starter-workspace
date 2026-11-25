@@ -129,6 +129,7 @@ describe('generative UI', () => {
       await expect.element(screen.getByText('Bangkok: Park Hyatt vs JW Marriott')).toBeVisible()
       await expect.element(screen.getByText('Park Hyatt Bangkok', { exact: true })).toBeVisible()
       await expect.element(screen.getByText('JW Marriott Hotel Bangkok', { exact: true })).toBeVisible()
+      await expect.element(screen.getByRole('button', { name: ADD_BUTTON }).nth(1)).toBeVisible()
       expect(screen.getByRole('button', { name: ADD_BUTTON }).elements()).toHaveLength(2)
       // The call itself renders nothing: react-core's no-op `render_a2ui` renderer claims it.
       expect(document.body.textContent).not.toContain('render_a2ui')

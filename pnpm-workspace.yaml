@@ -89,9 +89,9 @@ catalogs:
   # @copilotkit/* must be exact AND identical on both sides of the wire (react-core in
   # @wl/ai-chat-fe, runtime in @wl/ai-chat-be) — version skew drops AG-UI events silently.
   copilotkit:
-    '@copilotkit/a2ui-renderer': 1.90.0
-    '@copilotkit/react-core': 1.90.0
-    '@copilotkit/runtime': 1.90.0
+    '@copilotkit/a2ui-renderer': 1.90.2
+    '@copilotkit/react-core': 1.90.2
+    '@copilotkit/runtime': 1.90.2
   # The zod that @ag-ui/client and @ag-ui/core take as a peer, on both sides of the wire. @copilotkit/core
   # and @copilotkit/runtime depend on zod 3 themselves; a package offering zod 4 got a second AG-UI
   # instance, and two AbstractAgent classes do not type-check against each other (private `_threadId`).
@@ -99,13 +99,11 @@ catalogs:
     zod: 3.25.76
 
 overrides:
-  # One AG-UI and one CopilotKit core: @copilotkit/runtime 1.90.0 still depends on @copilotkit/channels-*
-  # 0.12.0, which pin @ag-ui/client and @ag-ui/core at exactly 1.0.2 and resolve @copilotkit/core and
-  # shared to the older release. Drop these when a channels release matches the runtime.
-  '@ag-ui/client': 1.0.5
-  '@ag-ui/core': 1.0.5
-  '@copilotkit/core': 1.90.0
-  '@copilotkit/shared': 1.90.0
+  # One CopilotKit core: @copilotkit/runtime depends on @copilotkit/channels-* 0.13.0, which take
+  # @copilotkit/core and shared as `^1.90.1`, so the next CopilotKit release would land beside the catalog
+  # pin. Move these with the catalog.
+  '@copilotkit/core': 1.90.2
+  '@copilotkit/shared': 1.90.2
   # One copy of the LangGraph family: @ag-ui/langgraph (via @copilotkit/runtime) asks for `langchain >=1.2.0`
   # with no ceiling, and langchain 1.4.x resolves an older @langchain/langgraph than @wl/ai-chat-be's.
   # Bump them with the family, to the newest 1.x whose ranges accept the pins.
