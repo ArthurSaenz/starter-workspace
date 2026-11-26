@@ -47,8 +47,8 @@ catalog:
   '@tanstack/router-vite-plugin': 1.166.27
   '@types/aws-lambda': ^8.10.162
   '@types/jsonwebtoken': ^9.0.10
-  '@types/node': ^26.6.6
-  '@types/react': 19.3.0
+  '@types/node': ^26.6.10
+  '@types/react': 19.3.1
   '@types/react-dom': 19.3.0
   '@vitejs/plugin-react': 6.3.0
   '@vitest/browser': ^5.1.1
@@ -75,7 +75,7 @@ catalog:
   tw-animate-css: ^1.4.0
 
   typescript: ^6.0.3
-  typescript-plugin-css-modules: ^5.3.0
+  typescript-plugin-css-modules: ^5.3.1
 
   vite: 8.3.8
   vite-plugin-dts: ^5.1.2
