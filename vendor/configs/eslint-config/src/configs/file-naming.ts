@@ -7,12 +7,14 @@ import type { ConfigRules } from '../types.js'
 
 const KEBAB_PART = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const LOCALE_FOLDER = /^[a-z]{2}[-_][A-Z]{2}$/
+// The backend handler layer: the name is fixed by `serverless.yml` handler paths and the be-architect tree.
+const FIXED_FOLDERS = new Set(['lambda_controllers'])
 
 /**
  * Whether a folder name is kebab-case, or a name a tool or framework fixes: dotfolders, `__tests__`-style
  * tooling folders, `$param` / `@param` route segments and scoped-package mocks (`__mocks__/@aws-sdk`).
  * Route syntax around a name is stripped before the check: `_pathless`, `-ignored`, `(group)`, `[id]`,
- * `{-$optional}`, `posts_`, and the `[_]` escape. Dot-separated parts (`popup.legacy`) are checked one by
+ * `{-$optional}`, `posts_`, and the `[_]` escape. `lambda_controllers` is exempt by name. Dot-separated parts (`popup.legacy`) are checked one by
  * one, except `$param` parts (`posts.$postId`). Locale folders (`pt-BR`, `en_US`) are exempt.
  *
  * @example
@@ -20,7 +22,9 @@ const LOCALE_FOLDER = /^[a-z]{2}[-_][A-Z]{2}$/
  * isKebabFolder('dataSource') // false
  */
 export const isKebabFolder = (name: string): boolean => {
-  if (/^[.$@]/.test(name) || /^__[\w-]+__$/.test(name) || LOCALE_FOLDER.test(name)) return true
+  if (/^[.$@]/.test(name) || /^__[\w-]+__$/.test(name) || LOCALE_FOLDER.test(name) || FIXED_FOLDERS.has(name)) {
+    return true
+  }
 
   const bare = name
     .replaceAll(/[[\](){}]/g, '')

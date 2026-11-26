@@ -29,7 +29,15 @@ describe('file naming: kebab-case is required', () => {
   })
 
   it('flags a snake_case folder', async () => {
-    expectFlagged(await naming('src/lambda_controllers/get.ts'), 'wl-config/folder-case', '`lambda_controllers`')
+    expectFlagged(await naming('src/fastify_controllers/get.ts'), 'wl-config/folder-case', '`fastify_controllers`')
+  })
+
+  it('accepts the backend handler layer by name', async () => {
+    const ruleIds = (await naming('src/lambda_controllers/get.ts')).map((message) => {
+      return message.ruleId
+    })
+
+    expect(ruleIds).not.toContain('wl-config/folder-case')
   })
 
   // The folder rule exists because unicorn's own folder check stops at the first ignored segment.
@@ -86,6 +94,8 @@ describe('file naming: folder classification', () => {
     ['pt-BR', true],
     ['en_US', true],
     ['pt-br-BR', false],
+    ['lambda_controllers', true],
+    ['fastify_controllers', false],
   ])('%s -> %s', (name, expected) => {
     expect(isKebabFolder(name)).toBe(expected)
   })
